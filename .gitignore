@@ -1,2 +1,16 @@
+# Ignore everything by default
 *
+
+# Whitelist git tracking
 !.gitignore
+!README.md
+!Cargo.toml
+!Cargo.lock
+
+# Rust source code
+!crates/
+!crates/**/
+!crates/**/*.rs
+!crates/**/Cargo.toml
+!crates/**/Cargo.lock
+!crates/**/*.md
