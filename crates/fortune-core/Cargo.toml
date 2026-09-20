@@ -1,7 +1,10 @@
 [package]
 name = "fortune-core"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+
+[lib]
+crate-type = ["lib", "cdylib"]
 
 [dependencies]
 vedaksha = "9.4.1"
@@ -9,6 +12,7 @@ thiserror = "2.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+uniffi = { version = "0.32.1", default-features = false }
 
 [dev-dependencies]
 approx = "0.5"
