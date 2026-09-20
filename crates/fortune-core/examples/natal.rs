@@ -270,7 +270,7 @@ fn main() {
     for (i, cusp) in output.western.house_cusps.iter().enumerate() {
         println!("    House {:02} : {}", i + 1, format_deg(*cusp));
     }
-    println!("  Planetary Placements:");
+    println!("  Classical Planets (7):");
     for planet in &output.western.planets {
         let retro = if planet.is_retrograde { " [R]" } else { "" };
         println!(
@@ -281,7 +281,18 @@ fn main() {
             retro
         );
     }
-    println!("  Major Aspects:");
+    println!("  Lunar Nodes (Dragon's Head & Tail):");
+    for node in &output.western.nodes {
+        let retro = if node.is_retrograde { " [R]" } else { "" };
+        println!(
+            "    {:<10} : {} (House {:02}){}",
+            node.name,
+            format_deg(node.longitude),
+            node.house_number,
+            retro
+        );
+    }
+    println!("  Major Aspects (Classical Planets):");
     if output.western.aspects.is_empty() {
         println!("    None detected within standard orbs.");
     } else {

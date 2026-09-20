@@ -7,7 +7,6 @@
 
 use serde::{Deserialize, Serialize};
 use vedaksha::astro::houses::{compute_houses, HouseSystem};
-use vedaksha::math::angle::normalize_degrees;
 
 use crate::ephemeris::EphemerisSnapshot;
 
@@ -35,10 +34,21 @@ impl WesternHouseSystem {
     }
 }
 
-/// Planet placement in the Western tropical chart.
+/// Planet placement in the Western tropical chart (strictly 7 classical planets).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WesternPlanet {
     pub name: String,
+    pub longitude: f64,       // 0.0 .. 360.0
+    pub sign_index: u8,       // 0 = Aries .. 11 = Pisces
+    pub sign_degree: f64,     // 0.0 .. 30.0
+    pub house_number: u8,     // 1 .. 12
+    pub is_retrograde: bool,
+}
+
+/// Lunar node placement in the Western tropical chart (Dragon's Head and Tail).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WesternNode {
+    pub name: String,         // "North Node", "South Node"
     pub longitude: f64,       // 0.0 .. 360.0
     pub sign_index: u8,       // 0 = Aries .. 11 = Pisces
     pub sign_degree: f64,     // 0.0 .. 30.0
@@ -65,12 +75,12 @@ pub struct WesternChart {
     pub house_cusps: [f64; 12],
     pub house_system: WesternHouseSystem,
     pub planets: Vec<WesternPlanet>,
+    pub nodes: Vec<WesternNode>,
     pub aspects: Vec<WesternAspect>,
 }
 
 /// Determine which house a given longitude falls into based on 12 cusp degrees.
-fn determine_house(longitude: f64, cusps: &[f64; 12]) -> u8 {
-    let lon = normalize_degrees(longitude);
+fn determine_house(lon: f64, cusps: &[f64; 12]) -> u8 {
     for h in 0..12 {
         let cusp_curr = cusps[h];
         let cusp_next = cusps[(h + 1) % 12];
@@ -105,25 +115,51 @@ pub fn calculate_western(
     let ascendant = house_result.asc;
     let midheaven = house_result.mc;
 
-    // 1. Calculate planets and their house locations
-    let mut planets = Vec::with_capacity(ephem.bodies.len());
+    // 1. Separate 7 classical planets and 2 lunar nodes (Dragon's Head & Tail)
+    let mut planets = Vec::with_capacity(7);
+    let mut nodes = Vec::with_capacity(2);
+
     for b in &ephem.bodies {
         let lon = b.tropical_longitude;
         let sign_index = (lon / 30.0).floor() as u8;
         let sign_degree = lon - (sign_index as f64 * 30.0);
         let house_number = determine_house(lon, &cusps);
 
-        planets.push(WesternPlanet {
-            name: b.name.clone(),
-            longitude: lon,
-            sign_index,
-            sign_degree,
-            house_number,
-            is_retrograde: b.is_retrograde,
-        });
+        match b.name.as_str() {
+            "Rahu" => {
+                nodes.push(WesternNode {
+                    name: "North Node".to_string(),
+                    longitude: lon,
+                    sign_index,
+                    sign_degree,
+                    house_number,
+                    is_retrograde: b.is_retrograde,
+                });
+            }
+            "Ketu" => {
+                nodes.push(WesternNode {
+                    name: "South Node".to_string(),
+                    longitude: lon,
+                    sign_index,
+                    sign_degree,
+                    house_number,
+                    is_retrograde: b.is_retrograde,
+                });
+            }
+            _ => {
+                planets.push(WesternPlanet {
+                    name: b.name.clone(),
+                    longitude: lon,
+                    sign_index,
+                    sign_degree,
+                    house_number,
+                    is_retrograde: b.is_retrograde,
+                });
+            }
+        }
     }
 
-    // 2. Compute major aspects among classical 7 planets
+    // 2. Compute major aspects exclusively among the 7 classical planets
     let mut aspects = Vec::new();
     let aspect_defs = [
         ("Conjunction", 0.0, 8.0),
@@ -133,9 +169,8 @@ pub fn calculate_western(
         ("Opposition", 180.0, 8.0),
     ];
 
-    let classical_count = ephem.bodies.len().min(7);
-    for i in 0..classical_count {
-        for j in (i + 1)..classical_count {
+    for i in 0..planets.len() {
+        for j in (i + 1)..planets.len() {
             let p1 = &planets[i];
             let p2 = &planets[j];
 
@@ -164,6 +199,7 @@ pub fn calculate_western(
         house_cusps: cusps,
         house_system: system,
         planets,
+        nodes,
         aspects,
     }
 }
@@ -181,7 +217,13 @@ mod tests {
         let chart = calculate_western(&ephem, 51.5074, WesternHouseSystem::Placidus);
 
         assert_eq!(chart.house_cusps.len(), 12);
-        assert_eq!(chart.planets.len(), 9);
+        assert_eq!(chart.planets.len(), 7, "Strictly 7 classical planets in western chart");
+        assert_eq!(chart.nodes.len(), 2, "Strictly 2 lunar nodes (North Node & South Node)");
+
+        assert_eq!(chart.nodes[0].name, "North Node");
+        assert_eq!(chart.nodes[1].name, "South Node");
+        let node_diff = ((chart.nodes[0].longitude - chart.nodes[1].longitude).abs() - 180.0).abs();
+        assert!(node_diff < 0.01, "Nodes must be in 180-degree opposition");
 
         // House 1 cusp must match Ascendant
         let asc_diff = (chart.house_cusps[0] - chart.ascendant).abs();
@@ -192,7 +234,7 @@ mod tests {
             assert!((0.0..360.0).contains(cusp));
         }
 
-        // Verify all planets have valid house placements
+        // Verify all 7 planets have valid house placements
         for planet in &chart.planets {
             assert!((1..=12).contains(&planet.house_number));
             assert!((0.0..360.0).contains(&planet.longitude));
@@ -218,7 +260,8 @@ mod tests {
 
         let chart = calculate_western(&ephem, 70.0, WesternHouseSystem::Placidus);
         assert_eq!(chart.house_cusps.len(), 12);
-        assert_eq!(chart.planets.len(), 9);
+        assert_eq!(chart.planets.len(), 7);
+        assert_eq!(chart.nodes.len(), 2);
     }
 }
 

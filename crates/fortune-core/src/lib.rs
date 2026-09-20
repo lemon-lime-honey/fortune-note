@@ -21,7 +21,7 @@ pub use ephemeris::{compute_ephemeris, CelestialBody, EphemerisSnapshot};
 pub use saju::{calculate_saju, DaeUnPeriod, Gender, Pillar, SajuChart};
 pub use timezone::{lookup_timezone_id, resolve_local_to_utc, TimezoneResolution};
 pub use vedic::{calculate_vedic, DashaPeriodInfo, VargaChart, VargaDivision, VargaPlacement, VedicChart, VedicPlanet};
-pub use western::{calculate_western, WesternAspect, WesternChart, WesternHouseSystem, WesternPlanet};
+pub use western::{calculate_western, WesternAspect, WesternChart, WesternHouseSystem, WesternNode, WesternPlanet};
 
 /// Unified input structure for fortune calculation.
 ///
@@ -136,7 +136,8 @@ mod tests {
         assert_eq!(output.utc_hour, 5);
         assert_eq!(output.utc_minute, 30);
         assert_eq!(output.ephemeris.bodies.len(), 9);
-        assert_eq!(output.western.planets.len(), 9);
+        assert_eq!(output.western.planets.len(), 7);
+        assert_eq!(output.western.nodes.len(), 2);
         assert_eq!(output.vedic.planets.len(), 9);
         assert_eq!(output.vedic.vargas.len(), 6);
         assert_eq!(output.saju.daeun_periods.len(), 10);
