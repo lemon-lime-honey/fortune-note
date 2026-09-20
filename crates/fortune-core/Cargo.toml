@@ -13,6 +13,8 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 uniffi = { version = "0.32.1", default-features = false }
+utz = { version = "0.4.1", features = ["balanced", "std"] }
+chrono-tz = "0.10.4"
 
 [dev-dependencies]
 approx = "0.5"
