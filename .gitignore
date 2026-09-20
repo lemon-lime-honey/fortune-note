@@ -14,3 +14,7 @@
 !crates/**/Cargo.toml
 !crates/**/Cargo.lock
 !crates/**/*.md
+
+# Build and deployment scripts
+!scripts/
+!scripts/**
