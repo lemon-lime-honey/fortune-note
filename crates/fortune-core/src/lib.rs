@@ -9,6 +9,7 @@
 pub mod ephemeris;
 pub mod ffi;
 pub mod saju;
+pub mod timezone;
 pub mod vedic;
 pub mod western;
 
@@ -18,10 +19,13 @@ use serde::{Deserialize, Serialize};
 
 pub use ephemeris::{compute_ephemeris, CelestialBody, EphemerisSnapshot};
 pub use saju::{calculate_saju, DaeUnPeriod, Gender, Pillar, SajuChart};
+pub use timezone::{lookup_timezone_id, resolve_local_to_utc, TimezoneResolution};
 pub use vedic::{calculate_vedic, DashaPeriodInfo, VargaChart, VargaDivision, VargaPlacement, VedicChart, VedicPlanet};
 pub use western::{calculate_western, WesternAspect, WesternChart, WesternHouseSystem, WesternPlanet};
 
 /// Unified input structure for fortune calculation.
+///
+/// Takes local calendar date, time, coordinates, and gender.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FortuneCalculationInput {
     pub year: i32,
@@ -35,9 +39,17 @@ pub struct FortuneCalculationInput {
     pub gender: Gender,
 }
 
-/// Unified output structure containing decoupled domain results.
+/// Unified output structure containing decoupled domain results and resolved timezone metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FortuneCalculationOutput {
+    pub timezone_id: String,
+    pub utc_offset_hours: f64,
+    pub utc_year: i32,
+    pub utc_month: u32,
+    pub utc_day: u32,
+    pub utc_hour: u32,
+    pub utc_minute: u32,
+    pub utc_second: f64,
     pub ephemeris: EphemerisSnapshot,
     pub western: WesternChart,
     pub vedic: VedicChart,
@@ -45,16 +57,30 @@ pub struct FortuneCalculationOutput {
 }
 
 /// Calculate all domains (ephemeris, western, vedic, saju) deterministically.
+///
+/// Automatically resolves timezone and historical DST from observer coordinates.
 pub fn calculate_fortune(
     input: FortuneCalculationInput,
 ) -> Result<FortuneCalculationOutput, String> {
-    let ephem = compute_ephemeris(
+    let tz_res = resolve_local_to_utc(
         input.year,
         input.month,
         input.day,
         input.hour,
         input.minute,
         input.second,
+        input.latitude,
+        input.longitude,
+    )
+    .map_err(|e| format!("Timezone resolution error: {}", e))?;
+
+    let ephem = compute_ephemeris(
+        tz_res.utc_year,
+        tz_res.utc_month,
+        tz_res.utc_day,
+        tz_res.utc_hour,
+        tz_res.utc_minute,
+        tz_res.utc_second,
         input.latitude,
         input.longitude,
     )
@@ -66,6 +92,14 @@ pub fn calculate_fortune(
         .map_err(|e| format!("Saju error: {}", e))?;
 
     Ok(FortuneCalculationOutput {
+        timezone_id: tz_res.timezone_id,
+        utc_offset_hours: tz_res.utc_offset_hours,
+        utc_year: tz_res.utc_year,
+        utc_month: tz_res.utc_month,
+        utc_day: tz_res.utc_day,
+        utc_hour: tz_res.utc_hour,
+        utc_minute: tz_res.utc_minute,
+        utc_second: tz_res.utc_second,
         ephemeris: ephem,
         western,
         vedic,
@@ -97,6 +131,10 @@ mod tests {
 
         let output = calculate_fortune(input).expect("calculation should succeed");
 
+        assert_eq!(output.timezone_id, "Asia/Seoul");
+        assert_eq!(output.utc_offset_hours, 9.0);
+        assert_eq!(output.utc_hour, 5);
+        assert_eq!(output.utc_minute, 30);
         assert_eq!(output.ephemeris.bodies.len(), 9);
         assert_eq!(output.western.planets.len(), 9);
         assert_eq!(output.vedic.planets.len(), 9);

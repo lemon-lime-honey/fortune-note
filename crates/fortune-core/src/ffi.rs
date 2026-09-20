@@ -60,6 +60,8 @@ mod tests {
             2024, 3, 20, 12, 0, 0.0, 37.5665, 126.9780, true,
         ).expect("FFI call should succeed");
 
+        assert!(json.contains("\"timezone_id\""));
+        assert!(json.contains("\"utc_offset_hours\""));
         assert!(json.contains("\"ephemeris\""));
         assert!(json.contains("\"western\""));
         assert!(json.contains("\"vedic\""));
