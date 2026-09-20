@@ -1,6 +1,12 @@
-//! UniFFI binding boundary for mobile and cross-platform clients.
-
 use crate::{calculate_fortune, FortuneCalculationInput, Gender};
+
+#[derive(Debug, thiserror::Error, uniffi::Error)]
+pub enum FortuneError {
+    #[error("Calculation error: {message}")]
+    CalculationError { message: String },
+    #[error("Serialization error: {message}")]
+    SerializationError { message: String },
+}
 
 #[uniffi::export]
 pub fn fortune_core_version() -> String {
@@ -8,14 +14,15 @@ pub fn fortune_core_version() -> String {
 }
 
 #[uniffi::export]
-pub fn calculate_fortune_json(input_json: String) -> Result<String, String> {
+pub fn calculate_fortune_json(input_json: String) -> Result<String, FortuneError> {
     let input: FortuneCalculationInput = serde_json::from_str(&input_json)
-        .map_err(|e| format!("Invalid input JSON: {}", e))?;
+        .map_err(|e| FortuneError::SerializationError { message: format!("Invalid input JSON: {}", e) })?;
 
-    let output = calculate_fortune(input)?;
+    let output = calculate_fortune(input)
+        .map_err(|e| FortuneError::CalculationError { message: e })?;
 
     serde_json::to_string(&output)
-        .map_err(|e| format!("Serialization error: {}", e))
+        .map_err(|e| FortuneError::SerializationError { message: format!("Serialization error: {}", e) })
 }
 
 #[uniffi::export]
@@ -29,7 +36,7 @@ pub fn calculate_fortune_direct(
     latitude: f64,
     longitude: f64,
     is_male: bool,
-) -> Result<String, String> {
+) -> Result<String, FortuneError> {
     let gender = if is_male { Gender::Male } else { Gender::Female };
     let input = FortuneCalculationInput {
         year,
@@ -43,9 +50,11 @@ pub fn calculate_fortune_direct(
         gender,
     };
 
-    let output = calculate_fortune(input)?;
+    let output = calculate_fortune(input)
+        .map_err(|e| FortuneError::CalculationError { message: e })?;
+
     serde_json::to_string(&output)
-        .map_err(|e| format!("Serialization error: {}", e))
+        .map_err(|e| FortuneError::SerializationError { message: format!("Serialization error: {}", e) })
 }
 
 #[cfg(test)]

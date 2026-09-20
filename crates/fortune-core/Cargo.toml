@@ -16,5 +16,14 @@ uniffi = { version = "0.32.1", default-features = false }
 utz = { version = "0.4.1", features = ["balanced", "std"] }
 chrono-tz = "0.10.4"
 
+[features]
+default = []
+cli = ["uniffi/cli"]
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["cli"]
+
 [dev-dependencies]
 approx = "0.5"
