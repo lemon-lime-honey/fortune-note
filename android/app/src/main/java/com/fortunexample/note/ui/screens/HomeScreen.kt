@@ -6,8 +6,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -29,15 +31,43 @@ fun HomeScreen(
     onHoraryClick: (String) -> Unit,
     onAddProfile: () -> Unit,
     onAddHorary: () -> Unit,
-    onSearch: (String) -> Unit
+    onSearch: (String) -> Unit,
+    onExportBackup: () -> Unit,
+    onImportBackup: () -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
+    var showMenu by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Fortune Note", fontWeight = FontWeight.Bold, color = TextPrimary) },
+                actions = {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "메뉴", tint = TextPrimary)
+                    }
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                        modifier = Modifier.background(BackgroundWhite)
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("데이터 백업 (DB 파일 내보내기)", color = TextPrimary, fontSize = 14.sp) },
+                            onClick = {
+                                showMenu = false
+                                onExportBackup()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("데이터 복원 (DB 파일 불러오기)", color = TextPrimary, fontSize = 14.sp) },
+                            onClick = {
+                                showMenu = false
+                                onImportBackup()
+                            }
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = BackgroundWhite,
                     titleContentColor = TextPrimary

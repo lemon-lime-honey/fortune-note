@@ -1,9 +1,13 @@
 package com.fortunexample.note
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -17,10 +21,10 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val repository = FortuneApp.repository
 
         setContent {
             FortuneNoteTheme {
+                val context = LocalContext.current
                 val navController = rememberNavController()
                 val scope = rememberCoroutineScope()
 
@@ -29,13 +33,46 @@ class MainActivity : ComponentActivity() {
 
                 fun refreshData() {
                     scope.launch {
-                        repository.listProfiles().onSuccess { profiles = it }
-                        repository.listHorary().onSuccess { horaryList = it }
+                        FortuneApp.repository.listProfiles().onSuccess { profiles = it }
+                        FortuneApp.repository.listHorary().onSuccess { horaryList = it }
                     }
                 }
 
                 LaunchedEffect(Unit) {
                     refreshData()
+                }
+
+                val exportLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.CreateDocument("application/octet-stream")
+                ) { uri ->
+                    if (uri != null) {
+                        scope.launch {
+                            BackupManager.exportDatabase(context, uri)
+                                .onSuccess {
+                                    Toast.makeText(context, "데이터 백업 파일이 성공적으로 저장되었습니다", Toast.LENGTH_LONG).show()
+                                }
+                                .onFailure {
+                                    Toast.makeText(context, "백업 저장 실패: ${it.localizedMessage}", Toast.LENGTH_LONG).show()
+                                }
+                        }
+                    }
+                }
+
+                val importLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.OpenDocument()
+                ) { uri ->
+                    if (uri != null) {
+                        scope.launch {
+                            BackupManager.importDatabase(context, uri)
+                                .onSuccess {
+                                    refreshData()
+                                    Toast.makeText(context, "데이터 복원이 완료되었습니다", Toast.LENGTH_LONG).show()
+                                }
+                                .onFailure {
+                                    Toast.makeText(context, "복원 실패: ${it.localizedMessage}", Toast.LENGTH_LONG).show()
+                                }
+                        }
+                    }
                 }
 
                 NavHost(navController = navController, startDestination = "home") {
@@ -49,8 +86,14 @@ class MainActivity : ComponentActivity() {
                             onAddHorary = { navController.navigate("horary_edit") },
                             onSearch = { query ->
                                 scope.launch {
-                                    repository.listProfiles(query).onSuccess { profiles = it }
+                                    FortuneApp.repository.listProfiles(query).onSuccess { profiles = it }
                                 }
+                            },
+                            onExportBackup = {
+                                exportLauncher.launch(BackupManager.generateBackupFileName())
+                            },
+                            onImportBackup = {
+                                importLauncher.launch(arrayOf("*/*"))
                             }
                         )
                     }
@@ -72,7 +115,7 @@ class MainActivity : ComponentActivity() {
                             onSave = { name, isMale, y, m, d, h, min, lat, lon, notes ->
                                 scope.launch {
                                     if (editId != null) {
-                                        repository.updateProfile(
+                                        FortuneApp.repository.updateProfile(
                                             editId,
                                             UpdateProfileRequest(
                                                 name = name,
@@ -91,7 +134,7 @@ class MainActivity : ComponentActivity() {
                                             navController.popBackStack()
                                         }
                                     } else {
-                                        repository.createProfile(
+                                        FortuneApp.repository.createProfile(
                                             CreateProfileRequest(
                                                 name = name,
                                                 gender = if (isMale) "male" else "female",
@@ -124,8 +167,8 @@ class MainActivity : ComponentActivity() {
                         var markdown by remember { mutableStateOf<String?>(null) }
 
                         LaunchedEffect(id) {
-                            repository.calculateProfileChart(id).onSuccess { chart = it }
-                            repository.exportProfileMarkdown(id).onSuccess { markdown = it }
+                            FortuneApp.repository.calculateProfileChart(id).onSuccess { chart = it }
+                            FortuneApp.repository.exportProfileMarkdown(id).onSuccess { markdown = it }
                         }
 
                         if (profile != null) {
@@ -137,7 +180,7 @@ class MainActivity : ComponentActivity() {
                                 onEdit = { navController.navigate("profile_edit?id=$id") },
                                 onDelete = {
                                     scope.launch {
-                                        repository.deleteProfile(id).onSuccess {
+                                        FortuneApp.repository.deleteProfile(id).onSuccess {
                                             refreshData()
                                             navController.popBackStack()
                                         }
@@ -164,7 +207,7 @@ class MainActivity : ComponentActivity() {
                             onSave = { title, category, text, y, m, d, h, min, sec, lat, lon ->
                                 scope.launch {
                                     if (editId != null) {
-                                        repository.updateHorary(
+                                        FortuneApp.repository.updateHorary(
                                             editId,
                                             UpdateHoraryRequest(
                                                 title = title,
@@ -184,7 +227,7 @@ class MainActivity : ComponentActivity() {
                                             navController.popBackStack()
                                         }
                                     } else {
-                                        repository.createHorary(
+                                        FortuneApp.repository.createHorary(
                                             CreateHoraryRequest(
                                                 title = title,
                                                 category = category,
@@ -218,8 +261,8 @@ class MainActivity : ComponentActivity() {
                         var markdown by remember { mutableStateOf<String?>(null) }
 
                         LaunchedEffect(id) {
-                            repository.calculateHoraryChart(id).onSuccess { chart = it }
-                            repository.exportHoraryMarkdown(id).onSuccess { markdown = it }
+                            FortuneApp.repository.calculateHoraryChart(id).onSuccess { chart = it }
+                            FortuneApp.repository.exportHoraryMarkdown(id).onSuccess { markdown = it }
                         }
 
                         if (horary != null) {
@@ -231,7 +274,7 @@ class MainActivity : ComponentActivity() {
                                 onEdit = { navController.navigate("horary_edit?id=$id") },
                                 onDelete = {
                                     scope.launch {
-                                        repository.deleteHorary(id).onSuccess {
+                                        FortuneApp.repository.deleteHorary(id).onSuccess {
                                             refreshData()
                                             navController.popBackStack()
                                         }

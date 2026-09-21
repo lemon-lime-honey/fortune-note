@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <include domain="file" path="fortune_note.db" />
+    <include domain="file" path="fortune_note.db-wal" />
+    <include domain="file" path="fortune_note.db-shm" />
+</full-backup-content>
