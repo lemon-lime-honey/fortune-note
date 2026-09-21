@@ -1,5 +1,6 @@
 package com.fortunexample.note.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -36,9 +37,9 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Fortune Note", fontWeight = FontWeight.Bold) },
+                title = { Text("Fortune Note", fontWeight = FontWeight.Bold, color = TextPrimary) },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DeepNavy,
+                    containerColor = BackgroundWhite,
                     titleContentColor = TextPrimary
                 )
             )
@@ -46,13 +47,13 @@ fun HomeScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { if (selectedTab == 0) onAddProfile() else onAddHorary() },
-                containerColor = AccentGold,
-                contentColor = DeepNavy
+                containerColor = AccentPrimary,
+                contentColor = BackgroundWhite
             ) {
                 Icon(Icons.Default.Add, contentDescription = "추가")
             }
         },
-        containerColor = DeepNavy
+        containerColor = BackgroundWhite
     ) { padding ->
         Column(
             modifier = Modifier
@@ -71,9 +72,10 @@ fun HomeScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(10.dp),
+                singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AccentGold,
+                    focusedBorderColor = AccentPrimary,
                     unfocusedBorderColor = BorderColor,
                     focusedTextColor = TextPrimary,
                     unfocusedTextColor = TextPrimary
@@ -83,8 +85,8 @@ fun HomeScreen(
             // 탭 헤더
             TabRow(
                 selectedTabIndex = selectedTab,
-                containerColor = DeepNavy,
-                contentColor = AccentGold
+                containerColor = SurfaceLight,
+                contentColor = AccentPrimary
             ) {
                 Tab(
                     selected = selectedTab == 0,
@@ -94,29 +96,41 @@ fun HomeScreen(
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    text = { Text("호라리 질문 (${horaryQuestions.size})", fontWeight = FontWeight.SemiBold) }
+                    text = { Text("질문 노트 (${horaryQuestions.size})", fontWeight = FontWeight.SemiBold) }
                 )
             }
 
             // 목록 영역
             if (selectedTab == 0) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(profiles) { profile ->
-                        ProfileCard(profile = profile, onClick = { onProfileClick(profile.id) })
+                if (profiles.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("등록된 인물 정보가 없습니다.", color = TextSecondary, fontSize = 14.sp)
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(profiles) { profile ->
+                            ProfileCard(profile = profile, onClick = { onProfileClick(profile.id) })
+                        }
                     }
                 }
             } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(horaryQuestions) { horary ->
-                        HoraryCard(horary = horary, onClick = { onHoraryClick(horary.id) })
+                if (horaryQuestions.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("등록된 질문 기록이 없습니다.", color = TextSecondary, fontSize = 14.sp)
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(horaryQuestions) { horary ->
+                            HoraryCard(horary = horary, onClick = { onHoraryClick(horary.id) })
+                        }
                     }
                 }
             }
@@ -131,7 +145,8 @@ private fun ProfileCard(
 ) {
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+        colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
+        border = BorderStroke(1.dp, BorderColor),
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
@@ -146,17 +161,18 @@ private fun ProfileCard(
                     text = profile.name,
                     color = TextPrimary,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
+                    fontSize = 17.sp
                 )
                 Text(
                     text = if (profile.gender == "male") "남성" else "여성",
-                    color = AccentGold,
-                    fontSize = 13.sp
+                    color = TextSecondary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium
                 )
             }
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "${profile.birth_year}년 ${profile.birth_month}월 ${profile.birth_day}일 ${String.format("%02d:%02d", profile.birth_hour, profile.birth_minute)}",
+                text = "${profile.birth_year}-${String.format("%02d", profile.birth_month)}-${String.format("%02d", profile.birth_day)} ${String.format("%02d:%02d", profile.birth_hour, profile.birth_minute)}",
                 color = TextSecondary,
                 fontSize = 14.sp
             )
@@ -180,7 +196,8 @@ private fun HoraryCard(
 ) {
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+        colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
+        border = BorderStroke(1.dp, BorderColor),
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
@@ -195,25 +212,26 @@ private fun HoraryCard(
                     text = horary.title,
                     color = TextPrimary,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp
+                    fontSize = 16.sp
                 )
                 Text(
                     text = horary.category,
                     color = CelestialBlue,
-                    fontSize = 12.sp
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
                 )
             }
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "${horary.query_year}-${horary.query_month}-${horary.query_day} ${String.format("%02d:%02d:%02d", horary.query_hour, horary.query_minute, horary.query_second.toInt())}",
+                text = "${horary.query_year}-${String.format("%02d", horary.query_month)}-${String.format("%02d", horary.query_day)} ${String.format("%02d:%02d:%02d", horary.query_hour, horary.query_minute, horary.query_second.toInt())}",
                 color = TextSecondary,
                 fontSize = 13.sp
             )
             if (horary.result_notes.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "결과: ${horary.result_notes}",
-                    color = VedicGreen,
+                    text = horary.result_notes,
+                    color = TextSecondary,
                     fontSize = 12.sp
                 )
             }

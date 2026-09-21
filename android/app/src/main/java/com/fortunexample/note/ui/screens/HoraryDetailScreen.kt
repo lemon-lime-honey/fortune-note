@@ -4,13 +4,16 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,6 +35,7 @@ fun HoraryDetailScreen(
     chart: FortuneChartOutput?,
     markdown: String?,
     onBack: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     val context = LocalContext.current
@@ -40,13 +44,16 @@ fun HoraryDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(horary.title, fontWeight = FontWeight.Bold) },
+                title = { Text(horary.title, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로", tint = TextPrimary)
                     }
                 },
                 actions = {
+                    IconButton(onClick = onEdit) {
+                        Icon(Icons.Default.Edit, contentDescription = "수정", tint = TextPrimary)
+                    }
                     IconButton(onClick = {
                         if (!markdown.isNullOrEmpty()) {
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -54,20 +61,20 @@ fun HoraryDetailScreen(
                             Toast.makeText(context, "호라리 LLM 프롬프트가 복사되었습니다.", Toast.LENGTH_SHORT).show()
                         }
                     }) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = "복사", tint = AccentGold)
+                        Icon(Icons.Default.ContentCopy, contentDescription = "복사", tint = TextPrimary)
                     }
                     IconButton(onClick = onDelete) {
                         Icon(Icons.Default.Delete, contentDescription = "삭제", tint = AstrologicalRed)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DeepNavy,
+                    containerColor = BackgroundWhite,
                     titleContentColor = TextPrimary,
                     navigationIconContentColor = TextPrimary
                 )
             )
         },
-        containerColor = DeepNavy
+        containerColor = BackgroundWhite
     ) { padding ->
         Column(
             modifier = Modifier
@@ -76,16 +83,16 @@ fun HoraryDetailScreen(
         ) {
             TabRow(
                 selectedTabIndex = selectedTab,
-                containerColor = SurfaceDark,
-                contentColor = CelestialBlue
+                containerColor = SurfaceLight,
+                contentColor = AccentPrimary
             ) {
-                Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("호라리 (서양)") })
-                Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("프라슈나 (베다)") })
+                Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Horary (Western)", fontWeight = FontWeight.SemiBold) })
+                Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Prashna (Vedic)", fontWeight = FontWeight.SemiBold) })
             }
 
             if (chart == null) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = CelestialBlue)
+                    CircularProgressIndicator(color = AccentPrimary)
                 }
             } else {
                 Column(
@@ -96,16 +103,18 @@ fun HoraryDetailScreen(
                 ) {
                     // 질문 내용 카드
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
+                        border = BorderStroke(1.dp, BorderColor),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Text(text = "분류: ${horary.category}", color = CelestialBlue, fontSize = 12.sp)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(text = horary.question_text, color = TextPrimary, fontSize = 15.sp)
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(text = "Category: ${horary.category}", color = CelestialBlue, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                             Spacer(modifier = Modifier.height(6.dp))
+                            Text(text = horary.question_text, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "질문 시각: ${horary.query_year}-${horary.query_month}-${horary.query_day} ${String.format("%02d:%02d:%02d", horary.query_hour, horary.query_minute, horary.query_second.toInt())}",
+                                text = "Query Time: ${horary.query_year}-${String.format("%02d", horary.query_month)}-${String.format("%02d", horary.query_day)} ${String.format("%02d:%02d:%02d", horary.query_hour, horary.query_minute, horary.query_second.toInt())} (${horary.timezone_id})",
                                 color = TextSecondary,
                                 fontSize = 12.sp
                             )
@@ -116,25 +125,66 @@ fun HoraryDetailScreen(
 
                     if (selectedTab == 0) {
                         WesternChartWheel(chart = chart.western)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text("주요 아스펙트", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        chart.western.aspects.forEach { a ->
-                            Text(
-                                text = "${a.planet1} - ${a.planet2}: ${a.aspect_type} (오차: ${String.format("%.2f°", a.orb)})",
-                                color = TextSecondary,
-                                fontSize = 13.sp
-                            )
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
+                            border = BorderStroke(1.dp, BorderColor),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text("Major Aspects", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                Spacer(modifier = Modifier.height(10.dp))
+                                chart.western.aspects.forEach { a ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(text = "${a.planet1} · ${a.planet2}", color = TextPrimary, fontSize = 13.sp)
+                                        Text(
+                                            text = "${a.aspect_type} (Orb ${String.format("%.2f°", a.orb)})",
+                                            color = TextSecondary,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                    HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
+                                }
+                            }
                         }
                     } else {
                         VedicChartDiamond(chart = chart.vedic)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text("프라슈나 라그나: ${String.format("%.2f°", chart.vedic.lagna_sidereal)}", color = TextPrimary, fontSize = 15.sp)
-                        chart.vedic.planets.forEach { p ->
-                            Text(
-                                text = "${p.name}: ${String.format("%.2f°", p.sidereal_longitude)} (${p.nakshatra_name})",
-                                color = TextSecondary,
-                                fontSize = 13.sp
-                            )
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
+                            border = BorderStroke(1.dp, BorderColor),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(
+                                    text = "Prashna Lagna: ${String.format("%.2f°", chart.vedic.lagna_sidereal)}",
+                                    color = TextPrimary,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                chart.vedic.planets.forEach { p ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(text = p.name, color = TextPrimary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                                        Text(
+                                            text = "${String.format("%.2f°", p.sidereal_longitude)} · ${p.nakshatra_name}",
+                                            color = TextSecondary,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                    HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
+                                }
+                            }
                         }
                     }
                 }

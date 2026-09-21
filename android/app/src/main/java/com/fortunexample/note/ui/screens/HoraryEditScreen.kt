@@ -3,9 +3,11 @@ package com.fortunexample.note.ui.screens
 import android.content.Context
 import android.location.LocationManager
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -15,9 +17,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.fortunexample.note.data.CreateHoraryRequest
+import com.fortunexample.note.data.HoraryDto
 import com.fortunexample.note.ui.components.LocationPicker
 import com.fortunexample.note.ui.theme.*
 import java.util.Calendar
@@ -25,41 +29,50 @@ import java.util.Calendar
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HoraryEditScreen(
+    initialHorary: HoraryDto? = null,
     onBack: () -> Unit,
-    onSave: (CreateHoraryRequest) -> Unit
+    onSave: (title: String, category: String, questionText: String, y: Int, m: Int, d: Int, h: Int, min: Int, sec: Double, lat: Double, lon: Double) -> Unit
 ) {
     val context = LocalContext.current
-    var title by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf("직업") }
-    var questionText by remember { mutableStateOf("") }
+    val isEditMode = initialHorary != null
+
+    var title by remember(initialHorary) { mutableStateOf(initialHorary?.title ?: "") }
+    var category by remember(initialHorary) { mutableStateOf(initialHorary?.category ?: "Career") }
+    var questionText by remember(initialHorary) { mutableStateOf(initialHorary?.question_text ?: "") }
 
     val cal = Calendar.getInstance()
-    var yearStr by remember { mutableStateOf(cal.get(Calendar.YEAR).toString()) }
-    var monthStr by remember { mutableStateOf((cal.get(Calendar.MONTH) + 1).toString()) }
-    var dayStr by remember { mutableStateOf(cal.get(Calendar.DAY_OF_MONTH).toString()) }
-    var hourStr by remember { mutableStateOf(cal.get(Calendar.HOUR_OF_DAY).toString()) }
-    var minuteStr by remember { mutableStateOf(cal.get(Calendar.MINUTE).toString()) }
-    var secondStr by remember { mutableStateOf(cal.get(Calendar.SECOND).toString()) }
-    var latitude by remember { mutableDoubleStateOf(37.5665) }
-    var longitude by remember { mutableDoubleStateOf(126.9780) }
+    var yearStr by remember(initialHorary) { mutableStateOf(initialHorary?.query_year?.toString() ?: cal.get(Calendar.YEAR).toString()) }
+    var monthStr by remember(initialHorary) { mutableStateOf(initialHorary?.query_month?.toString() ?: (cal.get(Calendar.MONTH) + 1).toString()) }
+    var dayStr by remember(initialHorary) { mutableStateOf(initialHorary?.query_day?.toString() ?: cal.get(Calendar.DAY_OF_MONTH).toString()) }
+    var hourStr by remember(initialHorary) { mutableStateOf(initialHorary?.query_hour?.toString() ?: cal.get(Calendar.HOUR_OF_DAY).toString()) }
+    var minuteStr by remember(initialHorary) { mutableStateOf(initialHorary?.query_minute?.toString() ?: cal.get(Calendar.MINUTE).toString()) }
+    var secondStr by remember(initialHorary) { mutableStateOf(initialHorary?.query_second?.toInt()?.toString() ?: cal.get(Calendar.SECOND).toString()) }
+    var latitude by remember(initialHorary) { mutableDoubleStateOf(initialHorary?.latitude ?: 37.5665) }
+    var longitude by remember(initialHorary) { mutableDoubleStateOf(initialHorary?.longitude ?: 126.9780) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("호라리 질문 등록", fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        text = if (isEditMode) "질문 수정" else "질문 등록",
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로", tint = TextPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = DeepNavy,
+                    containerColor = BackgroundWhite,
                     titleContentColor = TextPrimary,
                     navigationIconContentColor = TextPrimary
                 )
             )
         },
-        containerColor = DeepNavy
+        containerColor = BackgroundWhite
     ) { padding ->
         Column(
             modifier = Modifier
@@ -70,7 +83,7 @@ fun HoraryEditScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             // 원터치 일시 캡처 버튼
-            Button(
+            OutlinedButton(
                 onClick = {
                     val now = Calendar.getInstance()
                     yearStr = now.get(Calendar.YEAR).toString()
@@ -80,7 +93,6 @@ fun HoraryEditScreen(
                     minuteStr = now.get(Calendar.MINUTE).toString()
                     secondStr = now.get(Calendar.SECOND).toString()
 
-                    // 최신 위치도 함께 시도
                     val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
                     if (lm != null) {
                         try {
@@ -95,49 +107,110 @@ fun HoraryEditScreen(
                     Toast.makeText(context, "현재 시각이 캡처되었습니다.", Toast.LENGTH_SHORT).show()
                 },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = CelestialBlue),
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = SurfaceLight),
+                border = BorderStroke(1.dp, BorderColor),
                 shape = RoundedCornerShape(10.dp)
             ) {
-                Icon(Icons.Default.FlashOn, contentDescription = null, tint = DeepNavy)
+                Icon(Icons.Default.FlashOn, contentDescription = null, tint = CelestialBlue)
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("지금 현재 시각으로 캡처", color = DeepNavy, fontWeight = FontWeight.Bold)
+                Text("지금 현재 시각으로 캡처", color = TextPrimary, fontWeight = FontWeight.SemiBold)
             }
 
             OutlinedTextField(
                 value = title,
                 onValueChange = { title = it },
-                label = { Text("질문 제목 (필수)") },
-                modifier = Modifier.fillMaxWidth()
+                label = { Text("질문 제목 (필수)", color = TextSecondary) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = AccentPrimary,
+                    unfocusedBorderColor = BorderColor
+                )
             )
 
             OutlinedTextField(
                 value = category,
                 onValueChange = { category = it },
-                label = { Text("카테고리 (예: 직업, 연애, 재물)") },
-                modifier = Modifier.fillMaxWidth()
+                label = { Text("카테고리 (예: Career, Relationship, Wealth)", color = TextSecondary) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = AccentPrimary,
+                    unfocusedBorderColor = BorderColor
+                )
             )
 
             OutlinedTextField(
                 value = questionText,
                 onValueChange = { questionText = it },
-                label = { Text("질문 상세 본문") },
+                label = { Text("질문 상세 본문", color = TextSecondary) },
                 modifier = Modifier.fillMaxWidth(),
-                minLines = 3
+                minLines = 3,
+                shape = RoundedCornerShape(10.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = AccentPrimary,
+                    unfocusedBorderColor = BorderColor
+                )
             )
 
-            Text("질문 일시", color = TextSecondary, fontSize = 13.sp)
+            // 질문 일시 (숫자 전용 키보드)
+            Text("질문 일시", color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedTextField(value = yearStr, onValueChange = { yearStr = it }, label = { Text("년") }, modifier = Modifier.weight(1.2f))
-                OutlinedTextField(value = monthStr, onValueChange = { monthStr = it }, label = { Text("월") }, modifier = Modifier.weight(1f))
-                OutlinedTextField(value = dayStr, onValueChange = { dayStr = it }, label = { Text("일") }, modifier = Modifier.weight(1f))
+                OutlinedTextField(
+                    value = yearStr,
+                    onValueChange = { yearStr = it },
+                    label = { Text("년") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                    modifier = Modifier.weight(1.2f),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = monthStr,
+                    onValueChange = { monthStr = it },
+                    label = { Text("월") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                    modifier = Modifier.weight(1f),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = dayStr,
+                    onValueChange = { dayStr = it },
+                    label = { Text("일") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                    modifier = Modifier.weight(1f),
+                    singleLine = true
+                )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedTextField(value = hourStr, onValueChange = { hourStr = it }, label = { Text("시") }, modifier = Modifier.weight(1f))
-                OutlinedTextField(value = minuteStr, onValueChange = { minuteStr = it }, label = { Text("분") }, modifier = Modifier.weight(1f))
-                OutlinedTextField(value = secondStr, onValueChange = { secondStr = it }, label = { Text("초") }, modifier = Modifier.weight(1f))
+                OutlinedTextField(
+                    value = hourStr,
+                    onValueChange = { hourStr = it },
+                    label = { Text("시") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                    modifier = Modifier.weight(1f),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = minuteStr,
+                    onValueChange = { minuteStr = it },
+                    label = { Text("분") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                    modifier = Modifier.weight(1f),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = secondStr,
+                    onValueChange = { secondStr = it },
+                    label = { Text("초") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                    modifier = Modifier.weight(1f),
+                    singleLine = true
+                )
             }
 
-            // 하이브리드 좌표 선택기 (도시 검색 / GPS / 수동 미세 조정)
+            // 관측 좌표 선택기
             LocationPicker(
                 latitude = latitude,
                 longitude = longitude,
@@ -151,31 +224,41 @@ fun HoraryEditScreen(
 
             Button(
                 onClick = {
+                    val y = yearStr.toIntOrNull() ?: 2026
+                    val m = (monthStr.toIntOrNull() ?: 1).coerceIn(1, 12)
+                    val d = (dayStr.toIntOrNull() ?: 1).coerceIn(1, 31)
+                    val h = (hourStr.toIntOrNull() ?: 0).coerceIn(0, 23)
+                    val min = (minuteStr.toIntOrNull() ?: 0).coerceIn(0, 59)
+                    val sec = (secondStr.toDoubleOrNull() ?: 0.0).coerceIn(0.0, 59.999)
+
                     if (title.trim().isNotEmpty()) {
                         onSave(
-                            CreateHoraryRequest(
-                                title = title.trim(),
-                                category = category.trim(),
-                                question_text = questionText.trim(),
-                                query_year = yearStr.toIntOrNull() ?: 2026,
-                                query_month = monthStr.toIntOrNull() ?: 1,
-                                query_day = dayStr.toIntOrNull() ?: 1,
-                                query_hour = hourStr.toIntOrNull() ?: 0,
-                                query_minute = minuteStr.toIntOrNull() ?: 0,
-                                query_second = secondStr.toDoubleOrNull() ?: 0.0,
-                                latitude = latitude,
-                                longitude = longitude
-                            )
+                            title.trim(),
+                            category.trim(),
+                            questionText.trim(),
+                            y,
+                            m,
+                            d,
+                            h,
+                            min,
+                            sec,
+                            latitude,
+                            longitude
                         )
                     }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = CelestialBlue),
-                shape = RoundedCornerShape(12.dp)
+                colors = ButtonDefaults.buttonColors(containerColor = AccentPrimary),
+                shape = RoundedCornerShape(10.dp)
             ) {
-                Text("호라리 질문 저장", color = DeepNavy, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(
+                    text = if (isEditMode) "수정 완료" else "저장하기",
+                    color = BackgroundWhite,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
             }
         }
     }

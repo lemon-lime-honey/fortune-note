@@ -22,6 +22,14 @@ class FortuneRepository(
         }
     }
 
+    suspend fun updateProfile(id: String, request: UpdateProfileRequest): Result<ProfileDto> = withContext(Dispatchers.IO) {
+        runCatching {
+            val reqJson = json.encodeToString(UpdateProfileRequest.serializer(), request)
+            val resJson = client.updateProfile(id, reqJson)
+            json.decodeFromString(ProfileDto.serializer(), resJson)
+        }
+    }
+
     suspend fun getProfile(id: String): Result<ProfileDto?> = withContext(Dispatchers.IO) {
         runCatching {
             val resJson = client.getProfile(id) ?: return@runCatching null
@@ -59,6 +67,14 @@ class FortuneRepository(
         runCatching {
             val reqJson = json.encodeToString(CreateHoraryRequest.serializer(), request)
             val resJson = client.createHorary(reqJson)
+            json.decodeFromString(HoraryDto.serializer(), resJson)
+        }
+    }
+
+    suspend fun updateHorary(id: String, request: UpdateHoraryRequest): Result<HoraryDto> = withContext(Dispatchers.IO) {
+        runCatching {
+            val reqJson = json.encodeToString(UpdateHoraryRequest.serializer(), request)
+            val resJson = client.updateHorary(id, reqJson)
             json.decodeFromString(HoraryDto.serializer(), resJson)
         }
     }

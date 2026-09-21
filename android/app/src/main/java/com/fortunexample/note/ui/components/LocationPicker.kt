@@ -7,6 +7,7 @@ import android.location.LocationManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -63,7 +65,8 @@ fun LocationPicker(
 
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+        colors = CardDefaults.cardColors(containerColor = SurfaceLight),
+        border = BorderStroke(1.dp, BorderColor),
         modifier = modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -76,7 +79,7 @@ fun LocationPicker(
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "현재 지정: 위도 ${String.format("%.4f°", latitude)}, 경도 ${String.format("%.4f°", longitude)}",
-                color = AccentGold,
+                color = TextSecondary,
                 fontSize = 13.sp
             )
 
@@ -87,10 +90,11 @@ fun LocationPicker(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Button(
+                OutlinedButton(
                     onClick = { showDialog = true },
                     modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = CardDark),
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = CardLight),
+                    border = BorderStroke(1.dp, BorderColor),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Icon(Icons.Default.Search, contentDescription = null, tint = CelestialBlue, modifier = Modifier.size(18.dp))
@@ -98,7 +102,7 @@ fun LocationPicker(
                     Text("위치 검색", color = TextPrimary, fontSize = 13.sp)
                 }
 
-                Button(
+                OutlinedButton(
                     onClick = {
                         val fineGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                         val coarseGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
@@ -111,7 +115,8 @@ fun LocationPicker(
                         }
                     },
                     modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = CardDark),
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = CardLight),
+                    border = BorderStroke(1.dp, BorderColor),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Icon(Icons.Default.GpsFixed, contentDescription = null, tint = VedicGreen, modifier = Modifier.size(18.dp))
@@ -144,6 +149,7 @@ fun LocationPicker(
                             it.toDoubleOrNull()?.let { l -> onLocationChanged(l, longitude) }
                         },
                         label = { Text("위도") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
                         modifier = Modifier.weight(1f),
                         singleLine = true
                     )
@@ -154,6 +160,7 @@ fun LocationPicker(
                             it.toDoubleOrNull()?.let { l -> onLocationChanged(latitude, l) }
                         },
                         label = { Text("경도") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
                         modifier = Modifier.weight(1f),
                         singleLine = true
                     )
@@ -190,7 +197,7 @@ fun LocationPicker(
 
         AlertDialog(
             onDismissRequest = { showDialog = false },
-            containerColor = SurfaceDark,
+            containerColor = BackgroundWhite,
             title = {
                 Text("위치 검색", color = TextPrimary, fontWeight = FontWeight.Bold)
             },
@@ -212,7 +219,7 @@ fun LocationPicker(
                                 )
                             } else if (query.isNotBlank()) {
                                 IconButton(onClick = { executeOnlineSearch() }) {
-                                    Icon(Icons.Default.Search, contentDescription = "검색", tint = AccentGold)
+                                    Icon(Icons.Default.Search, contentDescription = "검색", tint = AccentPrimary)
                                 }
                             }
                         },
@@ -267,7 +274,7 @@ fun LocationPicker(
                                         fontSize = 12.sp
                                     )
                                 }
-                                HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
+                                HorizontalDivider(color = BorderColor)
                             }
                         }
                     }
@@ -275,7 +282,7 @@ fun LocationPicker(
             },
             confirmButton = {
                 TextButton(onClick = { showDialog = false }) {
-                    Text("닫기", color = AccentGold)
+                    Text("닫기", color = TextPrimary)
                 }
             }
         )

@@ -36,6 +36,21 @@ data class CreateProfileRequest(
 )
 
 @Serializable
+data class UpdateProfileRequest(
+    val name: String,
+    val gender: String,
+    val birth_year: Int,
+    val birth_month: Int,
+    val birth_day: Int,
+    val birth_hour: Int,
+    val birth_minute: Int,
+    val latitude: Double,
+    val longitude: Double,
+    val timezone_id: String? = null,
+    val notes: String? = null
+)
+
+@Serializable
 data class HoraryDto(
     val id: String,
     val title: String,
@@ -58,6 +73,24 @@ data class HoraryDto(
 
 @Serializable
 data class CreateHoraryRequest(
+    val title: String,
+    val category: String,
+    val question_text: String,
+    val query_year: Int,
+    val query_month: Int,
+    val query_day: Int,
+    val query_hour: Int,
+    val query_minute: Int,
+    val query_second: Double,
+    val latitude: Double,
+    val longitude: Double,
+    val timezone_id: String? = null,
+    val querent_profile_id: String? = null,
+    val result_notes: String? = null
+)
+
+@Serializable
+data class UpdateHoraryRequest(
     val title: String,
     val category: String,
     val question_text: String,

@@ -1,17 +1,17 @@
 package com.fortunexample.note.ui.theme
 
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 
-private val DarkColorScheme = darkColorScheme(
-    primary = AccentGold,
+private val LightColorScheme = lightColorScheme(
+    primary = AccentPrimary,
     secondary = CelestialBlue,
     tertiary = VedicGreen,
-    background = DeepNavy,
-    surface = SurfaceDark,
-    onPrimary = DeepNavy,
-    onSecondary = DeepNavy,
+    background = BackgroundWhite,
+    surface = SurfaceLight,
+    onPrimary = BackgroundWhite,
+    onSecondary = BackgroundWhite,
     onBackground = TextPrimary,
     onSurface = TextPrimary
 )
@@ -21,7 +21,7 @@ fun FortuneNoteTheme(
     content: @Composable () -> Unit
 ) {
     MaterialTheme(
-        colorScheme = DarkColorScheme,
+        colorScheme = LightColorScheme,
         content = content
     )
 }
