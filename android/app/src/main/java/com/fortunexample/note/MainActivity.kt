@@ -42,39 +42,6 @@ class MainActivity : ComponentActivity() {
                     refreshData()
                 }
 
-                val exportLauncher = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.CreateDocument("application/octet-stream")
-                ) { uri ->
-                    if (uri != null) {
-                        scope.launch {
-                            BackupManager.exportDatabase(context, uri)
-                                .onSuccess {
-                                    Toast.makeText(context, "데이터 백업 파일이 성공적으로 저장되었습니다", Toast.LENGTH_LONG).show()
-                                }
-                                .onFailure {
-                                    Toast.makeText(context, "백업 저장 실패: ${it.localizedMessage}", Toast.LENGTH_LONG).show()
-                                }
-                        }
-                    }
-                }
-
-                val importLauncher = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.OpenDocument()
-                ) { uri ->
-                    if (uri != null) {
-                        scope.launch {
-                            BackupManager.importDatabase(context, uri)
-                                .onSuccess {
-                                    refreshData()
-                                    Toast.makeText(context, "데이터 복원이 완료되었습니다", Toast.LENGTH_LONG).show()
-                                }
-                                .onFailure {
-                                    Toast.makeText(context, "복원 실패: ${it.localizedMessage}", Toast.LENGTH_LONG).show()
-                                }
-                        }
-                    }
-                }
-
                 NavHost(navController = navController, startDestination = "home") {
                     composable("home") {
                         HomeScreen(
@@ -89,11 +56,20 @@ class MainActivity : ComponentActivity() {
                                     FortuneApp.repository.listProfiles(query).onSuccess { profiles = it }
                                 }
                             },
-                            onExportBackup = {
-                                exportLauncher.launch(BackupManager.generateBackupFileName())
-                            },
-                            onImportBackup = {
-                                importLauncher.launch(arrayOf("*/*"))
+                            onNavigateToDataManagement = {
+                                navController.navigate("data_management")
+                            }
+                        )
+                    }
+
+                    composable("data_management") {
+                        DataManagementScreen(
+                            profileCount = profiles.size,
+                            horaryCount = horaryList.size,
+                            onBack = { navController.popBackStack() },
+                            onDataRestored = {
+                                refreshData()
+                                navController.popBackStack()
                             }
                         )
                     }

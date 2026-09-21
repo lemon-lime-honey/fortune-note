@@ -258,3 +258,19 @@ data class FortuneChartOutput(
     val vedic: VedicChartData,
     val saju: SajuChartData
 )
+
+@Serializable
+data class ImportSummaryDto(
+    val imported_profiles: Int,
+    val imported_horary: Int,
+    val message: String
+)
+
+data class BackupPreview(
+    val app: String,
+    val version: Int,
+    val exportedAt: String,
+    val profileCount: Int,
+    val horaryCount: Int,
+    val rawJson: String
+)

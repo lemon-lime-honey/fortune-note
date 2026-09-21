@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,8 +33,7 @@ fun HomeScreen(
     onAddProfile: () -> Unit,
     onAddHorary: () -> Unit,
     onSearch: (String) -> Unit,
-    onExportBackup: () -> Unit,
-    onImportBackup: () -> Unit
+    onNavigateToDataManagement: () -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
@@ -44,6 +44,9 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text("Fortune Note", fontWeight = FontWeight.Bold, color = TextPrimary) },
                 actions = {
+                    IconButton(onClick = onNavigateToDataManagement) {
+                        Icon(Icons.Default.Storage, contentDescription = "데이터 관리 및 백업", tint = TextPrimary)
+                    }
                     IconButton(onClick = { showMenu = true }) {
                         Icon(Icons.Default.MoreVert, contentDescription = "메뉴", tint = TextPrimary)
                     }
@@ -53,17 +56,10 @@ fun HomeScreen(
                         modifier = Modifier.background(BackgroundWhite)
                     ) {
                         DropdownMenuItem(
-                            text = { Text("데이터 백업 (DB 파일 내보내기)", color = TextPrimary, fontSize = 14.sp) },
+                            text = { Text("데이터 백업 및 복원 관리", color = TextPrimary, fontSize = 14.sp) },
                             onClick = {
                                 showMenu = false
-                                onExportBackup()
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("데이터 복원 (DB 파일 불러오기)", color = TextPrimary, fontSize = 14.sp) },
-                            onClick = {
-                                showMenu = false
-                                onImportBackup()
+                                onNavigateToDataManagement()
                             }
                         )
                     }

@@ -123,4 +123,17 @@ class FortuneRepository(
             client.exportPrashnaVedicMarkdown(id)
         }
     }
+
+    suspend fun exportBackupJson(): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            client.exportBackupJson()
+        }
+    }
+
+    suspend fun importBackupJson(jsonStr: String, replaceExisting: Boolean): Result<ImportSummaryDto> = withContext(Dispatchers.IO) {
+        runCatching {
+            val resJson = client.importBackupJson(jsonStr, replaceExisting)
+            json.decodeFromString(ImportSummaryDto.serializer(), resJson)
+        }
+    }
 }
