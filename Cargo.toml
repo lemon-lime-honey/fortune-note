@@ -2,4 +2,5 @@
 resolver = "2"
 members = [
     "crates/fortune-core",
+    "crates/fortune-backend",
 ]

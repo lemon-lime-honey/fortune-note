@@ -7,7 +7,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-CRATE_DIR="${ROOT_DIR}/crates/fortune-core"
+CRATE_DIR="${ROOT_DIR}/crates/fortune-backend"
 
 DEFAULT_JNILIBS_DIR="${ROOT_DIR}/android/app/src/main/jniLibs"
 DEFAULT_KOTLIN_DIR="${ROOT_DIR}/android/app/src/main/java"
@@ -16,7 +16,7 @@ JNILIBS_OUT="${1:-${DEFAULT_JNILIBS_DIR}}"
 KOTLIN_OUT="${2:-${DEFAULT_KOTLIN_DIR}}"
 
 echo "================================================================="
-echo " Building Fortune Core for Android (UniFFI & Native Libraries)"
+echo " Building Fortune Backend for Android (UniFFI & Native Libraries)"
 echo "================================================================="
 echo "Root Directory       : ${ROOT_DIR}"
 echo "Native Output Target : ${JNILIBS_OUT}"
@@ -73,7 +73,7 @@ done
 echo "Building host release library for UniFFI bindgen..."
 cargo build --manifest-path "${CRATE_DIR}/Cargo.toml" --release
 
-HOST_SO="${ROOT_DIR}/target/release/libfortune_core.so"
+HOST_SO="${ROOT_DIR}/target/release/libfortune_backend.so"
 if [ ! -f "${HOST_SO}" ]; then
     echo "ERROR: Host release library not found at ${HOST_SO}"
     exit 1
