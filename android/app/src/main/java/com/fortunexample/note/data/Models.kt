@@ -211,8 +211,28 @@ data class VargaChartData(
 data class DashaPeriodData(
     val lord: String,
     val start_jd: Double,
-    val end_jd: Double
-)
+    val end_jd: Double,
+    val sub_periods: List<DashaPeriodData> = emptyList()
+) {
+    val startDateFormatted: String get() = jdToCalendarString(start_jd)
+    val endDateFormatted: String get() = jdToCalendarString(end_jd)
+}
+
+fun jdToCalendarString(jd: Double): String {
+    val z = (jd + 0.5).toLong()
+    val a = if (z < 2299161) z else {
+        val alpha = ((z - 1867216.25) / 36524.25).toLong()
+        z + 1 + alpha - (alpha / 4)
+    }
+    val b = a + 1524
+    val c = ((b - 122.1) / 365.25).toLong()
+    val d = (365.25 * c).toLong()
+    val e = ((b - d) / 30.6001).toLong()
+    val day = (b - d - (30.6001 * e).toLong()).toInt()
+    val month = (if (e < 14) e - 1 else e - 13).toInt()
+    val year = (if (month > 2) c - 4716 else c - 4715).toInt()
+    return String.format(java.util.Locale.US, "%04d.%02d.%02d", year, month, day)
+}
 
 @Serializable
 data class VedicChartData(

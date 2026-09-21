@@ -4,8 +4,11 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,6 +18,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -42,6 +47,22 @@ fun ProfileDetailScreen(
 ) {
     val context = LocalContext.current
     var selectedDomainTab by remember { mutableStateOf(0) }
+    var selectedVarga by remember { mutableStateOf("D1") }
+    var expandedDashaLord by remember { mutableStateOf<String?>(null) }
+
+    val vargaList = listOf(
+        "D1" to "Rasi (D1)",
+        "D2" to "Hora (D2)",
+        "D3" to "Drekkana (D3)",
+        "D4" to "Chaturthamsha (D4)",
+        "D6" to "Shashthamsha (D6)",
+        "D7" to "Saptamsha (D7)",
+        "D8" to "Ashtamamsha (D8)",
+        "D9" to "Navamsha (D9)",
+        "D10" to "Dashamsha (D10)",
+        "D11" to "Rudramsha (D11)",
+        "D12" to "Dwadashamsha (D12)"
+    )
 
     Scaffold(
         topBar = {
@@ -92,7 +113,6 @@ fun ProfileDetailScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // 서브 도메인 탭 (라이트 스타일)
             TabRow(
                 selectedTabIndex = selectedDomainTab,
                 containerColor = SurfaceLight,
@@ -133,12 +153,13 @@ fun ProfileDetailScreen(
                                     chart.western.planets.forEach { p ->
                                         val rx = if (p.is_retrograde) " [Rx]" else ""
                                         Row(
-                                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Text(text = "${p.name}$rx", color = TextPrimary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
                                             Text(
-                                                text = "${String.format("%.2f°", p.sign_degree)} (${getSignName(p.sign_index)}) · House ${p.house_number}",
+                                                text = "${String.format("%.2f°", p.sign_degree)} ${getSignName(p.sign_index)} · House ${p.house_number}",
                                                 color = TextSecondary,
                                                 fontSize = 13.sp
                                             )
@@ -147,12 +168,13 @@ fun ProfileDetailScreen(
                                     }
                                     chart.western.nodes.forEach { n ->
                                         Row(
-                                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Text(text = n.name, color = TextPrimary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
                                             Text(
-                                                text = "${String.format("%.2f°", n.sign_degree)} (${getSignName(n.sign_index)}) · House ${n.house_number}",
+                                                text = "${String.format("%.2f°", n.sign_degree)} ${getSignName(n.sign_index)} · House ${n.house_number}",
                                                 color = TextSecondary,
                                                 fontSize = 13.sp
                                             )
@@ -164,7 +186,6 @@ fun ProfileDetailScreen(
 
                             Spacer(modifier = Modifier.height(14.dp))
 
-                            // Major Aspects 카드
                             if (chart.western.aspects.isNotEmpty()) {
                                 Card(
                                     shape = RoundedCornerShape(12.dp),
@@ -177,8 +198,9 @@ fun ProfileDetailScreen(
                                         Spacer(modifier = Modifier.height(10.dp))
                                         chart.western.aspects.forEach { a ->
                                             Row(
-                                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                                horizontalArrangement = Arrangement.SpaceBetween
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
                                             ) {
                                                 Text(text = "${a.planet1} · ${a.planet2}", color = TextPrimary, fontSize = 13.sp)
                                                 Text(
@@ -194,10 +216,121 @@ fun ProfileDetailScreen(
                             }
                         }
                         2 -> {
-                            VedicChartDiamond(chart = chart.vedic)
+                            // 11종 바르가 분점도 선택 칩 바
+                            Text(
+                                text = "Divisional Charts (Vargas)",
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                vargaList.forEach { (key, title) ->
+                                    val isSelected = selectedVarga == key
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = { selectedVarga = key },
+                                        label = { Text(title, fontSize = 12.sp) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = AccentPrimary,
+                                            selectedLabelColor = BackgroundWhite,
+                                            containerColor = SurfaceLight,
+                                            labelColor = TextPrimary
+                                        ),
+                                        border = BorderStroke(1.dp, if (isSelected) AccentPrimary else BorderColor)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // 선택된 바르가 다이아몬드 차트
+                            VedicChartDiamond(
+                                chart = chart.vedic,
+                                selectedVargaKey = selectedVarga
+                            )
+
                             Spacer(modifier = Modifier.height(20.dp))
 
-                            // D1 Rasi Placements 카드
+                            // Sidereal Planetary Placements (낙샤트라 줄바꿈 깨짐 완전 해결)
+                            Card(
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
+                                border = BorderStroke(1.dp, BorderColor),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    val activeVarga = chart.vedic.vargas[selectedVarga]
+                                    val vargaLagnaSign = activeVarga?.lagna_sign ?: chart.vedic.lagna_sign
+                                    Text(
+                                        text = "${vargaList.find { it.first == selectedVarga }?.second ?: selectedVarga} Placements · Lagna: ${getSignName(vargaLagnaSign)}",
+                                        color = TextPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    chart.vedic.planets.forEach { p ->
+                                        val rx = if (p.is_retrograde) " [Rx]" else ""
+                                        val pPlacement = activeVarga?.placements?.find { it.planet_name == p.name }
+                                        val houseNum = pPlacement?.house ?: (((p.sign_index - vargaLagnaSign + 12) % 12) + 1)
+                                        val signIdx = pPlacement?.sign_index ?: p.sign_index
+
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 6.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "${p.name}$rx",
+                                                    color = TextPrimary,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    fontSize = 14.sp
+                                                )
+                                                Text(
+                                                    text = "House $houseNum · ${getSignName(signIdx)}",
+                                                    color = TextSecondary,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "${String.format("%.2f°", p.sign_degree)} in sign",
+                                                    color = TextSecondary,
+                                                    fontSize = 12.sp
+                                                )
+                                                Text(
+                                                    text = "${p.nakshatra_name} (Pada ${p.nakshatra_pada})",
+                                                    color = CelestialBlue,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
+                                        }
+                                        HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // 빔쇼타리 다샤 아코디언 UI (안타르다샤 확장, Mahadasha 접두어 제거, YYYY.MM.DD 환산)
                             Card(
                                 shape = RoundedCornerShape(12.dp),
                                 colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
@@ -206,51 +339,91 @@ fun ProfileDetailScreen(
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
                                     Text(
-                                        text = "D1 Rasi Placements (Lagna: ${String.format("%.2f°", chart.vedic.lagna_sidereal)} ${getSignName(chart.vedic.lagna_sign)})",
+                                        text = "Vimshottari Dasha Sequence",
                                         color = TextPrimary,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp
+                                        fontSize = 15.sp
                                     )
                                     Spacer(modifier = Modifier.height(10.dp))
-                                    chart.vedic.planets.forEach { p ->
-                                        val rx = if (p.is_retrograde) " [Rx]" else ""
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Text(text = "${p.name}$rx", color = TextPrimary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                                            Text(
-                                                text = "${String.format("%.2f°", p.sign_degree)} ${getSignName(p.sign_index)} · ${p.nakshatra_name} Pada ${p.nakshatra_pada}",
-                                                color = TextSecondary,
-                                                fontSize = 13.sp
-                                            )
-                                        }
-                                        HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
-                                    }
-                                }
-                            }
 
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            // Vimshottari Dasha 카드
-                            Card(
-                                shape = RoundedCornerShape(12.dp),
-                                colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
-                                border = BorderStroke(1.dp, BorderColor),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Text("Vimshottari Dasha Sequence", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                    Spacer(modifier = Modifier.height(10.dp))
                                     chart.vedic.vimshottari_dashas.forEach { d ->
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Text(text = "Mahadasha: ${d.lord}", color = TextPrimary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                                            Text(text = "Start JD ${String.format("%.1f", d.start_jd)}", color = TextSecondary, fontSize = 13.sp)
+                                        val isExpanded = expandedDashaLord == d.lord
+                                        Column(modifier = Modifier.fillMaxWidth()) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable {
+                                                        expandedDashaLord = if (isExpanded) null else d.lord
+                                                    }
+                                                    .padding(vertical = 10.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = d.lord,
+                                                    color = TextPrimary,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 15.sp
+                                                )
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(
+                                                        text = "${d.startDateFormatted} ~ ${d.endDateFormatted}",
+                                                        color = TextSecondary,
+                                                        fontSize = 12.sp
+                                                    )
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Icon(
+                                                        imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                        contentDescription = null,
+                                                        tint = TextSecondary,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
+                                            }
+
+                                            // 안타르다샤 아코디언 펼침 내용
+                                            AnimatedVisibility(visible = isExpanded) {
+                                                Column(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .background(SurfaceLight, RoundedCornerShape(8.dp))
+                                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                                ) {
+                                                    if (d.sub_periods.isEmpty()) {
+                                                        Text(
+                                                            text = "No Antardasha records available",
+                                                            color = TextSecondary,
+                                                            fontSize = 12.sp,
+                                                            modifier = Modifier.padding(vertical = 4.dp)
+                                                        )
+                                                    } else {
+                                                        d.sub_periods.forEach { sub ->
+                                                            Row(
+                                                                modifier = Modifier
+                                                                    .fillMaxWidth()
+                                                                    .padding(vertical = 4.dp),
+                                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                                verticalAlignment = Alignment.CenterVertically
+                                                            ) {
+                                                                Text(
+                                                                    text = "${d.lord} - ${sub.lord}",
+                                                                    color = TextPrimary,
+                                                                    fontWeight = FontWeight.Medium,
+                                                                    fontSize = 13.sp
+                                                                )
+                                                                Text(
+                                                                    text = "${sub.startDateFormatted} ~ ${sub.endDateFormatted}",
+                                                                    color = TextSecondary,
+                                                                    fontSize = 12.sp
+                                                                )
+                                                            }
+                                                            HorizontalDivider(color = BorderColor.copy(alpha = 0.3f))
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
                                         }
-                                        HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
                                     }
                                 }
                             }

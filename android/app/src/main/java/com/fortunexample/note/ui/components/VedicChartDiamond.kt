@@ -13,12 +13,31 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.dp
+import com.fortunexample.note.data.VargaPlacementData
 import com.fortunexample.note.data.VedicChartData
 import com.fortunexample.note.ui.theme.*
 
 @Composable
 fun VedicChartDiamond(
     chart: VedicChartData,
+    modifier: Modifier = Modifier,
+    selectedVargaKey: String = "D1"
+) {
+    val varga = chart.vargas[selectedVargaKey]
+    val lagnaSign = varga?.lagna_sign ?: chart.lagna_sign
+    val placements = varga?.placements ?: emptyList()
+
+    VedicChartDiamondCore(
+        lagnaSign = lagnaSign,
+        placements = placements,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun VedicChartDiamondCore(
+    lagnaSign: Int,
+    placements: List<VargaPlacementData>,
     modifier: Modifier = Modifier
 ) {
     val planetPaint = remember {
@@ -73,7 +92,7 @@ fun VedicChartDiamond(
         drawLine(color = AccentPrimary, start = bottomMid, end = leftMid, strokeWidth = 2.5f)
         drawLine(color = AccentPrimary, start = leftMid, end = topMid, strokeWidth = 2.5f)
 
-        // 4. 12개 하우스 영역 중심점 정의 (북인도 차트 표준)
+        // 4. 12개 하우스 중심점
         val houseCenters = listOf(
             Offset(w * 0.50f, h * 0.24f),  // H1 (Top Diamond)
             Offset(w * 0.25f, h * 0.13f),  // H2
@@ -89,13 +108,13 @@ fun VedicChartDiamond(
             Offset(w * 0.75f, h * 0.13f)   // H12
         )
 
-        // 5. 각 하우스별 행성 배치 맵 구성
+        // 5. 각 하우스별 행성 목록 구성
         val housePlanets = Array(12) { mutableListOf<String>() }
-        housePlanets[0].add("As") // H1 always contains Lagna Ascendant
+        housePlanets[0].add("As") // H1 contains Lagna Ascendant
 
-        chart.planets.forEach { p ->
-            val hIdx = ((p.sign_index - chart.lagna_sign + 12) % 12)
-            val abbr = when (p.name) {
+        placements.forEach { p ->
+            val hIdx = (p.house - 1).coerceIn(0, 11)
+            val abbr = when (p.planet_name) {
                 "Sun" -> "Su"
                 "Moon" -> "Mo"
                 "Mercury" -> "Me"
@@ -105,17 +124,15 @@ fun VedicChartDiamond(
                 "Saturn" -> "Sa"
                 "Rahu" -> "Ra"
                 "Ketu" -> "Ke"
-                else -> p.name.take(2)
+                else -> p.planet_name.take(2)
             }
-            val label = if (p.is_retrograde) "$abbrⓇ" else abbr
-            housePlanets[hIdx].add(label)
+            housePlanets[hIdx].add(abbr)
         }
 
         // 6. 각 하우스에 Sign 번호 및 행성 렌더링
         for (i in 0..11) {
             val center = houseCenters[i]
-            // Rasi Sign Number (1 = Aries, 2 = Taurus ...)
-            val signNum = ((chart.lagna_sign + i) % 12) + 1
+            val signNum = ((lagnaSign + i) % 12) + 1
             drawContext.canvas.nativeCanvas.drawText(
                 "$signNum",
                 center.x,
@@ -123,18 +140,17 @@ fun VedicChartDiamond(
                 signNumPaint
             )
 
-            // 행성 목록
-            val planetsInHouse = housePlanets[i]
-            if (planetsInHouse.isNotEmpty()) {
-                val line1 = planetsInHouse.take(3).joinToString(" ")
+            val inHouse = housePlanets[i]
+            if (inHouse.isNotEmpty()) {
+                val line1 = inHouse.take(3).joinToString(" ")
                 drawContext.canvas.nativeCanvas.drawText(
                     line1,
                     center.x,
                     center.y + 12f,
                     planetPaint
                 )
-                if (planetsInHouse.size > 3) {
-                    val line2 = planetsInHouse.drop(3).joinToString(" ")
+                if (inHouse.size > 3) {
+                    val line2 = inHouse.drop(3).joinToString(" ")
                     drawContext.canvas.nativeCanvas.drawText(
                         line2,
                         center.x,
