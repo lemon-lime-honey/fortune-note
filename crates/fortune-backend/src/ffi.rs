@@ -224,6 +224,21 @@ impl FortuneClient {
             }
         })
     }
+
+    pub fn export_backup_json(&self) -> Result<String, FortuneBackendFfiError> {
+        Ok(self.service.export_backup_json()?)
+    }
+
+    pub fn import_backup_json(
+        &self,
+        json_str: String,
+        replace_existing: bool,
+    ) -> Result<String, FortuneBackendFfiError> {
+        let summary = self.service.import_backup_json(&json_str, replace_existing)?;
+        serde_json::to_string(&summary).map_err(|e| FortuneBackendFfiError::SerializationError {
+            detail: format!("Failed to serialize import summary: {}", e),
+        })
+    }
 }
 
 #[uniffi::export]

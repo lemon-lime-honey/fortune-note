@@ -4,8 +4,8 @@ use crate::markdown::{
     format_profile_markdown,
 };
 use crate::models::{
-    CreateHoraryParams, CreateProfileParams, HoraryQuestion, Profile, UpdateHoraryParams,
-    UpdateProfileParams,
+    BackupData, CreateHoraryParams, CreateProfileParams, HoraryQuestion, ImportSummary, Profile,
+    UpdateHoraryParams, UpdateProfileParams,
 };
 use crate::repository::{HoraryRepository, ProfileRepository};
 use chrono::Utc;
@@ -413,6 +413,114 @@ impl FortuneBackendService {
         };
         calculate_fortune(input).map_err(FortuneBackendError::CalculationError)
     }
+
+    pub fn export_backup_json(&self) -> Result<String, FortuneBackendError> {
+        let profiles = self.list_profiles(None)?;
+        let horary_questions = self.list_horary(None, None)?;
+        let backup = BackupData {
+            app: "fortune-note".to_string(),
+            version: 1,
+            exported_at: Utc::now().to_rfc3339(),
+            profiles,
+            horary_questions,
+        };
+        serde_json::to_string_pretty(&backup)
+            .map_err(|e| FortuneBackendError::SerializationError(e.to_string()))
+    }
+
+    pub fn import_backup_json(
+        &self,
+        json_str: &str,
+        replace_existing: bool,
+    ) -> Result<ImportSummary, FortuneBackendError> {
+        let backup: BackupData = serde_json::from_str(json_str).map_err(|e| {
+            FortuneBackendError::ValidationError(format!("유효하지 않은 백업 JSON 형식입니다: {}", e))
+        })?;
+
+        if backup.app != "fortune-note" {
+            return Err(FortuneBackendError::ValidationError(
+                "fortune-note 앱의 백업 데이터가 아닙니다".to_string(),
+            ));
+        }
+
+        let mut conn = self
+            .pool
+            .lock()
+            .map_err(|e| FortuneBackendError::DatabaseError(e.to_string()))?;
+
+        let tx = conn
+            .transaction()
+            .map_err(|e| FortuneBackendError::DatabaseError(e.to_string()))?;
+
+        if replace_existing {
+            tx.execute("DELETE FROM horary_questions", [])
+                .map_err(|e| FortuneBackendError::DatabaseError(e.to_string()))?;
+            tx.execute("DELETE FROM profiles", [])
+                .map_err(|e| FortuneBackendError::DatabaseError(e.to_string()))?;
+        }
+
+        let mut profile_count = 0;
+        for p in &backup.profiles {
+            if replace_existing {
+                ProfileRepository::insert(&tx, p)
+                    .map_err(|e| FortuneBackendError::DatabaseError(e.to_string()))?;
+                profile_count += 1;
+            } else {
+                let exists: bool = tx
+                    .query_row("SELECT COUNT(1) FROM profiles WHERE id = ?1", [&p.id], |r| {
+                        Ok(r.get::<_, i64>(0)? > 0)
+                    })
+                    .map_err(|e| FortuneBackendError::DatabaseError(e.to_string()))?;
+
+                if exists {
+                    ProfileRepository::update(&tx, p)
+                        .map_err(|e| FortuneBackendError::DatabaseError(e.to_string()))?;
+                } else {
+                    ProfileRepository::insert(&tx, p)
+                        .map_err(|e| FortuneBackendError::DatabaseError(e.to_string()))?;
+                }
+                profile_count += 1;
+            }
+        }
+
+        let mut horary_count = 0;
+        for h in &backup.horary_questions {
+            if replace_existing {
+                HoraryRepository::insert(&tx, h)
+                    .map_err(|e| FortuneBackendError::DatabaseError(e.to_string()))?;
+                horary_count += 1;
+            } else {
+                let exists: bool = tx
+                    .query_row(
+                        "SELECT COUNT(1) FROM horary_questions WHERE id = ?1",
+                        [&h.id],
+                        |r| Ok(r.get::<_, i64>(0)? > 0),
+                    )
+                    .map_err(|e| FortuneBackendError::DatabaseError(e.to_string()))?;
+
+                if exists {
+                    HoraryRepository::update(&tx, h)
+                        .map_err(|e| FortuneBackendError::DatabaseError(e.to_string()))?;
+                } else {
+                    HoraryRepository::insert(&tx, h)
+                        .map_err(|e| FortuneBackendError::DatabaseError(e.to_string()))?;
+                }
+                horary_count += 1;
+            }
+        }
+
+        tx.commit()
+            .map_err(|e| FortuneBackendError::DatabaseError(e.to_string()))?;
+
+        Ok(ImportSummary {
+            imported_profiles: profile_count,
+            imported_horary: horary_count,
+            message: format!(
+                "프로필 {}건, 질문 {}건이 성공적으로 복원되었습니다",
+                profile_count, horary_count
+            ),
+        })
+    }
 }
 
 #[cfg(test)]
@@ -505,5 +613,71 @@ mod tests {
         assert!(prashna_md.contains("Vedic Sidereal"));
         assert!(prashna_md.contains("Prashna Lagna"));
         assert!(!prashna_md.contains("Major Aspects"));
+    }
+
+    #[test]
+    fn test_backup_and_restore_json_flow() {
+        let service1 = FortuneBackendService::new(":memory:").expect("service1 init failed");
+
+        let p1 = service1
+            .create_profile(CreateProfileParams {
+                name: "사용자A".to_string(),
+                gender: "male".to_string(),
+                birth_year: 1990,
+                birth_month: 1,
+                birth_day: 15,
+                birth_hour: 8,
+                birth_minute: 20,
+                latitude: 37.5665,
+                longitude: 126.9780,
+                timezone_id: None,
+                notes: Some("첫번째 인물".to_string()),
+            })
+            .expect("profile1 failed");
+
+        let h1 = service1
+            .create_horary(CreateHoraryParams {
+                title: "이직 성공 여부".to_string(),
+                category: "career".to_string(),
+                question_text: "올해 안에 이직할 수 있을까?".to_string(),
+                query_year: 2026,
+                query_month: 9,
+                query_day: 21,
+                query_hour: 23,
+                query_minute: 40,
+                query_second: 0.0,
+                latitude: 37.5665,
+                longitude: 126.9780,
+                timezone_id: None,
+                querent_profile_id: Some(p1.id.clone()),
+                result_notes: None,
+            })
+            .expect("horary1 failed");
+
+        // 1. JSON 내보내기 검증
+        let backup_json = service1.export_backup_json().expect("export failed");
+        assert!(backup_json.contains("fortune-note"));
+        assert!(backup_json.contains("사용자A"));
+        assert!(backup_json.contains("이직 성공 여부"));
+
+        // 2. 새로운 깨끗한 인스턴스로 복원 (재설치 시뮬레이션)
+        let service2 = FortuneBackendService::new(":memory:").expect("service2 init failed");
+        assert_eq!(service2.list_profiles(None).unwrap().len(), 0);
+        assert_eq!(service2.list_horary(None, None).unwrap().len(), 0);
+
+        let summary = service2
+            .import_backup_json(&backup_json, true)
+            .expect("import failed");
+        assert_eq!(summary.imported_profiles, 1);
+        assert_eq!(summary.imported_horary, 1);
+
+        let restored_profiles = service2.list_profiles(None).unwrap();
+        assert_eq!(restored_profiles.len(), 1);
+        assert_eq!(restored_profiles[0].name, "사용자A");
+
+        let restored_horaries = service2.list_horary(None, None).unwrap();
+        assert_eq!(restored_horaries.len(), 1);
+        assert_eq!(restored_horaries[0].title, "이직 성공 여부");
+        assert_eq!(restored_horaries[0].querent_profile_id, Some(p1.id));
     }
 }

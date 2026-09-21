@@ -104,3 +104,19 @@ pub struct UpdateHoraryParams {
     pub querent_profile_id: Option<String>,
     pub result_notes: Option<String>,
 }
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BackupData {
+    pub app: String,
+    pub version: u32,
+    pub exported_at: String,
+    pub profiles: Vec<Profile>,
+    pub horary_questions: Vec<HoraryQuestion>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ImportSummary {
+    pub imported_profiles: u32,
+    pub imported_horary: u32,
+    pub message: String,
+}

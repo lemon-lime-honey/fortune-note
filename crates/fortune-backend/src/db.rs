@@ -19,8 +19,8 @@ pub fn init_db(path: &str) -> Result<DbPool> {
 fn configure_connection(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         r#"
-        PRAGMA journal_mode = WAL;
-        PRAGMA synchronous = NORMAL;
+        PRAGMA journal_mode = DELETE;
+        PRAGMA synchronous = FULL;
         PRAGMA foreign_keys = ON;
         PRAGMA busy_timeout = 5000;
         "#,

@@ -22,8 +22,8 @@ pub use markdown::{
     format_profile_markdown,
 };
 pub use models::{
-    CreateHoraryParams, CreateProfileParams, HoraryQuestion, Profile, UpdateHoraryParams,
-    UpdateProfileParams,
+    BackupData, CreateHoraryParams, CreateProfileParams, HoraryQuestion, ImportSummary, Profile,
+    UpdateHoraryParams, UpdateProfileParams,
 };
 pub use repository::{HoraryRepository, ProfileRepository};
 pub use service::{FortuneBackendError, FortuneBackendService};
