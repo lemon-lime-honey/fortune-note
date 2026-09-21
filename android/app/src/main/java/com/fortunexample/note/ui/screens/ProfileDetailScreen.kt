@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fortunexample.note.data.FortuneChartOutput
@@ -267,11 +268,21 @@ fun ProfileDetailScreen(
                                 Column(modifier = Modifier.padding(16.dp)) {
                                     val activeVarga = chart.vedic.vargas[selectedVarga]
                                     val vargaLagnaSign = activeVarga?.lagna_sign ?: chart.vedic.lagna_sign
+                                    val vargaTitle = vargaList.find { it.first == selectedVarga }?.second ?: selectedVarga
                                     Text(
-                                        text = "${vargaList.find { it.first == selectedVarga }?.second ?: selectedVarga} Placements · Lagna: ${getSignName(vargaLagnaSign)}",
+                                        text = "$vargaTitle Placements",
                                         color = TextPrimary,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "Lagna: ${getSignName(vargaLagnaSign)}",
+                                        color = TextSecondary,
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 12.sp,
+                                        textAlign = TextAlign.End,
+                                        modifier = Modifier.fillMaxWidth()
                                     )
                                     Spacer(modifier = Modifier.height(10.dp))
 
@@ -406,7 +417,7 @@ fun ProfileDetailScreen(
                                                                 verticalAlignment = Alignment.CenterVertically
                                                             ) {
                                                                 Text(
-                                                                    text = "${d.lord} - ${sub.lord}",
+                                                                    text = sub.lord,
                                                                     color = TextPrimary,
                                                                     fontWeight = FontWeight.Medium,
                                                                     fontSize = 13.sp

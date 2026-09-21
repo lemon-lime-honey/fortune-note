@@ -64,10 +64,10 @@ fun WesternChartWheel(
         val innerRadius = outerRadius * 0.70f
         val aspectRadius = outerRadius * 0.45f
 
-        // 1. 외곽 원 및 하우스 대역
-        drawCircle(color = BorderColor, radius = outerRadius, center = center, style = Stroke(width = 2.5f))
-        drawCircle(color = BorderColor, radius = innerRadius, center = center, style = Stroke(width = 2f))
-        drawCircle(color = BorderColor.copy(alpha = 0.5f), radius = aspectRadius, center = center, style = Stroke(width = 1.2f))
+        // 1. 외곽 원 및 하우스 대역 (안쪽 원 및 링 선명화)
+        drawCircle(color = TextSecondary.copy(alpha = 0.85f), radius = outerRadius, center = center, style = Stroke(width = 3.5f))
+        drawCircle(color = TextSecondary.copy(alpha = 0.75f), radius = innerRadius, center = center, style = Stroke(width = 2.5f))
+        drawCircle(color = TextSecondary.copy(alpha = 0.70f), radius = aspectRadius, center = center, style = Stroke(width = 2.5f))
 
         // 2. 12 하우스 커스프 분할선 및 번호
         val cusps = chart.house_cusps
@@ -83,12 +83,12 @@ fun WesternChartWheel(
                 center.y + (outerRadius * sin(angleRad)).toFloat()
             )
             val isAxis = (i == 0 || i == 9)
-            val strokeColor = if (isAxis) AccentPrimary else BorderColor
+            val strokeColor = if (isAxis) AccentPrimary else TextSecondary.copy(alpha = 0.45f)
             drawLine(
                 color = strokeColor,
                 start = start,
                 end = end,
-                strokeWidth = if (isAxis) 3f else 1.5f
+                strokeWidth = if (isAxis) 3.5f else 1.8f
             )
 
             val nextCuspDeg = cusps[(i + 1) % 12]
@@ -118,11 +118,11 @@ fun WesternChartWheel(
                 )
 
                 val color = when (aspect.aspect_type) {
-                    "Trine", "Sextile" -> CelestialBlue.copy(alpha = 0.7f)
-                    "Square", "Opposition" -> AstrologicalRed.copy(alpha = 0.7f)
-                    else -> SajuSlate.copy(alpha = 0.5f)
+                    "Trine", "Sextile" -> CelestialBlue.copy(alpha = 0.8f)
+                    "Square", "Opposition" -> AstrologicalRed.copy(alpha = 0.8f)
+                    else -> SajuSlate.copy(alpha = 0.6f)
                 }
-                drawLine(color = color, start = pos1, end = pos2, strokeWidth = 1.5f)
+                drawLine(color = color, start = pos1, end = pos2, strokeWidth = 1.8f)
             }
         }
 
