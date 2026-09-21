@@ -12,22 +12,26 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GpsFixed
-import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import com.fortunexample.note.data.CityDatabase
-import com.fortunexample.note.data.CityLocation
+import com.fortunexample.note.data.CachedLocation
+import com.fortunexample.note.data.GeocodingCache
 import com.fortunexample.note.ui.theme.*
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,7 +42,8 @@ fun LocationPicker(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var showCityDialog by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    var showDialog by remember { mutableStateOf(false) }
     var showManualEdit by remember { mutableStateOf(false) }
 
     var latStr by remember(latitude) { mutableStateOf(String.format("%.4f", latitude)) }
@@ -63,7 +68,7 @@ fun LocationPicker(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = "관측 위치 (좌표)",
+                text = "관측 위치",
                 color = TextPrimary,
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp
@@ -77,20 +82,20 @@ fun LocationPicker(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 도시 검색 및 GPS 캡처 액션 버튼
+            // 위치 검색 및 GPS 캡처 액션 버튼
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(
-                    onClick = { showCityDialog = true },
+                    onClick = { showDialog = true },
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(containerColor = CardDark),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Icon(Icons.Default.LocationCity, contentDescription = null, tint = CelestialBlue, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Search, contentDescription = null, tint = CelestialBlue, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("도시 검색", color = TextPrimary, fontSize = 13.sp)
+                    Text("위치 검색", color = TextPrimary, fontSize = 13.sp)
                 }
 
                 Button(
@@ -117,13 +122,13 @@ fun LocationPicker(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // 수동 미세 조정 접기/펼치기 버튼
+            // 수동 좌표 입력 접기/펼치기
             TextButton(
                 onClick = { showManualEdit = !showManualEdit },
                 contentPadding = PaddingValues(0.dp)
             ) {
                 Text(
-                    text = if (showManualEdit) "수동 미세 조정 닫기 ▲" else "수동으로 위경도 숫자 직접 수정 ▼",
+                    text = if (showManualEdit) "수동 좌표 입력 닫기 ▲" else "수동 좌표 직접 입력 ▼",
                     color = TextSecondary,
                     fontSize = 12.sp
                 )
@@ -157,58 +162,119 @@ fun LocationPicker(
         }
     }
 
-    // 도시 검색 모달 다이얼로그
-    if (showCityDialog) {
+    // 위치 검색 모달 다이얼로그
+    if (showDialog) {
+        val keyboardController = LocalSoftwareKeyboardController.current
         var query by remember { mutableStateOf("") }
-        val searchResults by remember(query) { derivedStateOf { CityDatabase.search(query) } }
+        var isSearching by remember { mutableStateOf(false) }
+        var locations by remember { mutableStateOf(emptyList<CachedLocation>()) }
+
+        // 로컬 캐시 즉시 반영 (오프라인 0바이트)
+        LaunchedEffect(query) {
+            locations = GeocodingCache.searchLocal(context, query)
+        }
+
+        fun executeOnlineSearch() {
+            if (query.isBlank() || isSearching) return
+            keyboardController?.hide()
+            isSearching = true
+            coroutineScope.launch {
+                val results = GeocodingCache.searchOnline(context, query)
+                locations = GeocodingCache.searchLocal(context, query)
+                isSearching = false
+                if (results.isEmpty() && locations.isEmpty()) {
+                    Toast.makeText(context, "검색 결과가 없습니다.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
 
         AlertDialog(
-            onDismissRequest = { showCityDialog = false },
+            onDismissRequest = { showDialog = false },
             containerColor = SurfaceDark,
             title = {
-                Text("출생 / 관측 도시 선택", color = TextPrimary, fontWeight = FontWeight.Bold)
+                Text("위치 검색", color = TextPrimary, fontWeight = FontWeight.Bold)
             },
             text = {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     OutlinedTextField(
                         value = query,
                         onValueChange = { query = it },
-                        placeholder = { Text("도시 또는 구 이름 (예: 강남, 수원, 부산, 도쿄)") },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = TextSecondary) },
+                        placeholder = { Text("동, 읍, 면 또는 도로명 입력") },
+                        leadingIcon = {
+                            Icon(Icons.Default.Search, contentDescription = null, tint = TextSecondary)
+                        },
+                        trailingIcon = {
+                            if (isSearching) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    color = CelestialBlue,
+                                    strokeWidth = 2.dp
+                                )
+                            } else if (query.isNotBlank()) {
+                                IconButton(onClick = { executeOnlineSearch() }) {
+                                    Icon(Icons.Default.Search, contentDescription = "검색", tint = AccentGold)
+                                }
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(onSearch = { executeOnlineSearch() }),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
+
                     Spacer(modifier = Modifier.height(12.dp))
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(280.dp)
-                    ) {
-                        items(searchResults) { city ->
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        onLocationChanged(city.latitude, city.longitude)
-                                        showCityDialog = false
-                                        Toast.makeText(context, "${city.displayName} 좌표가 적용되었습니다.", Toast.LENGTH_SHORT).show()
-                                    }
-                                    .padding(vertical = 10.dp, horizontal = 4.dp)
-                            ) {
-                                Text(text = city.displayName, color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                                Text(
-                                    text = "위도 ${String.format("%.4f", city.latitude)}°, 경도 ${String.format("%.4f", city.longitude)}°",
-                                    color = TextSecondary,
-                                    fontSize = 12.sp
-                                )
+
+                    if (locations.isEmpty() && !isSearching) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(160.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "검색 버튼을 눌러 온라인으로 위치를 찾을 수 있습니다.",
+                                color = TextSecondary,
+                                fontSize = 13.sp
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(280.dp)
+                        ) {
+                            items(locations) { loc ->
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            onLocationChanged(loc.latitude, loc.longitude)
+                                            showDialog = false
+                                            Toast.makeText(context, "${loc.displayName} 좌표가 적용되었습니다.", Toast.LENGTH_SHORT).show()
+                                        }
+                                        .padding(vertical = 10.dp, horizontal = 4.dp)
+                                ) {
+                                    Text(
+                                        text = loc.displayName,
+                                        color = TextPrimary,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 15.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "위도 ${String.format("%.4f", loc.latitude)}°, 경도 ${String.format("%.4f", loc.longitude)}°",
+                                        color = TextSecondary,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
                             }
-                            HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
                         }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showCityDialog = false }) {
+                TextButton(onClick = { showDialog = false }) {
                     Text("닫기", color = AccentGold)
                 }
             }
