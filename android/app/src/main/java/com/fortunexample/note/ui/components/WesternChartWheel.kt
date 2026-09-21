@@ -10,10 +10,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import com.fortunexample.note.data.WesternChartData
 import com.fortunexample.note.ui.theme.*
@@ -25,22 +23,23 @@ fun WesternChartWheel(
     chart: WesternChartData,
     modifier: Modifier = Modifier
 ) {
-    val textPaint = remember {
+    val symbolPaint = remember {
         Paint().apply {
             isAntiAlias = true
             textAlign = Paint.Align.CENTER
-            textSize = 28f
+            textSize = 34f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             color = android.graphics.Color.parseColor("#0F172A")
         }
     }
 
-    val subTextPaint = remember {
+    val retroPaint = remember {
         Paint().apply {
             isAntiAlias = true
-            textAlign = Paint.Align.CENTER
-            textSize = 22f
-            color = android.graphics.Color.parseColor("#475569")
+            textAlign = Paint.Align.LEFT
+            textSize = 18f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            color = android.graphics.Color.parseColor("#DC2626")
         }
     }
 
@@ -62,15 +61,15 @@ fun WesternChartWheel(
     ) {
         val center = Offset(size.width / 2f, size.height / 2f)
         val outerRadius = size.minDimension / 2f * 0.95f
-        val innerRadius = outerRadius * 0.72f
-        val aspectRadius = outerRadius * 0.48f
+        val innerRadius = outerRadius * 0.70f
+        val aspectRadius = outerRadius * 0.45f
 
-        // 1. 외곽 원 및 하우스 밴드
+        // 1. 외곽 원 및 하우스 대역
         drawCircle(color = BorderColor, radius = outerRadius, center = center, style = Stroke(width = 2.5f))
         drawCircle(color = BorderColor, radius = innerRadius, center = center, style = Stroke(width = 2f))
-        drawCircle(color = BorderColor.copy(alpha = 0.6f), radius = aspectRadius, center = center, style = Stroke(width = 1.2f))
+        drawCircle(color = BorderColor.copy(alpha = 0.5f), radius = aspectRadius, center = center, style = Stroke(width = 1.2f))
 
-        // 2. 12 하우스 커스프 분할선 및 하우스 번호
+        // 2. 12 하우스 커스프 분할선 및 번호
         val cusps = chart.house_cusps
         for (i in cusps.indices) {
             val cuspDeg = cusps[i]
@@ -83,7 +82,7 @@ fun WesternChartWheel(
                 center.x + (outerRadius * cos(angleRad)).toFloat(),
                 center.y + (outerRadius * sin(angleRad)).toFloat()
             )
-            val isAxis = (i == 0 || i == 9) // Ascendant (1H) or Midheaven (10H)
+            val isAxis = (i == 0 || i == 9)
             val strokeColor = if (isAxis) AccentPrimary else BorderColor
             drawLine(
                 color = strokeColor,
@@ -92,7 +91,6 @@ fun WesternChartWheel(
                 strokeWidth = if (isAxis) 3f else 1.5f
             )
 
-            // 하우스 번호 표시 (커스프 중간 위치)
             val nextCuspDeg = cusps[(i + 1) % 12]
             var span = nextCuspDeg - cuspDeg
             if (span < 0.0) span += 360.0
@@ -103,7 +101,7 @@ fun WesternChartWheel(
             drawContext.canvas.nativeCanvas.drawText("${i + 1}", numX, numY, houseNumPaint)
         }
 
-        // 3. 메이저 아스펙트 연결선 (중심부)
+        // 3. 메이저 아스펙트 연결선
         chart.aspects.forEach { aspect ->
             val p1 = chart.planets.find { it.name == aspect.planet1 }
             val p2 = chart.planets.find { it.name == aspect.planet2 }
@@ -122,45 +120,72 @@ fun WesternChartWheel(
                 val color = when (aspect.aspect_type) {
                     "Trine", "Sextile" -> CelestialBlue.copy(alpha = 0.7f)
                     "Square", "Opposition" -> AstrologicalRed.copy(alpha = 0.7f)
-                    else -> SajuSlate.copy(alpha = 0.6f)
+                    else -> SajuSlate.copy(alpha = 0.5f)
                 }
                 drawLine(color = color, start = pos1, end = pos2, strokeWidth = 1.5f)
             }
         }
 
-        // 4. 행성 및 노드 표시 (점 + 표준 약어 텍스트)
-        val allBodies = chart.planets.map {
-            Triple(it.name, it.longitude, it.is_retrograde)
+        // 4. 행성 및 노드 유니코드 기호 표시 (겹침 방지 방사상 오프셋 알고리즘 적용)
+        data class BodyRenderItem(
+            val name: String,
+            val symbol: String,
+            val longitude: Double,
+            val isRetrograde: Boolean
+        )
+
+        val items = (chart.planets.map {
+            BodyRenderItem(it.name, getPlanetSymbol(it.name), it.longitude, it.is_retrograde)
         } + chart.nodes.map {
-            Triple(it.name, it.longitude, it.is_retrograde)
+            BodyRenderItem(it.name, getPlanetSymbol(it.name), it.longitude, it.is_retrograde)
+        }).sortedBy { it.longitude }
+
+        val baseRadius = (outerRadius + innerRadius) / 2f
+        val radialOffsets = FloatArray(items.size) { 0f }
+
+        // 근접 행성(각도차 8도 이내) 지그재그 분산 오프셋 계산
+        for (i in items.indices) {
+            val curr = items[i]
+            val prev = if (i > 0) items[i - 1] else items.last()
+            var diff = (curr.longitude - prev.longitude).let { if (it < 0.0) it + 360.0 else it }
+            if (diff < 8.0) {
+                // 이전 항목과 엇갈리게 레벨 변경 (-18f, +18f, 0f)
+                val prevOffset = if (i > 0) radialOffsets[i - 1] else 0f
+                radialOffsets[i] = if (prevOffset <= 0f) 18f else -18f
+            }
         }
 
-        allBodies.forEach { (name, longitude, isRetro) ->
-            val angleRad = Math.toRadians(longitude - chart.ascendant + 180.0)
+        items.forEachIndexed { idx, body ->
+            val angleRad = Math.toRadians(body.longitude - chart.ascendant + 180.0)
             val dotPos = Offset(
                 center.x + (innerRadius * cos(angleRad)).toFloat(),
                 center.y + (innerRadius * sin(angleRad)).toFloat()
             )
             drawCircle(color = AccentPrimary, radius = 4f, center = dotPos)
 
-            val textRadius = (outerRadius + innerRadius) / 2f
+            val textRadius = baseRadius + radialOffsets[idx]
             val textX = center.x + (textRadius * cos(angleRad)).toFloat()
-            val textY = center.y + (textRadius * sin(angleRad)).toFloat() + 8f
+            val textY = center.y + (textRadius * sin(angleRad)).toFloat() + 10f
 
-            val abbr = when (name) {
-                "Sun" -> "Sun"
-                "Moon" -> "Moon"
-                "Mercury" -> "Mer"
-                "Venus" -> "Ven"
-                "Mars" -> "Mar"
-                "Jupiter" -> "Jup"
-                "Saturn" -> "Sat"
-                "North Node" -> "NN"
-                "South Node" -> "SN"
-                else -> name.take(3)
+            drawContext.canvas.nativeCanvas.drawText(body.symbol, textX, textY, symbolPaint)
+            if (body.isRetrograde) {
+                drawContext.canvas.nativeCanvas.drawText("℞", textX + 14f, textY - 14f, retroPaint)
             }
-            val label = if (isRetro) "$abbrⓇ" else abbr
-            drawContext.canvas.nativeCanvas.drawText(label, textX, textY, textPaint)
         }
+    }
+}
+
+private fun getPlanetSymbol(name: String): String {
+    return when (name) {
+        "Sun" -> "☉"
+        "Moon" -> "☽"
+        "Mercury" -> "☿"
+        "Venus" -> "♀"
+        "Mars" -> "♂"
+        "Jupiter" -> "♃"
+        "Saturn" -> "♄"
+        "North Node" -> "☊"
+        "South Node" -> "☋"
+        else -> name.take(2)
     }
 }
