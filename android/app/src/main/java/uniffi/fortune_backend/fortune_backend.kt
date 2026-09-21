@@ -691,6 +691,10 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_fortune_backend_checksum_method_fortuneclient_export_horary_markdown(
     ): Int
+    external fun uniffi_fortune_backend_checksum_method_fortuneclient_export_horary_western_markdown(
+    ): Int
+    external fun uniffi_fortune_backend_checksum_method_fortuneclient_export_prashna_vedic_markdown(
+    ): Int
     external fun uniffi_fortune_backend_checksum_method_fortuneclient_export_profile_markdown(
     ): Int
     external fun uniffi_fortune_backend_checksum_method_fortuneclient_get_horary(
@@ -746,6 +750,10 @@ internal object UniffiLib {
     external fun uniffi_fortune_backend_fn_method_fortuneclient_delete_profile(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Byte
     external fun uniffi_fortune_backend_fn_method_fortuneclient_export_horary_markdown(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_fortune_backend_fn_method_fortuneclient_export_horary_western_markdown(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_fortune_backend_fn_method_fortuneclient_export_prashna_vedic_markdown(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_fortune_backend_fn_method_fortuneclient_export_profile_markdown(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -907,6 +915,12 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_export_horary_markdown() and 0xFFFF) != 23370) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_export_horary_western_markdown() and 0xFFFF) != 44166) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_export_prashna_vedic_markdown() and 0xFFFF) != 38472) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_export_profile_markdown() and 0xFFFF) != 3029) {
@@ -1353,6 +1367,10 @@ public interface FortuneClientInterface {
     
     fun `exportHoraryMarkdown`(`id`: kotlin.String): kotlin.String
     
+    fun `exportHoraryWesternMarkdown`(`id`: kotlin.String): kotlin.String
+    
+    fun `exportPrashnaVedicMarkdown`(`id`: kotlin.String): kotlin.String
+    
     fun `exportProfileMarkdown`(`id`: kotlin.String): kotlin.String
     
     fun `getHorary`(`id`: kotlin.String): kotlin.String?
@@ -1599,6 +1617,36 @@ open class FortuneClient: Disposable, AutoCloseable, FortuneClientInterface
     callWithHandle {
     uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
     UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_export_horary_markdown(
+        it,
+        
+        FfiConverterString.lower(`id`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(FortuneBackendFfiException::class)override fun `exportHoraryWesternMarkdown`(`id`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
+    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_export_horary_western_markdown(
+        it,
+        
+        FfiConverterString.lower(`id`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(FortuneBackendFfiException::class)override fun `exportPrashnaVedicMarkdown`(`id`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
+    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_export_prashna_vedic_markdown(
         it,
         
         FfiConverterString.lower(`id`),_status)
