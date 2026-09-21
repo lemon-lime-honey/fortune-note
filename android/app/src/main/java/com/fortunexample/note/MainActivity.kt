@@ -258,18 +258,24 @@ class MainActivity : ComponentActivity() {
                         val id = backStackEntry.arguments?.getString("id") ?: return@composable
                         val horary = horaryList.find { it.id == id }
                         var chart by remember { mutableStateOf<FortuneChartOutput?>(null) }
-                        var markdown by remember { mutableStateOf<String?>(null) }
+                        var westernMarkdown by remember { mutableStateOf<String?>(null) }
+                        var prashnaMarkdown by remember { mutableStateOf<String?>(null) }
+                        var integratedMarkdown by remember { mutableStateOf<String?>(null) }
 
                         LaunchedEffect(id) {
                             FortuneApp.repository.calculateHoraryChart(id).onSuccess { chart = it }
-                            FortuneApp.repository.exportHoraryMarkdown(id).onSuccess { markdown = it }
+                            FortuneApp.repository.exportHoraryWesternMarkdown(id).onSuccess { westernMarkdown = it }
+                            FortuneApp.repository.exportPrashnaVedicMarkdown(id).onSuccess { prashnaMarkdown = it }
+                            FortuneApp.repository.exportHoraryMarkdown(id).onSuccess { integratedMarkdown = it }
                         }
 
                         if (horary != null) {
                             HoraryDetailScreen(
                                 horary = horary,
                                 chart = chart,
-                                markdown = markdown,
+                                westernMarkdown = westernMarkdown,
+                                prashnaMarkdown = prashnaMarkdown,
+                                integratedMarkdown = integratedMarkdown,
                                 onBack = { navController.popBackStack() },
                                 onEdit = { navController.navigate("horary_edit?id=$id") },
                                 onDelete = {

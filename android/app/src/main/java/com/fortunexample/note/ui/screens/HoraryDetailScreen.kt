@@ -6,6 +6,7 @@ import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,13 +35,24 @@ import com.fortunexample.note.ui.theme.*
 fun HoraryDetailScreen(
     horary: HoraryDto,
     chart: FortuneChartOutput?,
-    markdown: String?,
+    westernMarkdown: String?,
+    prashnaMarkdown: String?,
+    integratedMarkdown: String?,
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
     val context = LocalContext.current
     var selectedTab by remember { mutableStateOf(0) }
+    var showMenu by remember { mutableStateOf(false) }
+
+    fun copyToClipboard(label: String, text: String?, message: String) {
+        if (!text.isNullOrEmpty()) {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -55,16 +68,51 @@ fun HoraryDetailScreen(
                         Icon(Icons.Default.Edit, contentDescription = "수정", tint = TextPrimary)
                     }
                     IconButton(onClick = {
-                        if (!markdown.isNullOrEmpty()) {
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            clipboard.setPrimaryClip(ClipData.newPlainText("Horary Prompt", markdown))
-                            Toast.makeText(context, "호라리 LLM 프롬프트가 복사되었습니다.", Toast.LENGTH_SHORT).show()
+                        if (selectedTab == 0) {
+                            copyToClipboard("Western Horary Prompt", westernMarkdown ?: integratedMarkdown, "호라리(서양) LLM 프롬프트가 복사되었습니다.")
+                        } else {
+                            copyToClipboard("Vedic Prashna Prompt", prashnaMarkdown ?: integratedMarkdown, "프라슈나(베다) LLM 프롬프트가 복사되었습니다.")
                         }
                     }) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = "복사", tint = TextPrimary)
+                        Icon(Icons.Default.ContentCopy, contentDescription = "현재 탭 복사", tint = TextPrimary)
                     }
-                    IconButton(onClick = onDelete) {
-                        Icon(Icons.Default.Delete, contentDescription = "삭제", tint = AstrologicalRed)
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "복사 옵션 및 메뉴", tint = TextPrimary)
+                    }
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                        modifier = Modifier.background(BackgroundWhite)
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("호라리 (서양) 프롬프트 복사", color = TextPrimary, fontSize = 14.sp) },
+                            onClick = {
+                                showMenu = false
+                                copyToClipboard("Western Horary Prompt", westernMarkdown ?: integratedMarkdown, "호라리(서양) LLM 프롬프트가 복사되었습니다.")
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("프라슈나 (베다) 프롬프트 복사", color = TextPrimary, fontSize = 14.sp) },
+                            onClick = {
+                                showMenu = false
+                                copyToClipboard("Vedic Prashna Prompt", prashnaMarkdown ?: integratedMarkdown, "프라슈나(베다) LLM 프롬프트가 복사되었습니다.")
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("호라리/프라슈나 통합 전체 복사", color = TextPrimary, fontSize = 14.sp) },
+                            onClick = {
+                                showMenu = false
+                                copyToClipboard("Integrated Prompt", integratedMarkdown, "통합 호라리/프라슈나 프롬프트가 복사되었습니다.")
+                            }
+                        )
+                        HorizontalDivider(color = BorderColor)
+                        DropdownMenuItem(
+                            text = { Text("질문 기록 삭제", color = AstrologicalRed, fontSize = 14.sp) },
+                            onClick = {
+                                showMenu = false
+                                onDelete()
+                            }
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

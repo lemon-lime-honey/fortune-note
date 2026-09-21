@@ -111,4 +111,16 @@ class FortuneRepository(
             client.exportHoraryMarkdown(id)
         }
     }
+
+    suspend fun exportHoraryWesternMarkdown(id: String): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            client.exportHoraryWesternMarkdown(id)
+        }
+    }
+
+    suspend fun exportPrashnaVedicMarkdown(id: String): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            client.exportPrashnaVedicMarkdown(id)
+        }
+    }
 }
