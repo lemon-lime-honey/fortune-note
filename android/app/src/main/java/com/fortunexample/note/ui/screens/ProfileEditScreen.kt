@@ -24,13 +24,13 @@ fun ProfileEditScreen(
 ) {
     var name by remember { mutableStateOf("") }
     var isMale by remember { mutableStateOf(true) }
-    var yearStr by remember { mutableStateOf("1995") }
-    var monthStr by remember { mutableStateOf("10") }
-    var dayStr by remember { mutableStateOf("25") }
-    var hourStr by remember { mutableStateOf("14") }
-    var minuteStr by remember { mutableStateOf("30") }
-    var latStr by remember { mutableStateOf("37.5665") }
-    var lonStr by remember { mutableStateOf("126.9780") }
+    var yearStr by remember { mutableStateOf("2000") }
+    var monthStr by remember { mutableStateOf("1") }
+    var dayStr by remember { mutableStateOf("1") }
+    var hourStr by remember { mutableStateOf("12") }
+    var minuteStr by remember { mutableStateOf("0") }
+    var latitude by remember { mutableDoubleStateOf(37.5665) }
+    var longitude by remember { mutableDoubleStateOf(126.9780) }
     var notes by remember { mutableStateOf("") }
 
     Scaffold(
@@ -113,39 +113,32 @@ fun ProfileEditScreen(
                 )
             }
 
-            // 출생 시각 (초 단위 배제)
-            Text("출생 시각 (시/분 필수 입력, 00초 기본)", color = TextSecondary, fontSize = 13.sp)
+            // 출생 시각
+            Text("출생 시각", color = TextSecondary, fontSize = 13.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = hourStr,
                     onValueChange = { hourStr = it },
-                    label = { Text("시 (0~23)") },
+                    label = { Text("시") },
                     modifier = Modifier.weight(1f)
                 )
                 OutlinedTextField(
                     value = minuteStr,
                     onValueChange = { minuteStr = it },
-                    label = { Text("분 (0~59)") },
+                    label = { Text("분") },
                     modifier = Modifier.weight(1f)
                 )
             }
 
-            // 관측 좌표
-            Text("출생지 좌표 (서울 기본값)", color = TextSecondary, fontSize = 13.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = latStr,
-                    onValueChange = { latStr = it },
-                    label = { Text("위도") },
-                    modifier = Modifier.weight(1f)
-                )
-                OutlinedTextField(
-                    value = lonStr,
-                    onValueChange = { lonStr = it },
-                    label = { Text("경도") },
-                    modifier = Modifier.weight(1f)
-                )
-            }
+            // 하이브리드 관측 좌표 선택기 (도시 검색 / GPS / 수동 미세 조정)
+            com.fortunexample.note.ui.components.LocationPicker(
+                latitude = latitude,
+                longitude = longitude,
+                onLocationChanged = { newLat, newLon ->
+                    latitude = newLat
+                    longitude = newLon
+                }
+            )
 
             // 메모
             OutlinedTextField(
@@ -160,13 +153,11 @@ fun ProfileEditScreen(
 
             Button(
                 onClick = {
-                    val y = yearStr.toIntOrNull() ?: 1995
+                    val y = yearStr.toIntOrNull() ?: 2000
                     val m = monthStr.toIntOrNull() ?: 1
                     val d = dayStr.toIntOrNull() ?: 1
                     val h = hourStr.toIntOrNull() ?: 0
                     val min = minuteStr.toIntOrNull() ?: 0
-                    val lat = latStr.toDoubleOrNull() ?: 37.5665
-                    val lon = lonStr.toDoubleOrNull() ?: 126.9780
 
                     if (name.trim().isNotEmpty()) {
                         onSave(
@@ -178,8 +169,8 @@ fun ProfileEditScreen(
                                 birth_day = d,
                                 birth_hour = h,
                                 birth_minute = min,
-                                latitude = lat,
-                                longitude = lon,
+                                latitude = latitude,
+                                longitude = longitude,
                                 notes = notes.trim()
                             )
                         )

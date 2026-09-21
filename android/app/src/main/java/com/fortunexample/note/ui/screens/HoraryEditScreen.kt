@@ -1,5 +1,8 @@
 package com.fortunexample.note.ui.screens
 
+import android.content.Context
+import android.location.LocationManager
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -10,10 +13,12 @@ import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fortunexample.note.data.CreateHoraryRequest
+import com.fortunexample.note.ui.components.LocationPicker
 import com.fortunexample.note.ui.theme.*
 import java.util.Calendar
 
@@ -23,6 +28,7 @@ fun HoraryEditScreen(
     onBack: () -> Unit,
     onSave: (CreateHoraryRequest) -> Unit
 ) {
+    val context = LocalContext.current
     var title by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("직업") }
     var questionText by remember { mutableStateOf("") }
@@ -34,8 +40,8 @@ fun HoraryEditScreen(
     var hourStr by remember { mutableStateOf(cal.get(Calendar.HOUR_OF_DAY).toString()) }
     var minuteStr by remember { mutableStateOf(cal.get(Calendar.MINUTE).toString()) }
     var secondStr by remember { mutableStateOf(cal.get(Calendar.SECOND).toString()) }
-    var latStr by remember { mutableStateOf("37.5665") }
-    var lonStr by remember { mutableStateOf("126.9780") }
+    var latitude by remember { mutableDoubleStateOf(37.5665) }
+    var longitude by remember { mutableDoubleStateOf(126.9780) }
 
     Scaffold(
         topBar = {
@@ -63,7 +69,7 @@ fun HoraryEditScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // 즉시 캡처 버튼
+            // 원터치 일시 캡처 버튼
             Button(
                 onClick = {
                     val now = Calendar.getInstance()
@@ -73,6 +79,20 @@ fun HoraryEditScreen(
                     hourStr = now.get(Calendar.HOUR_OF_DAY).toString()
                     minuteStr = now.get(Calendar.MINUTE).toString()
                     secondStr = now.get(Calendar.SECOND).toString()
+
+                    // 최신 위치도 함께 시도
+                    val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+                    if (lm != null) {
+                        try {
+                            val loc = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+                                ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+                            if (loc != null) {
+                                latitude = loc.latitude
+                                longitude = loc.longitude
+                            }
+                        } catch (_: SecurityException) {}
+                    }
+                    Toast.makeText(context, "현재 시각이 캡처되었습니다.", Toast.LENGTH_SHORT).show()
                 },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = CelestialBlue),
@@ -105,7 +125,7 @@ fun HoraryEditScreen(
                 minLines = 3
             )
 
-            Text("질문 일시 (초 단위 정밀 지원)", color = TextSecondary, fontSize = 13.sp)
+            Text("질문 일시", color = TextSecondary, fontSize = 13.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 OutlinedTextField(value = yearStr, onValueChange = { yearStr = it }, label = { Text("년") }, modifier = Modifier.weight(1.2f))
                 OutlinedTextField(value = monthStr, onValueChange = { monthStr = it }, label = { Text("월") }, modifier = Modifier.weight(1f))
@@ -116,6 +136,16 @@ fun HoraryEditScreen(
                 OutlinedTextField(value = minuteStr, onValueChange = { minuteStr = it }, label = { Text("분") }, modifier = Modifier.weight(1f))
                 OutlinedTextField(value = secondStr, onValueChange = { secondStr = it }, label = { Text("초") }, modifier = Modifier.weight(1f))
             }
+
+            // 하이브리드 좌표 선택기 (도시 검색 / GPS / 수동 미세 조정)
+            LocationPicker(
+                latitude = latitude,
+                longitude = longitude,
+                onLocationChanged = { newLat, newLon ->
+                    latitude = newLat
+                    longitude = newLon
+                }
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -133,8 +163,8 @@ fun HoraryEditScreen(
                                 query_hour = hourStr.toIntOrNull() ?: 0,
                                 query_minute = minuteStr.toIntOrNull() ?: 0,
                                 query_second = secondStr.toDoubleOrNull() ?: 0.0,
-                                latitude = latStr.toDoubleOrNull() ?: 37.5665,
-                                longitude = lonStr.toDoubleOrNull() ?: 126.9780
+                                latitude = latitude,
+                                longitude = longitude
                             )
                         )
                     }
