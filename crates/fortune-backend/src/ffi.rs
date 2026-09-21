@@ -4,26 +4,26 @@ use std::sync::Arc;
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum FortuneBackendFfiError {
-    #[error("Database error: {message}")]
-    DatabaseError { message: String },
-    #[error("Not found: {message}")]
-    NotFoundError { message: String },
-    #[error("Calculation error: {message}")]
-    CalculationError { message: String },
-    #[error("Serialization error: {message}")]
-    SerializationError { message: String },
-    #[error("Validation error: {message}")]
-    ValidationError { message: String },
+    #[error("Database error: {detail}")]
+    DatabaseError { detail: String },
+    #[error("Not found: {detail}")]
+    NotFoundError { detail: String },
+    #[error("Calculation error: {detail}")]
+    CalculationError { detail: String },
+    #[error("Serialization error: {detail}")]
+    SerializationError { detail: String },
+    #[error("Validation error: {detail}")]
+    ValidationError { detail: String },
 }
 
 impl From<FortuneBackendError> for FortuneBackendFfiError {
     fn from(err: FortuneBackendError) -> Self {
         match err {
-            FortuneBackendError::DatabaseError(m) => FortuneBackendFfiError::DatabaseError { message: m },
-            FortuneBackendError::NotFoundError(m) => FortuneBackendFfiError::NotFoundError { message: m },
-            FortuneBackendError::CalculationError(m) => FortuneBackendFfiError::CalculationError { message: m },
-            FortuneBackendError::SerializationError(m) => FortuneBackendFfiError::SerializationError { message: m },
-            FortuneBackendError::ValidationError(m) => FortuneBackendFfiError::ValidationError { message: m },
+            FortuneBackendError::DatabaseError(m) => FortuneBackendFfiError::DatabaseError { detail: m },
+            FortuneBackendError::NotFoundError(m) => FortuneBackendFfiError::NotFoundError { detail: m },
+            FortuneBackendError::CalculationError(m) => FortuneBackendFfiError::CalculationError { detail: m },
+            FortuneBackendError::SerializationError(m) => FortuneBackendFfiError::SerializationError { detail: m },
+            FortuneBackendError::ValidationError(m) => FortuneBackendFfiError::ValidationError { detail: m },
         }
     }
 }
@@ -44,14 +44,14 @@ impl FortuneClient {
     pub fn create_profile(&self, params_json: String) -> Result<String, FortuneBackendFfiError> {
         let params: CreateProfileParams = serde_json::from_str(&params_json).map_err(|e| {
             FortuneBackendFfiError::SerializationError {
-                message: format!("Invalid JSON: {}", e),
+                detail: format!("Invalid JSON: {}", e),
             }
         })?;
 
         let profile = self.service.create_profile(params)?;
         serde_json::to_string(&profile).map_err(|e| {
             FortuneBackendFfiError::SerializationError {
-                message: format!("Failed to serialize profile: {}", e),
+                detail: format!("Failed to serialize profile: {}", e),
             }
         })
     }
@@ -62,7 +62,7 @@ impl FortuneClient {
             Some(p) => {
                 let json = serde_json::to_string(&p).map_err(|e| {
                     FortuneBackendFfiError::SerializationError {
-                        message: format!("Failed to serialize profile: {}", e),
+                        detail: format!("Failed to serialize profile: {}", e),
                     }
                 })?;
                 Ok(Some(json))
@@ -75,7 +75,7 @@ impl FortuneClient {
         let profiles = self.service.list_profiles(search.as_deref())?;
         serde_json::to_string(&profiles).map_err(|e| {
             FortuneBackendFfiError::SerializationError {
-                message: format!("Failed to serialize profiles: {}", e),
+                detail: format!("Failed to serialize profiles: {}", e),
             }
         })
     }
@@ -87,14 +87,14 @@ impl FortuneClient {
     ) -> Result<String, FortuneBackendFfiError> {
         let params: UpdateProfileParams = serde_json::from_str(&params_json).map_err(|e| {
             FortuneBackendFfiError::SerializationError {
-                message: format!("Invalid JSON: {}", e),
+                detail: format!("Invalid JSON: {}", e),
             }
         })?;
 
         let profile = self.service.update_profile(&id, params)?;
         serde_json::to_string(&profile).map_err(|e| {
             FortuneBackendFfiError::SerializationError {
-                message: format!("Failed to serialize profile: {}", e),
+                detail: format!("Failed to serialize profile: {}", e),
             }
         })
     }
@@ -107,7 +107,7 @@ impl FortuneClient {
         let chart = self.service.calculate_profile_chart(&id)?;
         serde_json::to_string(&chart).map_err(|e| {
             FortuneBackendFfiError::SerializationError {
-                message: format!("Failed to serialize chart: {}", e),
+                detail: format!("Failed to serialize chart: {}", e),
             }
         })
     }
@@ -119,14 +119,14 @@ impl FortuneClient {
     pub fn create_horary(&self, params_json: String) -> Result<String, FortuneBackendFfiError> {
         let params: CreateHoraryParams = serde_json::from_str(&params_json).map_err(|e| {
             FortuneBackendFfiError::SerializationError {
-                message: format!("Invalid JSON: {}", e),
+                detail: format!("Invalid JSON: {}", e),
             }
         })?;
 
         let horary = self.service.create_horary(params)?;
         serde_json::to_string(&horary).map_err(|e| {
             FortuneBackendFfiError::SerializationError {
-                message: format!("Failed to serialize horary: {}", e),
+                detail: format!("Failed to serialize horary: {}", e),
             }
         })
     }
@@ -137,7 +137,7 @@ impl FortuneClient {
             Some(h) => {
                 let json = serde_json::to_string(&h).map_err(|e| {
                     FortuneBackendFfiError::SerializationError {
-                        message: format!("Failed to serialize horary: {}", e),
+                        detail: format!("Failed to serialize horary: {}", e),
                     }
                 })?;
                 Ok(Some(json))
@@ -154,7 +154,7 @@ impl FortuneClient {
         let items = self.service.list_horary(category.as_deref(), querent_id.as_deref())?;
         serde_json::to_string(&items).map_err(|e| {
             FortuneBackendFfiError::SerializationError {
-                message: format!("Failed to serialize horary list: {}", e),
+                detail: format!("Failed to serialize horary list: {}", e),
             }
         })
     }
@@ -166,14 +166,14 @@ impl FortuneClient {
     ) -> Result<String, FortuneBackendFfiError> {
         let params: UpdateHoraryParams = serde_json::from_str(&params_json).map_err(|e| {
             FortuneBackendFfiError::SerializationError {
-                message: format!("Invalid JSON: {}", e),
+                detail: format!("Invalid JSON: {}", e),
             }
         })?;
 
         let horary = self.service.update_horary(&id, params)?;
         serde_json::to_string(&horary).map_err(|e| {
             FortuneBackendFfiError::SerializationError {
-                message: format!("Failed to serialize horary: {}", e),
+                detail: format!("Failed to serialize horary: {}", e),
             }
         })
     }
@@ -186,7 +186,7 @@ impl FortuneClient {
         let chart = self.service.calculate_horary_chart(&id)?;
         serde_json::to_string(&chart).map_err(|e| {
             FortuneBackendFfiError::SerializationError {
-                message: format!("Failed to serialize chart: {}", e),
+                detail: format!("Failed to serialize chart: {}", e),
             }
         })
     }
@@ -212,7 +212,7 @@ impl FortuneClient {
         )?;
         serde_json::to_string(&chart).map_err(|e| {
             FortuneBackendFfiError::SerializationError {
-                message: format!("Failed to serialize chart: {}", e),
+                detail: format!("Failed to serialize chart: {}", e),
             }
         })
     }
