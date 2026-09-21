@@ -7,13 +7,10 @@
 //! - Saju / Four Pillars of Destiny (`saju`)
 
 pub mod ephemeris;
-pub mod ffi;
 pub mod saju;
 pub mod timezone;
 pub mod vedic;
 pub mod western;
-
-uniffi::setup_scaffolding!();
 
 use serde::{Deserialize, Serialize};
 

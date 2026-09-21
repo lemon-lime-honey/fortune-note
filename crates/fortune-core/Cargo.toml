@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [lib]
-crate-type = ["lib", "cdylib"]
+crate-type = ["lib"]
 
 [dependencies]
 vedaksha = "9.4.1"
@@ -12,18 +12,8 @@ thiserror = "2.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
-uniffi = { version = "0.32.1", default-features = false }
 utz = { version = "0.4.1", features = ["balanced", "std"] }
 chrono-tz = "0.10.4"
-
-[features]
-default = []
-cli = ["uniffi/cli"]
-
-[[bin]]
-name = "uniffi-bindgen"
-path = "src/bin/uniffi-bindgen.rs"
-required-features = ["cli"]
 
 [dev-dependencies]
 approx = "0.5"
