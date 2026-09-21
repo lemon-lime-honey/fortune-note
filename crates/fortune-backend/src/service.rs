@@ -1,5 +1,8 @@
 use crate::db::{init_db, DbPool};
-use crate::markdown::{format_horary_markdown, format_profile_markdown};
+use crate::markdown::{
+    format_horary_markdown, format_horary_western_markdown, format_prashna_vedic_markdown,
+    format_profile_markdown,
+};
 use crate::models::{
     CreateHoraryParams, CreateProfileParams, HoraryQuestion, Profile, UpdateHoraryParams,
     UpdateProfileParams,
@@ -364,6 +367,22 @@ impl FortuneBackendService {
         Ok(format_horary_markdown(&item, &chart))
     }
 
+    pub fn export_horary_western_markdown(&self, id: &str) -> Result<String, FortuneBackendError> {
+        let item = self
+            .get_horary(id)?
+            .ok_or_else(|| FortuneBackendError::NotFoundError(format!("Horary {} not found", id)))?;
+        let chart = self.calculate_horary_chart(id)?;
+        Ok(format_horary_western_markdown(&item, &chart))
+    }
+
+    pub fn export_prashna_vedic_markdown(&self, id: &str) -> Result<String, FortuneBackendError> {
+        let item = self
+            .get_horary(id)?
+            .ok_or_else(|| FortuneBackendError::NotFoundError(format!("Horary {} not found", id)))?;
+        let chart = self.calculate_horary_chart(id)?;
+        Ok(format_prashna_vedic_markdown(&item, &chart))
+    }
+
     pub fn calculate_direct(
         &self,
         year: i32,
@@ -472,5 +491,19 @@ mod tests {
         assert!(markdown.contains("사업 확장 제안 수락 여부"));
         assert!(markdown.contains("Horary Chart Placements"));
         assert!(markdown.contains("Prashna Chart"));
+
+        let western_md = service
+            .export_horary_western_markdown(&horary.id)
+            .expect("western horary markdown failed");
+        assert!(western_md.contains("Western Tropical"));
+        assert!(western_md.contains("Major Aspects"));
+        assert!(!western_md.contains("Prashna Lagna"));
+
+        let prashna_md = service
+            .export_prashna_vedic_markdown(&horary.id)
+            .expect("vedic prashna markdown failed");
+        assert!(prashna_md.contains("Vedic Sidereal"));
+        assert!(prashna_md.contains("Prashna Lagna"));
+        assert!(!prashna_md.contains("Major Aspects"));
     }
 }

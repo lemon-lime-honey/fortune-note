@@ -195,6 +195,14 @@ impl FortuneClient {
         Ok(self.service.export_horary_markdown(&id)?)
     }
 
+    pub fn export_horary_western_markdown(&self, id: String) -> Result<String, FortuneBackendFfiError> {
+        Ok(self.service.export_horary_western_markdown(&id)?)
+    }
+
+    pub fn export_prashna_vedic_markdown(&self, id: String) -> Result<String, FortuneBackendFfiError> {
+        Ok(self.service.export_prashna_vedic_markdown(&id)?)
+    }
+
     pub fn calculate_direct(
         &self,
         year: i32,

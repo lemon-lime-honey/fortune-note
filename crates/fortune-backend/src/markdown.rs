@@ -147,6 +147,98 @@ pub fn format_profile_markdown(profile: &Profile, chart: &FortuneCalculationOutp
     out
 }
 
+fn append_horary_meta(out: &mut String, horary: &HoraryQuestion, chart: &FortuneCalculationOutput, header: &str) {
+    out.push_str(&format!("# {}: {}\n\n", header, horary.title));
+    out.push_str("## 1. 질문 메타 정보\n");
+    out.push_str(&format!("- 분류: {}\n", horary.category));
+    out.push_str(&format!("- 질문 본문: {}\n", horary.question_text));
+    out.push_str(&format!(
+        "- 질문 발생 일시: {:04}-{:02}-{:02} {:02}:{:02}:{:02} (현지 기준)\n",
+        horary.query_year, horary.query_month, horary.query_day, horary.query_hour, horary.query_minute, horary.query_second as u32
+    ));
+    out.push_str(&format!("- 질문 장소 좌표: 위도 {:.4}°, 경도 {:.4}°\n", horary.latitude, horary.longitude));
+    out.push_str(&format!("- 시간대: {} (UTC {:+0.1}시간)\n", chart.timezone_id, chart.utc_offset_hours));
+    if !horary.result_notes.is_empty() {
+        out.push_str(&format!("- 사후 실현 결과 판정: {}\n", horary.result_notes));
+    }
+    out.push('\n');
+}
+
+pub fn format_horary_western_markdown(horary: &HoraryQuestion, chart: &FortuneCalculationOutput) -> String {
+    let mut out = String::new();
+    append_horary_meta(&mut out, horary, chart, "호라리 질의 분석 데이터 (Western Tropical)");
+
+    out.push_str("## 2. Horary Chart Placements (Western Tropical)\n");
+    let asc_sign = (chart.western.ascendant / 30.0).floor() as usize % 12;
+    let mc_sign = (chart.western.midheaven / 30.0).floor() as usize % 12;
+    out.push_str(&format!(
+        "- Ascendant: {:.2}° ({})\n",
+        chart.western.ascendant, ZODIAC_SIGNS[asc_sign]
+    ));
+    out.push_str(&format!(
+        "- Midheaven (MC): {:.2}° ({})\n",
+        chart.western.midheaven, ZODIAC_SIGNS[mc_sign]
+    ));
+    for p in &chart.western.planets {
+        let sign_name = ZODIAC_SIGNS[p.sign_index as usize % 12];
+        let retro = if p.is_retrograde { " [Rx]" } else { "" };
+        out.push_str(&format!(
+            "- {}: {:.2}° ({}) - House {}{}\n",
+            p.name, p.longitude, sign_name, p.house_number, retro
+        ));
+    }
+    for n in &chart.western.nodes {
+        let sign_name = ZODIAC_SIGNS[n.sign_index as usize % 12];
+        out.push_str(&format!(
+            "- {}: {:.2}° ({}) - House {}\n",
+            n.name, n.longitude, sign_name, n.house_number
+        ));
+    }
+    out.push_str("- Major Aspects:\n");
+    if chart.western.aspects.is_empty() {
+        out.push_str("  * No major aspects within orb\n");
+    } else {
+        for a in &chart.western.aspects {
+            out.push_str(&format!(
+                "  * {} - {}: {} (Orb: {:.2}°)\n",
+                a.planet1, a.planet2, a.aspect_type, a.orb
+            ));
+        }
+    }
+    out.push('\n');
+
+    out.push_str("## 3. LLM 해석 지침 (Western Horary)\n");
+    out.push_str("위 서양 트로피컬 호라리 차트의 시그니피케이터(제1하우스 룰러인 질문자 주성 및 해당 질문 사안을 주관하는 해당 하우스 룰러), 달의 현재 위치와 접근/분리 아스펙트, 보이드 오브 코스 여부, 주요 행성 간의 리셉션(Exaltation, Domicile 등)을 정밀 분석하여 질문 사안의 성사 여부와 실현 시기, 주의점을 명확히 판단해 주십시오.\n");
+
+    out
+}
+
+pub fn format_prashna_vedic_markdown(horary: &HoraryQuestion, chart: &FortuneCalculationOutput) -> String {
+    let mut out = String::new();
+    append_horary_meta(&mut out, horary, chart, "프라슈나 질의 분석 데이터 (Vedic Sidereal)");
+
+    out.push_str("## 2. Prashna Chart Placements (Vedic Sidereal)\n");
+    let lagna_sign_idx = chart.vedic.lagna_sign as usize % 12;
+    out.push_str(&format!(
+        "- Prashna Lagna: {:.2}° ({})\n",
+        chart.vedic.lagna_sidereal, VEDIC_SIGNS[lagna_sign_idx]
+    ));
+    for p in &chart.vedic.planets {
+        let sign_name = VEDIC_SIGNS[p.sign_index as usize % 12];
+        let retro = if p.is_retrograde { " [Rx]" } else { "" };
+        out.push_str(&format!(
+            "- {}: {:.2}° ({}, {} Pada {}){}\n",
+            p.name, p.sidereal_longitude, sign_name, p.nakshatra_name, p.nakshatra_pada, retro
+        ));
+    }
+    out.push('\n');
+
+    out.push_str("## 3. LLM 해석 지침 (Vedic Prashna)\n");
+    out.push_str("위 베다 시데리얼 프라슈나 차트의 라그나 로드(질문자), 사안 주관 행성(카랴카), 달의 위치 및 낙샤트라/파다, 타지카 요가(Ithasala, Ishrafa 등)를 정밀 분석하여 질문 사안의 성사 여부와 실현 시기, 방해요인을 베다 점성술 원리에 입각하여 명확히 판정해 주십시오.\n");
+
+    out
+}
+
 pub fn format_horary_markdown(horary: &HoraryQuestion, chart: &FortuneCalculationOutput) -> String {
     let mut out = String::new();
 

@@ -17,7 +17,10 @@ uniffi::setup_scaffolding!();
 
 pub use db::{init_db, DbPool};
 pub use ffi::{fortune_backend_version, FortuneBackendFfiError, FortuneClient};
-pub use markdown::{format_horary_markdown, format_profile_markdown};
+pub use markdown::{
+    format_horary_markdown, format_horary_western_markdown, format_prashna_vedic_markdown,
+    format_profile_markdown,
+};
 pub use models::{
     CreateHoraryParams, CreateProfileParams, HoraryQuestion, Profile, UpdateHoraryParams,
     UpdateProfileParams,
