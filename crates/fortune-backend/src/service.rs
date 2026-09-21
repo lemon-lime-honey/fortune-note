@@ -470,7 +470,7 @@ mod tests {
             .export_horary_markdown(&horary.id)
             .expect("horary markdown failed");
         assert!(markdown.contains("사업 확장 제안 수락 여부"));
-        assert!(markdown.contains("호라리 차트 행성 및 하우스 상태"));
-        assert!(markdown.contains("프라슈나 차트"));
+        assert!(markdown.contains("Horary Chart Placements"));
+        assert!(markdown.contains("Prashna Chart"));
     }
 }

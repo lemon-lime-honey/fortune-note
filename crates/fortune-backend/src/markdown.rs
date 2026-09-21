@@ -2,14 +2,14 @@ use crate::models::{HoraryQuestion, Profile};
 use fortune_core::FortuneCalculationOutput;
 
 const ZODIAC_SIGNS: [&str; 12] = [
-    "양자리", "황소자리", "쌍둥이자리", "게자리", "사자자리", "처녀자리",
-    "천칭자리", "전갈자리", "사수자리", "염소자리", "물병자리", "물고기자리",
+    "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+    "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"
 ];
 
 const VEDIC_SIGNS: [&str; 12] = [
-    "Mesha (양자리)", "Vrishabha (황소자리)", "Mithuna (쌍둥이자리)", "Karka (게자리)",
-    "Simha (사자자리)", "Kanya (처녀자리)", "Tula (천칭자리)", "Vrishchika (전갈자리)",
-    "Dhanu (사수자리)", "Makara (염소자리)", "Kumbha (물병자리)", "Meena (물고기자리)",
+    "Mesha (Aries)", "Vrishabha (Taurus)", "Mithuna (Gemini)", "Karka (Cancer)",
+    "Simha (Leo)", "Kanya (Virgo)", "Tula (Libra)", "Vrishchika (Scorpio)",
+    "Dhanu (Sagittarius)", "Makara (Capricorn)", "Kumbha (Aquarius)", "Meena (Pisces)",
 ];
 
 pub fn format_profile_markdown(profile: &Profile, chart: &FortuneCalculationOutput) -> String {
@@ -46,7 +46,7 @@ pub fn format_profile_markdown(profile: &Profile, chart: &FortuneCalculationOutp
         chart.saju.hour_pillar.korean(), chart.saju.hour_pillar.hanja()
     ));
     out.push_str(&format!(
-        "- 대운 방향: {} (대운수: {}세)\n",
+        "- 대운 방향: {} (대운수: {})\n",
         if chart.saju.is_forward_daeun { "순행" } else { "역행" },
         chart.saju.daeun_number
     ));
@@ -66,37 +66,37 @@ pub fn format_profile_markdown(profile: &Profile, chart: &FortuneCalculationOutp
     let asc_sign = (chart.western.ascendant / 30.0).floor() as usize % 12;
     let mc_sign = (chart.western.midheaven / 30.0).floor() as usize % 12;
     out.push_str(&format!(
-        "- 어센던트 (Ascendant): {:.2}° ({})\n",
+        "- Ascendant: {:.2}° ({})\n",
         chart.western.ascendant, ZODIAC_SIGNS[asc_sign]
     ));
     out.push_str(&format!(
-        "- 천정 (Midheaven): {:.2}° ({})\n",
+        "- Midheaven (MC): {:.2}° ({})\n",
         chart.western.midheaven, ZODIAC_SIGNS[mc_sign]
     ));
-    out.push_str("- 7개 고전 행성 위치:\n");
+    out.push_str("- Planets:\n");
     for p in &chart.western.planets {
         let sign_name = ZODIAC_SIGNS[p.sign_index as usize % 12];
-        let retro_str = if p.is_retrograde { " [역행]" } else { "" };
+        let retro_str = if p.is_retrograde { " [Rx]" } else { "" };
         out.push_str(&format!(
-            "  * {}: {:.2}° ({}) - 제{}하우스{}\n",
+            "  * {}: {:.2}° ({}) - House {}{}\n",
             p.name, p.longitude, sign_name, p.house_number, retro_str
         ));
     }
-    out.push_str("- 달의 교점 (Lunar Nodes):\n");
+    out.push_str("- Nodes:\n");
     for n in &chart.western.nodes {
         let sign_name = ZODIAC_SIGNS[n.sign_index as usize % 12];
         out.push_str(&format!(
-            "  * {}: {:.2}° ({}) - 제{}하우스\n",
+            "  * {}: {:.2}° ({}) - House {}\n",
             n.name, n.longitude, sign_name, n.house_number
         ));
     }
-    out.push_str("- 메이저 아스펙트 (Major Aspects):\n");
+    out.push_str("- Major Aspects:\n");
     if chart.western.aspects.is_empty() {
-        out.push_str("  * 유효 오브 범위 내 메이저 아스펙트 없음\n");
+        out.push_str("  * No major aspects within orb\n");
     } else {
         for a in &chart.western.aspects {
             out.push_str(&format!(
-                "  * {} - {}: {} (각도: {:.2}°, 오차: {:.2}°)\n",
+                "  * {} - {}: {} (Actual: {:.2}°, Orb: {:.2}°)\n",
                 a.planet1, a.planet2, a.aspect_type, a.actual_angle, a.orb
             ));
         }
@@ -106,32 +106,38 @@ pub fn format_profile_markdown(profile: &Profile, chart: &FortuneCalculationOutp
     out.push_str("## 4. 베다 점성술 (Vedic Sidereal / Jyotish)\n");
     let lagna_sign_idx = chart.vedic.lagna_sign as usize % 12;
     out.push_str(&format!(
-        "- 라그나 (Lagna): {:.2}° ({})\n",
+        "- Lagna: {:.2}° ({})\n",
         chart.vedic.lagna_sidereal, VEDIC_SIGNS[lagna_sign_idx]
     ));
-    out.push_str("- 항성황도대 행성 위치 (D1 Rasi):\n");
+    out.push_str("- D1 Rasi Placements:\n");
     for p in &chart.vedic.planets {
         let sign_name = VEDIC_SIGNS[p.sign_index as usize % 12];
-        let retro_str = if p.is_retrograde { " [역행]" } else { "" };
+        let retro_str = if p.is_retrograde { " [Rx]" } else { "" };
         out.push_str(&format!(
-            "  * {}: {:.2}° ({}, {} 제{}파다){}\n",
+            "  * {}: {:.2}° ({}, {} Pada {}){}\n",
             p.name, p.sidereal_longitude, sign_name, p.nakshatra_name, p.nakshatra_pada, retro_str
         ));
     }
-    out.push_str("- 6종 바르가 차트 라그나 별자리 요약:\n");
+    out.push_str("- Divisional Charts (Vargas):\n");
     for (division, v) in &chart.vedic.vargas {
         let sign_name = VEDIC_SIGNS[v.lagna_sign as usize % 12];
         out.push_str(&format!(
-            "  * {}: 라그나 {}\n",
+            "  * {}: Lagna {}\n",
             division.title(), sign_name
         ));
     }
-    out.push_str("- 빔쇼타리 다샤 (Vimshottari Dasha) 대운 주기 요약:\n");
+    out.push_str("- Vimshottari Dasha Sequence:\n");
     for d in &chart.vedic.vimshottari_dashas {
         out.push_str(&format!(
-            "  * 주성 {}: JD {:.1} ~ JD {:.1}\n",
+            "  * Mahadasha {}: JD {:.1} ~ JD {:.1}\n",
             d.lord, d.start_jd, d.end_jd
         ));
+        for sub in &d.sub_periods {
+            out.push_str(&format!(
+                "    - Antardasha {}: JD {:.1} ~ JD {:.1}\n",
+                sub.lord, sub.start_jd, sub.end_jd
+            ));
+        }
     }
     out.push('\n');
 
@@ -160,38 +166,38 @@ pub fn format_horary_markdown(horary: &HoraryQuestion, chart: &FortuneCalculatio
     }
     out.push('\n');
 
-    out.push_str("## 2. 호라리 차트 행성 및 하우스 상태 (Western Tropical)\n");
+    out.push_str("## 2. Horary Chart Placements (Western Tropical)\n");
     let asc_sign = (chart.western.ascendant / 30.0).floor() as usize % 12;
     let mc_sign = (chart.western.midheaven / 30.0).floor() as usize % 12;
     out.push_str(&format!(
-        "- 어센던트: {:.2}° ({})\n",
+        "- Ascendant: {:.2}° ({})\n",
         chart.western.ascendant, ZODIAC_SIGNS[asc_sign]
     ));
     out.push_str(&format!(
-        "- 천정: {:.2}° ({})\n",
+        "- Midheaven (MC): {:.2}° ({})\n",
         chart.western.midheaven, ZODIAC_SIGNS[mc_sign]
     ));
     for p in &chart.western.planets {
         let sign_name = ZODIAC_SIGNS[p.sign_index as usize % 12];
-        let retro = if p.is_retrograde { " [역행]" } else { "" };
+        let retro = if p.is_retrograde { " [Rx]" } else { "" };
         out.push_str(&format!(
-            "- {}: {:.2}° ({}) - 제{}하우스{}\n",
+            "- {}: {:.2}° ({}) - House {}{}\n",
             p.name, p.longitude, sign_name, p.house_number, retro
         ));
     }
-    out.push_str("- 메이저 아스펙트:\n");
+    out.push_str("- Major Aspects:\n");
     for a in &chart.western.aspects {
         out.push_str(&format!(
-            "  * {} - {}: {} (오차: {:.2}°)\n",
+            "  * {} - {}: {} (Orb: {:.2}°)\n",
             a.planet1, a.planet2, a.aspect_type, a.orb
         ));
     }
     out.push('\n');
 
-    out.push_str("## 3. 프라슈나 차트 (Vedic Sidereal)\n");
+    out.push_str("## 3. Prashna Chart (Vedic Sidereal)\n");
     let lagna_sign_idx = chart.vedic.lagna_sign as usize % 12;
     out.push_str(&format!(
-        "- 프라슈나 라그나: {:.2}° ({})\n",
+        "- Prashna Lagna: {:.2}° ({})\n",
         chart.vedic.lagna_sidereal, VEDIC_SIGNS[lagna_sign_idx]
     ));
     for p in &chart.vedic.planets {
