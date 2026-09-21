@@ -689,6 +689,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_fortune_backend_checksum_method_fortuneclient_delete_profile(
     ): Int
+    external fun uniffi_fortune_backend_checksum_method_fortuneclient_export_backup_json(
+    ): Int
     external fun uniffi_fortune_backend_checksum_method_fortuneclient_export_horary_markdown(
     ): Int
     external fun uniffi_fortune_backend_checksum_method_fortuneclient_export_horary_western_markdown(
@@ -700,6 +702,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_fortune_backend_checksum_method_fortuneclient_get_horary(
     ): Int
     external fun uniffi_fortune_backend_checksum_method_fortuneclient_get_profile(
+    ): Int
+    external fun uniffi_fortune_backend_checksum_method_fortuneclient_import_backup_json(
     ): Int
     external fun uniffi_fortune_backend_checksum_method_fortuneclient_list_horary(
     ): Int
@@ -749,6 +753,8 @@ internal object UniffiLib {
     ): Byte
     external fun uniffi_fortune_backend_fn_method_fortuneclient_delete_profile(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Byte
+    external fun uniffi_fortune_backend_fn_method_fortuneclient_export_backup_json(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_fortune_backend_fn_method_fortuneclient_export_horary_markdown(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_fortune_backend_fn_method_fortuneclient_export_horary_western_markdown(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -760,6 +766,8 @@ internal object UniffiLib {
     external fun uniffi_fortune_backend_fn_method_fortuneclient_get_horary(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_fortune_backend_fn_method_fortuneclient_get_profile(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_fortune_backend_fn_method_fortuneclient_import_backup_json(`ptr`: Long,`jsonStr`: RustBuffer.ByValue,`replaceExisting`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_fortune_backend_fn_method_fortuneclient_list_horary(`ptr`: Long,`category`: RustBuffer.ByValue,`querentId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -914,6 +922,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_delete_profile() and 0xFFFF) != 7718) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_export_backup_json() and 0xFFFF) != 40571) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_export_horary_markdown() and 0xFFFF) != 23370) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -930,6 +941,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_get_profile() and 0xFFFF) != 44537) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_import_backup_json() and 0xFFFF) != 52854) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_list_horary() and 0xFFFF) != 45462) {
@@ -1365,6 +1379,8 @@ public interface FortuneClientInterface {
     
     fun `deleteProfile`(`id`: kotlin.String): kotlin.Boolean
     
+    fun `exportBackupJson`(): kotlin.String
+    
     fun `exportHoraryMarkdown`(`id`: kotlin.String): kotlin.String
     
     fun `exportHoraryWesternMarkdown`(`id`: kotlin.String): kotlin.String
@@ -1376,6 +1392,8 @@ public interface FortuneClientInterface {
     fun `getHorary`(`id`: kotlin.String): kotlin.String?
     
     fun `getProfile`(`id`: kotlin.String): kotlin.String?
+    
+    fun `importBackupJson`(`jsonStr`: kotlin.String, `replaceExisting`: kotlin.Boolean): kotlin.String
     
     fun `listHorary`(`category`: kotlin.String?, `querentId`: kotlin.String?): kotlin.String
     
@@ -1612,6 +1630,20 @@ open class FortuneClient: Disposable, AutoCloseable, FortuneClientInterface
     
 
     
+    @Throws(FortuneBackendFfiException::class)override fun `exportBackupJson`(): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
+    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_export_backup_json(
+        it,
+        _status)
+}
+    }
+    )
+    }
+    
+
+    
     @Throws(FortuneBackendFfiException::class)override fun `exportHoraryMarkdown`(`id`: kotlin.String): kotlin.String {
             return FfiConverterString.lift(
     callWithHandle {
@@ -1695,6 +1727,22 @@ open class FortuneClient: Disposable, AutoCloseable, FortuneClientInterface
         it,
         
         FfiConverterString.lower(`id`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(FortuneBackendFfiException::class)override fun `importBackupJson`(`jsonStr`: kotlin.String, `replaceExisting`: kotlin.Boolean): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
+    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_import_backup_json(
+        it,
+        
+        FfiConverterString.lower(`jsonStr`),
+        FfiConverterBoolean.lower(`replaceExisting`),_status)
 }
     }
     )
