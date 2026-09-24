@@ -197,6 +197,7 @@ data class VedicPlanetData(
 data class VargaPlacementData(
     val planet_name: String,
     val sign_index: Int,
+    val sign_degree: Double = 0.0,
     val house: Int
 )
 

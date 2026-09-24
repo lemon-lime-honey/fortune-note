@@ -316,18 +316,29 @@ fun ProfileDetailScreen(
                                                 )
                                             }
                                             Spacer(modifier = Modifier.height(2.dp))
+                                            val displayDegree = if (selectedVarga == "D1") {
+                                                p.sign_degree
+                                            } else {
+                                                pPlacement?.sign_degree ?: p.sign_degree
+                                            }
+                                            val degreeLabel = if (selectedVarga == "D1") "in sign" else "in varga sign"
+                                            val nakshatraLabel = if (selectedVarga == "D1") {
+                                                "${p.nakshatra_name} (Pada ${p.nakshatra_pada})"
+                                            } else {
+                                                "D1: ${p.nakshatra_name} (Pada ${p.nakshatra_pada})"
+                                            }
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 horizontalArrangement = Arrangement.SpaceBetween,
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
                                                 Text(
-                                                    text = "${String.format("%.2f°", p.sign_degree)} in sign",
+                                                    text = "${String.format("%.2f°", displayDegree)} $degreeLabel",
                                                     color = TextSecondary,
                                                     fontSize = 12.sp
                                                 )
                                                 Text(
-                                                    text = "${p.nakshatra_name} (Pada ${p.nakshatra_pada})",
+                                                    text = nakshatraLabel,
                                                     color = CelestialBlue,
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.Medium
