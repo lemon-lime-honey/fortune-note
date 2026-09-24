@@ -12,7 +12,6 @@ use vedaksha::astro::houses::{compute_houses, HouseSystem};
 use vedaksha::math::angle::normalize_degrees;
 use vedaksha::vedic::dasha::vimshottari::{compute_vimshottari, DashaPeriod};
 use vedaksha::vedic::nakshatra::Nakshatra;
-use vedaksha::vedic::varga::{varga_sign, VargaType};
 
 use crate::ephemeris::EphemerisSnapshot;
 
@@ -64,46 +63,147 @@ impl VargaDivision {
     }
 }
 
-/// Computes the divisional sign index (0..11) for any supported varga division.
-pub fn calculate_varga_sign(sidereal_lon: f64, div: VargaDivision) -> u8 {
+/// Computes the divisional sign index (0..11) and normalized degree in that sign (0.0..30.0)
+/// for any supported varga division.
+pub fn calculate_varga_sign_and_degree(sidereal_lon: f64, div: VargaDivision) -> (u8, f64) {
     let norm = normalize_degrees(sidereal_lon);
-    let sign_idx = (norm / 30.0).floor() as u8;
-    let pos_in_sign = norm - (sign_idx as f64 * 30.0);
+    let sign_idx = ((norm / 30.0).floor() as u8).min(11);
+    let pos_in_sign = (norm - (sign_idx as f64 * 30.0)).clamp(0.0, 30.0);
 
     match div {
-        VargaDivision::D1 => sign_idx,
-        VargaDivision::D2 => varga_sign(norm, VargaType::Hora),
-        VargaDivision::D3 => varga_sign(norm, VargaType::Drekkana),
-        VargaDivision::D4 => varga_sign(norm, VargaType::Chaturthamsha),
-        VargaDivision::D6 => {
-            // Jaimini Shashthamsha: 5-degree segments (0..5)
-            // Odd signs start from Aries (0), even signs start from Libra (6)
-            let part = (pos_in_sign / 5.0).floor().min(5.0) as u8;
-            let start = if sign_idx % 2 == 0 { 0 } else { 6 };
-            (start + part) % 12
+        VargaDivision::D1 => (sign_idx, pos_in_sign),
+        VargaDivision::D2 => {
+            // Parivritti Dwaya (15-degree cyclical divisions across 12 signs)
+            // 360 degrees divided into 24 parts of 15 degrees each, cycling through 12 signs
+            let total_part = ((norm / 15.0).floor() as u8).min(23);
+            let sign = total_part % 12;
+            let pos_in_part = norm - (total_part as f64 * 15.0);
+            let degree = (pos_in_part / 15.0) * 30.0;
+            (sign, degree.clamp(0.0, 30.0))
         }
-        VargaDivision::D7 => varga_sign(norm, VargaType::Saptamsha),
+        VargaDivision::D3 => {
+            // Parashari Drekkana: 10-degree divisions (0..2)
+            // 1st part: same sign; 2nd part: 5th sign (+4); 3rd part: 9th sign (+8)
+            let part = ((pos_in_sign / 10.0).floor() as u8).min(2);
+            let offset = match part {
+                0 => 0,
+                1 => 4,
+                _ => 8,
+            };
+            let sign = (sign_idx + offset) % 12;
+            let pos_in_part = pos_in_sign - (part as f64 * 10.0);
+            let degree = (pos_in_part / 10.0) * 30.0;
+            (sign, degree.clamp(0.0, 30.0))
+        }
+        VargaDivision::D4 => {
+            // Parashari Chaturthamsha: 7.5-degree divisions (0..3)
+            // 1st part: same sign; 2nd part: 4th sign (+3); 3rd part: 7th sign (+6); 4th part: 10th sign (+9)
+            let part = ((pos_in_sign / 7.5).floor() as u8).min(3);
+            let offset = part * 3;
+            let sign = (sign_idx + offset) % 12;
+            let pos_in_part = pos_in_sign - (part as f64 * 7.5);
+            let degree = (pos_in_part / 7.5) * 30.0;
+            (sign, degree.clamp(0.0, 30.0))
+        }
+        VargaDivision::D6 => {
+            // Parashari Shashthamsha: 5-degree divisions (0..5)
+            // Odd signs start from the sign itself; Even signs start from 7th sign (+6)
+            let part = ((pos_in_sign / 5.0).floor() as u8).min(5);
+            let start = if sign_idx % 2 == 0 {
+                sign_idx
+            } else {
+                (sign_idx + 6) % 12
+            };
+            let sign = (start + part) % 12;
+            let pos_in_part = pos_in_sign - (part as f64 * 5.0);
+            let degree = (pos_in_part / 5.0) * 30.0;
+            (sign, degree.clamp(0.0, 30.0))
+        }
+        VargaDivision::D7 => {
+            // Parashari Saptamsha: (30/7)-degree divisions (0..6)
+            // Odd signs start from sign itself; Even signs start from 7th sign (+6)
+            let span = 30.0 / 7.0;
+            let part = ((pos_in_sign / span).floor() as u8).min(6);
+            let start = if sign_idx % 2 == 0 {
+                sign_idx
+            } else {
+                (sign_idx + 6) % 12
+            };
+            let sign = (start + part) % 12;
+            let pos_in_part = pos_in_sign - (part as f64 * span);
+            let degree = (pos_in_part / span) * 30.0;
+            (sign, degree.clamp(0.0, 30.0))
+        }
         VargaDivision::D8 => {
-            // Jaimini Ashtamamsha: 3.75-degree segments (0..7)
-            // Movable signs start Aries (0), Fixed start Sagittarius (8), Dual start Leo (4)
-            let part = (pos_in_sign / 3.75).floor().min(7.0) as u8;
+            // Jaimini Ashtamamsha: 3.75-degree divisions (0..7)
+            // Movable start Aries (0), Fixed start Sagittarius (8), Dual start Leo (4)
+            let part = ((pos_in_sign / 3.75).floor() as u8).min(7);
             let start = match sign_idx % 3 {
                 0 => 0, // Movable: Aries
                 1 => 8, // Fixed: Sagittarius
                 _ => 4, // Dual: Leo
             };
-            (start + part) % 12
+            let sign = (start + part) % 12;
+            let pos_in_part = pos_in_sign - (part as f64 * 3.75);
+            let degree = (pos_in_part / 3.75) * 30.0;
+            (sign, degree.clamp(0.0, 30.0))
         }
-        VargaDivision::D9 => varga_sign(norm, VargaType::Navamsha),
-        VargaDivision::D10 => varga_sign(norm, VargaType::Dashamsha),
+        VargaDivision::D9 => {
+            // Parashari Navamsha: (30/9 = 3°20') divisions (0..8)
+            // Movable start from sign itself, Fixed from 9th (+8), Dual from 5th (+4)
+            let span = 30.0 / 9.0;
+            let part = ((pos_in_sign / span).floor() as u8).min(8);
+            let start = match sign_idx % 3 {
+                0 => sign_idx,
+                1 => (sign_idx + 8) % 12,
+                _ => (sign_idx + 4) % 12,
+            };
+            let sign = (start + part) % 12;
+            let pos_in_part = pos_in_sign - (part as f64 * span);
+            let degree = (pos_in_part / span) * 30.0;
+            (sign, degree.clamp(0.0, 30.0))
+        }
+        VargaDivision::D10 => {
+            // Parashari Dashamsha: 3-degree divisions (0..9)
+            // Odd signs start from sign itself; Even signs start from 9th sign (+8)
+            let part = ((pos_in_sign / 3.0).floor() as u8).min(9);
+            let start = if sign_idx % 2 == 0 {
+                sign_idx
+            } else {
+                (sign_idx + 8) % 12
+            };
+            let sign = (start + part) % 12;
+            let pos_in_part = pos_in_sign - (part as f64 * 3.0);
+            let degree = (pos_in_part / 3.0) * 30.0;
+            (sign, degree.clamp(0.0, 30.0))
+        }
         VargaDivision::D11 => {
-            // Jaimini Rudramsha: 30/11 degree segments (0..10)
-            let part = (pos_in_sign / (30.0 / 11.0)).floor().min(10.0) as u8;
+            // Jaimini Rudramsha: (30/11)-degree divisions (0..10)
+            // Start sign = count backward from Aries by sign position
+            // Then count forward by part
+            let span = 30.0 / 11.0;
+            let part = ((pos_in_sign / span).floor() as u8).min(10);
             let start = (12 - sign_idx) % 12;
-            (start + 12 - (part % 12)) % 12
+            let sign = (start + part) % 12;
+            let pos_in_part = pos_in_sign - (part as f64 * span);
+            let degree = (pos_in_part / span) * 30.0;
+            (sign, degree.clamp(0.0, 30.0))
         }
-        VargaDivision::D12 => varga_sign(norm, VargaType::Dwadashamsha),
+        VargaDivision::D12 => {
+            // Parashari Dwadashamsha: 2.5-degree divisions (0..11)
+            // Count from sign itself through 12 signs
+            let part = ((pos_in_sign / 2.5).floor() as u8).min(11);
+            let sign = (sign_idx + part) % 12;
+            let pos_in_part = pos_in_sign - (part as f64 * 2.5);
+            let degree = (pos_in_part / 2.5) * 30.0;
+            (sign, degree.clamp(0.0, 30.0))
+        }
     }
+}
+
+/// Computes the divisional sign index (0..11) for any supported varga division.
+pub fn calculate_varga_sign(sidereal_lon: f64, div: VargaDivision) -> u8 {
+    calculate_varga_sign_and_degree(sidereal_lon, div).0
 }
 
 /// Planet placement in the sidereal framework.
@@ -123,6 +223,7 @@ pub struct VedicPlanet {
 pub struct VargaPlacement {
     pub planet_name: String,
     pub sign_index: u8,       // 0 .. 11
+    pub sign_degree: f64,     // 0.0 .. 30.0 relative degree within the varga sign
     pub house: u8,            // 1 .. 12 counted from varga lagna
 }
 
@@ -213,16 +314,17 @@ pub fn calculate_vedic(ephem: &EphemerisSnapshot, latitude: f64) -> VedicChart {
     // 3. Compute the 11 supported divisional charts
     let mut vargas = BTreeMap::new();
     for div in VargaDivision::ALL {
-        let v_lagna = calculate_varga_sign(lagna_sidereal, div);
+        let (v_lagna, _) = calculate_varga_sign_and_degree(lagna_sidereal, div);
 
         let mut placements = Vec::with_capacity(planets.len());
         for p in &planets {
-            let p_sign = calculate_varga_sign(p.sidereal_longitude, div);
+            let (p_sign, p_degree) = calculate_varga_sign_and_degree(p.sidereal_longitude, div);
             let house = ((p_sign as i16 - v_lagna as i16 + 12) % 12 + 1) as u8;
 
             placements.push(VargaPlacement {
                 planet_name: p.name.clone(),
                 sign_index: p_sign,
+                sign_degree: p_degree,
                 house,
             });
         }
@@ -286,5 +388,74 @@ mod tests {
         for dasha in &chart.vimshottari_dashas {
             assert_eq!(dasha.sub_periods.len(), 9, "Each Mahadasha must contain 9 Antardashas");
         }
+    }
+
+    #[test]
+    fn test_varga_calculations_accuracy() {
+        // D1 Rasi
+        let (sign, deg) = calculate_varga_sign_and_degree(15.5, VargaDivision::D1);
+        assert_eq!(sign, 0); // Aries
+        assert!((deg - 15.5).abs() < 1e-6);
+
+        // D2 Hora (Parivritti Dwaya 15-degree cycle)
+        let (sign, deg) = calculate_varga_sign_and_degree(7.5, VargaDivision::D2);
+        assert_eq!(sign, 0); // Aries
+        assert!((deg - 15.0).abs() < 1e-6);
+
+        let (sign, deg) = calculate_varga_sign_and_degree(15.0, VargaDivision::D2);
+        assert_eq!(sign, 1); // Taurus
+        assert!((deg - 0.0).abs() < 1e-6);
+
+        let (sign, deg) = calculate_varga_sign_and_degree(35.0, VargaDivision::D2); // Taurus 5 deg
+        assert_eq!(sign, 2); // Gemini (30..45 deg)
+        assert!((deg - 10.0).abs() < 1e-6);
+
+        // D3 Drekkana (0-10 same, 10-20 +4, 20-30 +8)
+        assert_eq!(calculate_varga_sign(5.0, VargaDivision::D3), 0); // Aries 5 -> Aries
+        assert_eq!(calculate_varga_sign(15.0, VargaDivision::D3), 4); // Aries 15 -> Leo
+        assert_eq!(calculate_varga_sign(25.0, VargaDivision::D3), 8); // Aries 25 -> Sagittarius
+
+        // D4 Chaturthamsha (7.5-deg Kendra offsets: 0, 3, 6, 9)
+        assert_eq!(calculate_varga_sign(2.0, VargaDivision::D4), 0); // Aries (0 + 0)
+        assert_eq!(calculate_varga_sign(8.0, VargaDivision::D4), 3); // Cancer (0 + 3)
+        assert_eq!(calculate_varga_sign(16.0, VargaDivision::D4), 6); // Libra (0 + 6)
+        assert_eq!(calculate_varga_sign(23.0, VargaDivision::D4), 9); // Capricorn (0 + 9)
+        assert_eq!(calculate_varga_sign(38.0, VargaDivision::D4), 4); // Taurus 8 deg -> Leo (1 + 3)
+
+        // D6 Shashthamsha (Odd: same sign; Even: 7th sign)
+        assert_eq!(calculate_varga_sign(2.0, VargaDivision::D6), 0); // Aries -> Aries
+        assert_eq!(calculate_varga_sign(6.0, VargaDivision::D6), 1); // Aries -> Taurus
+        assert_eq!(calculate_varga_sign(32.0, VargaDivision::D6), 7); // Taurus (even) -> Scorpio (1 + 6)
+        assert_eq!(calculate_varga_sign(62.0, VargaDivision::D6), 2); // Gemini (odd) -> Gemini (2)
+
+        // D7 Saptamsha (Odd: same; Even: 7th)
+        assert_eq!(calculate_varga_sign(2.0, VargaDivision::D7), 0); // Aries
+        assert_eq!(calculate_varga_sign(32.0, VargaDivision::D7), 7); // Taurus -> Scorpio
+
+        // D8 Ashtamamsha (Movable: Aries, Fixed: Sag, Dual: Leo)
+        assert_eq!(calculate_varga_sign(1.0, VargaDivision::D8), 0); // Aries (Movable) -> Aries
+        assert_eq!(calculate_varga_sign(31.0, VargaDivision::D8), 8); // Taurus (Fixed) -> Sagittarius
+        assert_eq!(calculate_varga_sign(61.0, VargaDivision::D8), 4); // Dual (Gemini) -> Leo
+
+        // D9 Navamsha (3°20' divisions)
+        assert_eq!(calculate_varga_sign(1.0, VargaDivision::D9), 0); // Aries
+        assert_eq!(calculate_varga_sign(4.0, VargaDivision::D9), 1); // Taurus
+        assert_eq!(calculate_varga_sign(31.0, VargaDivision::D9), 9); // Taurus 1 deg -> Capricorn
+
+        // D10 Dashamsha (Odd: same, Even: 9th)
+        assert_eq!(calculate_varga_sign(1.0, VargaDivision::D10), 0); // Aries
+        assert_eq!(calculate_varga_sign(31.0, VargaDivision::D10), 9); // Taurus -> Capricorn (1 + 8)
+
+        // D11 Rudramsha (Gemini: start Aquarius, count forward)
+        // Gemini = sign_idx 2. start = (12 - 2) % 12 = 10 (Aquarius).
+        // Part 0 (0..2.727 deg) -> Aquarius (10)
+        assert_eq!(calculate_varga_sign(61.0, VargaDivision::D11), 10);
+        // Part 1 (2.727..5.454 deg) -> Pisces (11)
+        assert_eq!(calculate_varga_sign(63.0, VargaDivision::D11), 11);
+
+        // D12 Dwadashamsha (Count from same sign)
+        assert_eq!(calculate_varga_sign(1.0, VargaDivision::D12), 0); // Aries
+        assert_eq!(calculate_varga_sign(3.0, VargaDivision::D12), 1); // Taurus
+        assert_eq!(calculate_varga_sign(31.0, VargaDivision::D12), 1); // Taurus 1 deg -> Taurus
     }
 }

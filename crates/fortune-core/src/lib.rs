@@ -17,7 +17,10 @@ use serde::{Deserialize, Serialize};
 pub use ephemeris::{compute_ephemeris, CelestialBody, EphemerisSnapshot};
 pub use saju::{calculate_saju, DaeUnPeriod, Gender, Pillar, SajuChart};
 pub use timezone::{lookup_timezone_id, resolve_local_to_utc, TimezoneResolution};
-pub use vedic::{calculate_vedic, DashaPeriodInfo, VargaChart, VargaDivision, VargaPlacement, VedicChart, VedicPlanet};
+pub use vedic::{
+    calculate_varga_sign, calculate_varga_sign_and_degree, calculate_vedic, DashaPeriodInfo,
+    VargaChart, VargaDivision, VargaPlacement, VedicChart, VedicPlanet,
+};
 pub use western::{calculate_western, WesternAspect, WesternChart, WesternHouseSystem, WesternNode, WesternPlanet};
 
 /// Unified input structure for fortune calculation.
