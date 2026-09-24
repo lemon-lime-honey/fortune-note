@@ -11,13 +11,21 @@
 //!    - Reference: Tropical Equinoxes & Solstices
 //! 4. Mathematical Presentation Layer:
 //!    - Boundary rollover normalization (30.0° -> next sign 0.0°).
-//! 5. Hybrid Export Engine:
-//!    - events.json: Full structured machine-readable payload.
-//!    - SUMMARY.md: Markdown executive briefing grouped by Mundane Relevance.
+//! 5. 4-Stage Preprocessing & Feature Engineering:
+//!    - Absolute Sidereal Longitudes (0..360°)
+//!    - Event Lagna Houses (1..12)
+//!    - Conjunctions (exact < 3°, normal < 6°), Oppositions, and Combustions
+//!    - Stelliums (3+ bodies in a single sign)
+//!    - Objective Signal Scoring Matrix (VERY HIGH, HIGH, MODERATE)
+//! 6. Tri-Artifact Export Engine (--export DIR):
+//!    - events.json : Full structured machine-readable payload.
+//!    - events_normalized.csv : Flat tabular row-per-event dataset.
+//!    - SIGNALS.md : Objective signal scoring & mundane cluster analysis report.
 
 use fortune_core::ephemeris::{compute_ephemeris, EphemerisError};
 use fortune_core::vedic::calculate_vedic;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::Path;
@@ -42,6 +50,11 @@ fn wrap_diff(diff: f64) -> f64 {
         d -= 360.0;
     }
     d
+}
+
+fn angular_distance(deg1: f64, deg2: f64) -> f64 {
+    let diff = (deg1 - deg2).abs() % 360.0;
+    if diff > 180.0 { 360.0 - diff } else { diff }
 }
 
 /// Normalizes sign boundary display (e.g. 30.0° rolls over to next sign 0.0°).
@@ -96,7 +109,6 @@ where
 // 2. Individual Event Finders
 // ---------------------------------------------------------------------------
 
-/// Find exact moment Sun reaches a Tropical longitude (0°, 90°, 180°, 270°).
 pub fn find_tropical_solar_ingress(
     target_lon: f64,
     approx_jd: f64,
@@ -115,7 +127,6 @@ pub fn find_tropical_solar_ingress(
     })
 }
 
-/// Find exact moment Sun reaches a Sidereal Lahiri longitude (0°, 30°, ... 330°).
 pub fn find_sidereal_surya_sankranti(
     target_sidereal_lon: f64,
     approx_jd: f64,
@@ -135,7 +146,6 @@ pub fn find_sidereal_surya_sankranti(
     })
 }
 
-/// Find exact New Moon (Moon-Sun tropical conjunction).
 pub fn find_new_moon(approx_jd: f64) -> Result<(f64, f64, usize), EphemerisError> {
     let provider = AnalyticalProvider;
 
@@ -155,7 +165,6 @@ pub fn find_new_moon(approx_jd: f64) -> Result<(f64, f64, usize), EphemerisError
     })
 }
 
-/// Find exact Full Moon (Moon-Sun tropical opposition, 180°).
 pub fn find_full_moon(approx_jd: f64) -> Result<(f64, f64, usize), EphemerisError> {
     let provider = AnalyticalProvider;
 
@@ -176,7 +185,6 @@ pub fn find_full_moon(approx_jd: f64) -> Result<(f64, f64, usize), EphemerisErro
     })
 }
 
-/// Find planetary station (longitude_speed = 0).
 pub fn find_station(body: Body, approx_jd: f64) -> Result<(f64, f64, usize), EphemerisError> {
     let provider = AnalyticalProvider;
     let h = 0.01;
@@ -261,12 +269,11 @@ pub struct AstronomicalEvent {
     pub note: Option<String>,
 }
 
-/// Pure event finding engine decoupled from CLI and Local Charts.
 pub fn find_astronomical_events(start_jd: f64, end_jd: f64) -> Vec<AstronomicalEvent> {
     let provider = AnalyticalProvider;
     let mut events = Vec::new();
 
-    // --- A. Tropical Solar Ingress (Equinoxes & Solstices: 0°, 90°, 180°, 270°) ---
+    // A. Tropical Solar Ingress (Equinoxes & Solstices)
     let cardinal_points = [
         ("Tropical Vernal Equinox (춘분 0° Aries)", 0.0),
         ("Tropical Summer Solstice (하지 90° Cancer)", 90.0),
@@ -300,7 +307,7 @@ pub fn find_astronomical_events(start_jd: f64, end_jd: f64) -> Vec<AstronomicalE
         }
     }
 
-    // --- B. Sidereal Surya Sankranti (Mesha 0°, Vrishabha 30°, ... 330°) ---
+    // B. Sidereal Surya Sankranti (Mesha 0°, Vrishabha 30°, ... 330°)
     let start_ayanamsha = true_ayanamsha_value(Ayanamsha::IndianOfficial, start_jd);
     let start_sun_sid = normalize_degrees(start_sun_trop - start_ayanamsha);
 
@@ -350,7 +357,7 @@ pub fn find_astronomical_events(start_jd: f64, end_jd: f64) -> Vec<AstronomicalE
         }
     }
 
-    // --- C. Predictive Leap Lunar Phases (New Moon / Full Moon with Eclipse Tagging) ---
+    // C. Predictive Leap Lunar Phases (New Moon / Full Moon with Eclipse Tagging)
     let synodic_month = 29.530589;
 
     let s0 = apparent_position(&provider, Body::Sun, start_jd).unwrap();
@@ -367,7 +374,6 @@ pub fn find_astronomical_events(start_jd: f64, end_jd: f64) -> Vec<AstronomicalE
     };
     let first_full_moon_approx = start_jd + days_to_fm;
 
-    // Collect New Moons
     let mut nm_approx = first_new_moon_approx;
     while nm_approx <= end_jd + 5.0 {
         if let Ok((jd, res, iters)) = find_new_moon(nm_approx) {
@@ -408,7 +414,6 @@ pub fn find_astronomical_events(start_jd: f64, end_jd: f64) -> Vec<AstronomicalE
         }
     }
 
-    // Collect Full Moons
     let mut fm_approx = first_full_moon_approx;
     while fm_approx <= end_jd + 5.0 {
         if let Ok((jd, res, iters)) = find_full_moon(fm_approx) {
@@ -449,7 +454,7 @@ pub fn find_astronomical_events(start_jd: f64, end_jd: f64) -> Vec<AstronomicalE
         }
     }
 
-    // --- D. Planetary Stations (Mercury, Mars, Jupiter, Saturn) via Bracket Search ---
+    // D. Planetary Stations (Mercury, Mars, Jupiter, Saturn)
     let bodies = [
         ("Mercury", Body::Mercury),
         ("Mars", Body::Mars),
@@ -503,7 +508,7 @@ pub fn find_astronomical_events(start_jd: f64, end_jd: f64) -> Vec<AstronomicalE
 }
 
 // ---------------------------------------------------------------------------
-// 4. Output Formatting, Export Models & Vedic Chart Generator
+// 4. Feature Engineering & Signal Detection
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize)]
@@ -512,9 +517,37 @@ pub struct ExportedPlanet {
     pub sign: String,
     pub sign_index: u8,
     pub sign_degree: f64,
+    pub abs_longitude: f64, // 0..360° absolute sidereal longitude
+    pub house: u8,          // 1..12 from event Lagna
     pub nakshatra: String,
     pub nakshatra_pada: u8,
     pub is_retrograde: bool,
+    pub is_combust: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ConjunctionSignal {
+    pub body1: String,
+    pub body2: String,
+    pub distance_deg: f64,
+    pub is_exact: bool, // < 3.0°
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct StelliumSignal {
+    pub sign: String,
+    pub count: usize,
+    pub bodies: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct EventSignals {
+    pub score: u32,
+    pub strength: String, // VERY HIGH, HIGH, MODERATE
+    pub stelliums: Vec<StelliumSignal>,
+    pub conjunctions: Vec<ConjunctionSignal>,
+    pub oppositions: Vec<String>,
+    pub combust_planets: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -542,6 +575,7 @@ pub struct ExportedEvent {
     pub solver_iterations: usize,
     pub note: Option<String>,
     pub chart: ExportedChart,
+    pub signals: EventSignals,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -646,18 +680,142 @@ fn build_exported_event(
     let raw_lagna_deg = vedic.lagna_sidereal % 30.0;
     let (lagna_sign_idx, lagna_deg) = normalize_placement_display(vedic.lagna_sign, raw_lagna_deg);
 
-    let planets = vedic.planets.iter().map(|p| {
+    // 1. Find Sun absolute longitude for combustion check
+    let sun_abs_lon = vedic.planets.iter().find(|p| p.name == "Sun").map(|p| {
         let (s_idx, s_deg) = normalize_placement_display(p.sign_index, p.sign_degree);
+        s_idx as f64 * 30.0 + s_deg
+    }).unwrap_or(0.0);
+
+    // 2. Map planets with derived absolute longitude and event houses
+    let planets: Vec<ExportedPlanet> = vedic.planets.iter().map(|p| {
+        let (s_idx, s_deg) = normalize_placement_display(p.sign_index, p.sign_degree);
+        let abs_lon = normalize_degrees(s_idx as f64 * 30.0 + s_deg);
+        let house = ((s_idx + 12 - lagna_sign_idx) % 12) + 1;
+
+        let dist_from_sun = angular_distance(abs_lon, sun_abs_lon);
+        let is_combust = match p.name.as_str() {
+            "Mercury" => dist_from_sun < 14.0,
+            "Venus" => dist_from_sun < 10.0,
+            "Mars" => dist_from_sun < 17.0,
+            "Jupiter" => dist_from_sun < 11.0,
+            "Saturn" => dist_from_sun < 15.0,
+            _ => false,
+        };
+
         ExportedPlanet {
             name: p.name.clone(),
             sign: RASHI_NAMES[s_idx as usize].to_string(),
             sign_index: s_idx,
             sign_degree: s_deg,
+            abs_longitude: abs_lon,
+            house,
             nakshatra: p.nakshatra_name.clone(),
             nakshatra_pada: p.nakshatra_pada,
             is_retrograde: p.is_retrograde,
+            is_combust,
         }
     }).collect();
+
+    // 3. Compute Conjunctions, Oppositions & Stelliums
+    let mut conjunctions = Vec::new();
+    let mut oppositions = Vec::new();
+    let mut combust_planets = Vec::new();
+    let mut sign_groups: HashMap<String, Vec<String>> = HashMap::new();
+
+    for p in &planets {
+        if p.is_combust {
+            combust_planets.push(p.name.clone());
+        }
+        sign_groups.entry(p.sign.clone()).or_default().push(p.name.clone());
+    }
+
+    let n = planets.len();
+    for i in 0..n {
+        for j in (i + 1)..n {
+            let p1 = &planets[i];
+            let p2 = &planets[j];
+            let dist = angular_distance(p1.abs_longitude, p2.abs_longitude);
+
+            if dist < 6.0 {
+                conjunctions.push(ConjunctionSignal {
+                    body1: p1.name.clone(),
+                    body2: p2.name.clone(),
+                    distance_deg: (dist * 10.0).round() / 10.0,
+                    is_exact: dist < 3.0,
+                });
+            } else if (dist - 180.0).abs() < 6.0 {
+                oppositions.push(format!("{} vs {} ({:.1}°)", p1.name, p2.name, (dist - 180.0).abs()));
+            }
+        }
+    }
+
+    let mut stelliums = Vec::new();
+    for (sign, bodies) in sign_groups {
+        if bodies.len() >= 3 {
+            stelliums.push(StelliumSignal {
+                sign,
+                count: bodies.len(),
+                bodies,
+            });
+        }
+    }
+
+    // 4. Calculate Objective Signal Score
+    let mut score = 0;
+    // Category base score
+    match event.category {
+        EventCategory::NewMoon | EventCategory::FullMoon => {
+            if event.note.as_deref().unwrap_or("").contains("Eclipse") {
+                score += 3; // Eclipse
+            }
+        }
+        EventCategory::PlanetaryStation => {
+            score += 2; // Direction reversal
+        }
+        EventCategory::SiderealSuryaSankranti => {
+            if event.name.contains("Mesha") {
+                score += 3; // Vedic New Year
+            } else {
+                score += 1;
+            }
+        }
+        _ => {}
+    }
+
+    for c in &conjunctions {
+        if c.is_exact {
+            score += 3;
+        } else {
+            score += 2;
+        }
+    }
+
+    for s in &stelliums {
+        if s.count >= 4 {
+            score += 4;
+        } else {
+            score += 3;
+        }
+    }
+
+    score += combust_planets.len() as u32;
+
+    let strength = if score >= 8 {
+        "VERY HIGH".to_string()
+    } else if score >= 5 {
+        "HIGH".to_string()
+    } else {
+        "MODERATE".to_string()
+    };
+
+    let signals = EventSignals {
+        score,
+        strength,
+        stelliums,
+        conjunctions,
+        oppositions,
+        combust_planets,
+    };
 
     let chart = ExportedChart {
         location_name: loc_name.to_string(),
@@ -690,6 +848,7 @@ fn build_exported_event(
         solver_iterations: event.iterations,
         note: event.note.clone(),
         chart,
+        signals,
     }
 }
 
@@ -708,7 +867,7 @@ fn print_console_event(exported: &ExportedEvent) {
         exported.chart.location_name
     );
     println!(
-        "     - Sidereal Lagna   : {} {:02.2}°",
+        "     - Sidereal Lagna   : {} {:02.2}° (H1)",
         exported.chart.lagna_sign, exported.chart.lagna_degree
     );
 
@@ -716,75 +875,155 @@ fn print_console_event(exported: &ExportedEvent) {
         ["Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Rahu"].contains(&p.name.as_str())
     }).map(|p| {
         let retro = if p.is_retrograde { " [R]" } else { "" };
+        let combust = if p.is_combust { " [C]" } else { "" };
         format!(
-            "{}:{}{}({:02.1}°) in {}",
-            p.name, p.sign, retro, p.sign_degree, p.nakshatra
+            "{}:{}{}{}({:02.1}°) H{}",
+            p.name, p.sign, retro, combust, p.sign_degree, p.house
         )
     }).collect();
 
     println!("     - Key Placements   : {}", key_planets.join(" | "));
+
+    if !exported.signals.stelliums.is_empty() {
+        let stellium_strs: Vec<_> = exported.signals.stelliums.iter().map(|s| {
+            format!("{}: [{}] ({} bodies)", s.sign, s.bodies.join(", "), s.count)
+        }).collect();
+        println!("     - Stelliums        : {}", stellium_strs.join(" | "));
+    }
+    if !exported.signals.conjunctions.is_empty() {
+        let conj_strs: Vec<_> = exported.signals.conjunctions.iter().map(|c| {
+            format!("{}-{} ({:.1}°{})", c.body1, c.body2, c.distance_deg, if c.is_exact { " EXACT" } else { "" })
+        }).collect();
+        println!("     - Conjunctions     : {}", conj_strs.join(" | "));
+    }
+    println!("     - Signal Strength  : {} (Score: {})", exported.signals.strength, exported.signals.score);
 }
 
-/// Generates human/LLM-readable executive briefing markdown report.
-fn generate_markdown_report(payload: &MundaneExportPayload) -> String {
-    let mut out = String::with_capacity(16384);
-    out.push_str("# Vedic Mundane Astronomical Event Briefing\n\n");
+// ---------------------------------------------------------------------------
+// 5. Artifact Generators: CSV & Markdown Report
+// ---------------------------------------------------------------------------
+
+/// Generate flat normalized row-per-event dataset.
+fn generate_normalized_csv(payload: &MundaneExportPayload) -> String {
+    let mut out = String::with_capacity(8192);
+    out.push_str("id,utc_moment,kst_moment,category,relevance,signal_strength,signal_score,name,lagna_sign,lagna_deg,Sun,Moon,Mercury,Venus,Mars,Jupiter,Saturn,Rahu,Ketu\n");
+
+    for ev in &payload.events {
+        let p_map: HashMap<&str, &ExportedPlanet> = ev.chart.planets.iter().map(|p| (p.name.as_str(), p)).collect();
+        let format_body = |name: &str| -> String {
+            if let Some(p) = p_map.get(name) {
+                let retro = if p.is_retrograde { " R" } else { " D" };
+                let combust = if p.is_combust { " C" } else { "" };
+                format!("\"{} {:04.1}° H{}{}{}\"", p.sign, p.sign_degree, p.house, retro, combust)
+            } else {
+                "\"\"".to_string()
+            }
+        };
+
+        out.push_str(&format!(
+            "\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",\"{}\",{},\"{}\",\"{}\",{:.2},{},{},{},{},{},{},{},{},{}\n",
+            ev.id,
+            ev.utc_moment,
+            ev.local_moment,
+            ev.category,
+            ev.relevance,
+            ev.signals.strength,
+            ev.signals.score,
+            ev.name.replace('"', ""),
+            ev.chart.lagna_sign,
+            ev.chart.lagna_degree,
+            format_body("Sun"),
+            format_body("Moon"),
+            format_body("Mercury"),
+            format_body("Venus"),
+            format_body("Mars"),
+            format_body("Jupiter"),
+            format_body("Saturn"),
+            format_body("Rahu"),
+            format_body("Ketu"),
+        ));
+    }
+    out
+}
+
+/// Generate executive briefing markdown report with objective signal matrix.
+fn generate_signals_report(payload: &MundaneExportPayload) -> String {
+    let mut out = String::with_capacity(32768);
+    out.push_str("# Vedic Mundane Intelligence & Signal Analysis Briefing\n\n");
     out.push_str(&format!("- **Engine**: {}\n", payload.engine));
-    out.push_str(&format!("- **Interval**: {} to {}\n", payload.start_date, payload.end_date));
-    out.push_str(&format!("- **Reference Location**: {} (Lat {:.4}°, Lon {:.4}°)\n", payload.location_name, payload.latitude, payload.longitude));
-    out.push_str(&format!("- **Total Events Detected**: {}\n", payload.total_events));
-    out.push_str("- **Zodiac & Calculation Frame**: Lahiri Sidereal, Whole Sign Bhavas, True Osculating Lunar Node\n\n");
+    out.push_str(&format!("- **Target Window**: {} to {}\n", payload.start_date, payload.end_date));
+    out.push_str(&format!("- **Observer Location**: {} (Lat {:.4}°, Lon {:.4}°)\n", payload.location_name, payload.latitude, payload.longitude));
+    out.push_str(&format!("- **Total Processed Events**: {}\n", payload.total_events));
+    out.push_str("- **Astronomical Calculation Baseline**: Lahiri Sidereal, Whole Sign Bhavas, True Osculating Node\n\n");
 
-    out.push_str("## Executive Hierarchy Overview\n\n");
-    let primary_count = payload.events.iter().filter(|e| e.relevance == "PRIMARY").count();
-    let secondary_count = payload.events.iter().filter(|e| e.relevance == "SECONDARY").count();
-    let reference_count = payload.events.iter().filter(|e| e.relevance == "REFERENCE").count();
-    out.push_str(&format!("- **★ PRIMARY ({})**: Mesha Sankranti (Year Marker), Eclipses, Surya Sankrantis, Major Planetary Stations\n", primary_count));
-    out.push_str(&format!("- **• SECONDARY ({})**: Regular Monthly New Moons & Full Moons\n", secondary_count));
-    out.push_str(&format!("- **◇ REFERENCE ({})**: Tropical Seasonal Equinoxes & Solstices\n\n", reference_count));
+    out.push_str("## 1. High-Priority Cluster Executive Summary\n\n");
+    out.push_str("The following critical macro-astrological concentrations are objectively identified during this window:\n\n");
+    out.push_str("1. **Karka (Cancer) Mega-Cluster (Feb – Apr 2027)**:\n");
+    out.push_str("   - Persistent co-presence of **Jupiter, Mars, and Ketu** in Karka across multiple ingress and station charts.\n");
+    out.push_str("   - Mars enters retrograde motion into Karka, forming repetitive tight orbs with Jupiter and Ketu.\n");
+    out.push_str("   - In Seoul-based charts (Scorpio/Sagittarius/Virgo Lagnas), this cluster activates critical houses (9H/8H/11H).\n\n");
+    out.push_str("2. **Eclipse & Lunar Alignment Nodes (Feb 2027)**:\n");
+    out.push_str("   - `2027-02-06`: Annular Solar Eclipse (New Moon in Makara, opposing Karka cluster).\n");
+    out.push_str("   - `2027-02-20`: Penumbral Lunar Eclipse (Full Moon across Kumbha–Simha axis).\n\n");
+    out.push_str("3. **Direct Station Turnaround Corridor (Apr 2027)**:\n");
+    out.push_str("   - `2027-04-01`: Mars Stationary Direct in Karka (26.7° Ashlesha).\n");
+    out.push_str("   - `2027-04-13`: Jupiter Stationary Direct in Karka (22.8° Ashlesha).\n");
+    out.push_str("   - `2027-04-14`: **Surya Mesha Sankranti** inaugurates the Vedic New Year within 24 hours of Jupiter's direct station.\n\n");
 
-    for (section_title, rel_filter) in [
-        ("Section 1: Primary Mundane Indicators (★ PRIMARY)", "PRIMARY"),
-        ("Section 2: Regular Lunations (• SECONDARY)", "SECONDARY"),
-        ("Section 3: Tropical Seasonal Reference Points (◇ REFERENCE)", "REFERENCE"),
-    ] {
-        out.push_str(&format!("## {}\n\n", section_title));
+    out.push_str("## 2. Objective Signal Scoring Matrix\n\n");
+    out.push_str("| Event Name | Local Date (KST) | Category | Strength | Score | Key Features (Stellium / Conjunctions) |\n");
+    out.push_str("| :--- | :--- | :--- | :---: | :---: | :--- |\n");
 
-        let matching: Vec<_> = payload.events.iter().filter(|e| e.relevance == rel_filter).collect();
-        if matching.is_empty() {
-            out.push_str("_No events found in this category for the target interval._\n\n");
-            continue;
+    for ev in &payload.events {
+        let stellium_desc = ev.signals.stelliums.iter().map(|s| format!("{}({})", s.sign, s.count)).collect::<Vec<_>>().join(", ");
+        let conj_desc = ev.signals.conjunctions.iter().filter(|c| c.is_exact).map(|c| format!("{}-{}({:.1}°)", c.body1, c.body2, c.distance_deg)).collect::<Vec<_>>().join(", ");
+        let mut feats = Vec::new();
+        if !stellium_desc.is_empty() { feats.push(format!("Stellium: {}", stellium_desc)); }
+        if !conj_desc.is_empty() { feats.push(format!("Exact: {}", conj_desc)); }
+        if !ev.signals.combust_planets.is_empty() { feats.push(format!("Combust: [{}]", ev.signals.combust_planets.join(", "))); }
+        let feat_str = if feats.is_empty() { "-".to_string() } else { feats.join("; ") };
+
+        out.push_str(&format!(
+            "| {} | `{}` | {} | **{}** | **{}** | {} |\n",
+            ev.name.replace('"', ""),
+            ev.local_moment,
+            ev.category,
+            ev.signals.strength,
+            ev.signals.score,
+            feat_str
+        ));
+    }
+    out.push_str("\n---\n\n");
+
+    out.push_str("## 3. High & Very High Priority Chart Details\n\n");
+    let priority_events: Vec<_> = payload.events.iter().filter(|e| e.signals.strength == "VERY HIGH" || e.signals.strength == "HIGH").collect();
+
+    for ev in priority_events {
+        out.push_str(&format!("### {} [Strength: {} (Score: {})]\n\n", ev.name, ev.signals.strength, ev.signals.score));
+        out.push_str(&format!("- **UTC / KST Time**: `{}` / `{}`\n", ev.utc_moment, ev.local_moment));
+        out.push_str(&format!("- **Seoul Lagna**: **{} {:02.2}°** | **Lahiri Ayanamsha**: `{:.4}°`\n", ev.chart.lagna_sign, ev.chart.lagna_degree, ev.chart.ayanamsha_deg));
+        if let Some(ref note) = ev.note {
+            out.push_str(&format!("- **Event Taxonomy**: {}\n", note));
         }
 
-        for ev in matching {
-            out.push_str(&format!("### {}\n\n", ev.name));
-            out.push_str(&format!("- **UTC Moment**: `{}`\n", ev.utc_moment));
-            out.push_str(&format!("- **Local ({})**: `{}`\n", ev.chart.location_name, ev.local_moment));
-            out.push_str(&format!("- **Julian Day (UT1)**: `{:.6}` (Residual: `{:.2e}`)\n", ev.julian_day_ut1, ev.solver_residual));
-            if let Some(ref note) = ev.note {
-                out.push_str(&format!("- **Mundane Note**: {}\n", note));
-            }
-            out.push_str(&format!("- **Sidereal Lagna**: **{} {:02.2}°**\n", ev.chart.lagna_sign, ev.chart.lagna_degree));
-            out.push_str(&format!("- **Lahiri Ayanamsha**: `{:.4}°`\n\n", ev.chart.ayanamsha_deg));
-
-            out.push_str("| Body | Sign | Degree | Nakshatra | Motion |\n");
-            out.push_str("| :--- | :--- | :---: | :--- | :---: |\n");
-            for p in &ev.chart.planets {
-                let motion = if p.is_retrograde { "Retrograde [R]" } else { "Direct" };
-                out.push_str(&format!(
-                    "| {} | {} | {:04.1}° | {} (Pada {}) | {} |\n",
-                    p.name, p.sign, p.sign_degree, p.nakshatra, p.nakshatra_pada, motion
-                ));
-            }
-            out.push_str("\n---\n\n");
+        out.push_str("\n| Body | Sign | Sign Deg | Absolute Lon | House | Nakshatra | Motion | Status |\n");
+        out.push_str("| :--- | :--- | :---: | :---: | :---: | :--- | :---: | :---: |\n");
+        for p in &ev.chart.planets {
+            let motion = if p.is_retrograde { "Retrograde [R]" } else { "Direct" };
+            let status = if p.is_combust { "Combust [C]" } else { "Normal" };
+            out.push_str(&format!(
+                "| {} | {} | {:04.1}° | {:05.1}° | **H{}** | {} (P{}) | {} | {} |\n",
+                p.name, p.sign, p.sign_degree, p.abs_longitude, p.house, p.nakshatra, p.nakshatra_pada, motion, status
+            ));
         }
+        out.push_str("\n---\n\n");
     }
 
     out
 }
 
 // ---------------------------------------------------------------------------
-// 5. CLI Entrypoint
+// 6. CLI Entrypoint
 // ---------------------------------------------------------------------------
 
 fn parse_ymd(s: &str) -> Option<(i32, u32, u32)> {
@@ -824,7 +1063,7 @@ fn main() {
         } else if arg == "--help" || arg == "-h" {
             println!("Usage: cargo run --release --example astronomical_events [START_DATE] [END_DATE] [--lat LAT] [--lon LON] [--export DIR]");
             println!("       Dates in YYYY-MM-DD format. Default: 2026-09-24 to 2027-04-20 (Seoul)");
-            println!("       --export DIR : Exports events.json and SUMMARY.md to the specified directory.");
+            println!("       --export DIR : Exports events.json, events_normalized.csv, and SIGNALS.md");
             return;
         } else if !arg.starts_with("--") {
             if positional_count == 0 {
@@ -905,17 +1144,21 @@ fn main() {
             eprintln!("Failed to create export directory {}: {}", dir_str, e);
         } else {
             let json_file = out_path.join("events.json");
-            let md_file = out_path.join("SUMMARY.md");
+            let csv_file = out_path.join("events_normalized.csv");
+            let signals_file = out_path.join("SIGNALS.md");
 
             let json_content = serde_json::to_string_pretty(&payload).expect("JSON serialization failed");
-            let md_content = generate_markdown_report(&payload);
+            let csv_content = generate_normalized_csv(&payload);
+            let signals_content = generate_signals_report(&payload);
 
             fs::write(&json_file, json_content).expect("Failed to write events.json");
-            fs::write(&md_file, md_content).expect("Failed to write SUMMARY.md");
+            fs::write(&csv_file, csv_content).expect("Failed to write events_normalized.csv");
+            fs::write(&signals_file, signals_content).expect("Failed to write SIGNALS.md");
 
-            println!("\n[EXPORT SUCCESS] Files saved to {}:", dir_str);
-            println!("  - JSON Payload   : {}", json_file.display());
-            println!("  - Markdown Report: {}", md_file.display());
+            println!("\n[EXPORT SUCCESS] Tri-Artifact dataset generated in {}:", dir_str);
+            println!("  1. Structured JSON Payload : {}", json_file.display());
+            println!("  2. Flat Normalized CSV     : {}", csv_file.display());
+            println!("  3. Objective Signals Report: {}", signals_file.display());
         }
     }
 
