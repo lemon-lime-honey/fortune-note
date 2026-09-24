@@ -125,6 +125,17 @@ pub fn format_profile_markdown(profile: &Profile, chart: &FortuneCalculationOutp
             "  * {}: Lagna {}\n",
             division.title(), sign_name
         ));
+        let mut placements_str = Vec::new();
+        for p in &v.placements {
+            let p_sign_name = VEDIC_SIGNS[p.sign_index as usize % 12];
+            placements_str.push(format!(
+                "{}: H{} {} {:.1}°",
+                p.planet_name, p.house, p_sign_name, p.sign_degree
+            ));
+        }
+        if !placements_str.is_empty() {
+            out.push_str(&format!("    - Placements: {}\n", placements_str.join(", ")));
+        }
     }
     out.push_str("- Vimshottari Dasha Sequence:\n");
     for d in &chart.vedic.vimshottari_dashas {
