@@ -73,11 +73,26 @@ pub fn calculate_varga_sign_and_degree(sidereal_lon: f64, div: VargaDivision) ->
     match div {
         VargaDivision::D1 => (sign_idx, pos_in_sign),
         VargaDivision::D2 => {
-            // Parivritti Dwaya (15-degree cyclical divisions across 12 signs)
-            // 360 degrees divided into 24 parts of 15 degrees each, cycling through 12 signs
-            let total_part = ((norm / 15.0).floor() as u8).min(23);
-            let sign = total_part % 12;
-            let pos_in_part = norm - (total_part as f64 * 15.0);
+            // Parashari Hora (BPHS):
+            // In odd signs (sign_idx % 2 == 0):
+            //   1st half (0..15 deg): Leo (4, Sun)
+            //   2nd half (15..30 deg): Cancer (3, Moon)
+            // In even signs (sign_idx % 2 != 0):
+            //   1st half (0..15 deg): Cancer (3, Moon)
+            //   2nd half (15..30 deg): Leo (4, Sun)
+            let is_first_half = pos_in_sign < 15.0;
+            let is_odd_sign = sign_idx % 2 == 0;
+            let sign = match (is_odd_sign, is_first_half) {
+                (true, true) => 4,   // Odd 1st half: Leo
+                (true, false) => 3,  // Odd 2nd half: Cancer
+                (false, true) => 3,  // Even 1st half: Cancer
+                (false, false) => 4, // Even 2nd half: Leo
+            };
+            let pos_in_part = if is_first_half {
+                pos_in_sign
+            } else {
+                pos_in_sign - 15.0
+            };
             let degree = (pos_in_part / 15.0) * 30.0;
             (sign, degree.clamp(0.0, 30.0))
         }
@@ -397,17 +412,27 @@ mod tests {
         assert_eq!(sign, 0); // Aries
         assert!((deg - 15.5).abs() < 1e-6);
 
-        // D2 Hora (Parivritti Dwaya 15-degree cycle)
+        // D2 Hora (Parashari BPHS: Sun/Moon dual sign distribution)
+        // Aries (odd sign, sign_idx 0):
+        // 7.5 deg -> 1st half -> Leo (4), degree = 15.0
         let (sign, deg) = calculate_varga_sign_and_degree(7.5, VargaDivision::D2);
-        assert_eq!(sign, 0); // Aries
+        assert_eq!(sign, 4); // Leo
         assert!((deg - 15.0).abs() < 1e-6);
 
-        let (sign, deg) = calculate_varga_sign_and_degree(15.0, VargaDivision::D2);
-        assert_eq!(sign, 1); // Taurus
-        assert!((deg - 0.0).abs() < 1e-6);
+        // 20.0 deg -> 2nd half -> Cancer (3), degree = ((20 - 15) / 15) * 30 = 10.0
+        let (sign, deg) = calculate_varga_sign_and_degree(20.0, VargaDivision::D2);
+        assert_eq!(sign, 3); // Cancer
+        assert!((deg - 10.0).abs() < 1e-6);
 
-        let (sign, deg) = calculate_varga_sign_and_degree(35.0, VargaDivision::D2); // Taurus 5 deg
-        assert_eq!(sign, 2); // Gemini (30..45 deg)
+        // Taurus (even sign, sign_idx 1):
+        // 35.0 deg (Taurus 5 deg) -> 1st half -> Cancer (3), degree = 10.0
+        let (sign, deg) = calculate_varga_sign_and_degree(35.0, VargaDivision::D2);
+        assert_eq!(sign, 3); // Cancer
+        assert!((deg - 10.0).abs() < 1e-6);
+
+        // 50.0 deg (Taurus 20 deg) -> 2nd half -> Leo (4), degree = 10.0
+        let (sign, deg) = calculate_varga_sign_and_degree(50.0, VargaDivision::D2);
+        assert_eq!(sign, 4); // Leo
         assert!((deg - 10.0).abs() < 1e-6);
 
         // D3 Drekkana (0-10 same, 10-20 +4, 20-30 +8)
