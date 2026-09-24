@@ -57,9 +57,21 @@ class FortuneRepository(
         }
     }
 
-    suspend fun exportProfileMarkdown(id: String): Result<String> = withContext(Dispatchers.IO) {
+    suspend fun exportProfileSajuMarkdown(id: String): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
-            client.exportProfileMarkdown(id)
+            client.exportProfileSajuMarkdown(id)
+        }
+    }
+
+    suspend fun exportProfileWesternMarkdown(id: String): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            client.exportProfileWesternMarkdown(id)
+        }
+    }
+
+    suspend fun exportProfileVedicMarkdown(id: String): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            client.exportProfileVedicMarkdown(id)
         }
     }
 
@@ -106,11 +118,6 @@ class FortuneRepository(
         }
     }
 
-    suspend fun exportHoraryMarkdown(id: String): Result<String> = withContext(Dispatchers.IO) {
-        runCatching {
-            client.exportHoraryMarkdown(id)
-        }
-    }
 
     suspend fun exportHoraryWesternMarkdown(id: String): Result<String> = withContext(Dispatchers.IO) {
         runCatching {

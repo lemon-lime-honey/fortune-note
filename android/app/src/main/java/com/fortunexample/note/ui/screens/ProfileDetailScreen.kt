@@ -41,7 +41,9 @@ import com.fortunexample.note.ui.theme.*
 fun ProfileDetailScreen(
     profile: ProfileDto,
     chart: FortuneChartOutput?,
-    markdown: String?,
+    sajuMarkdown: String?,
+    westernMarkdown: String?,
+    vedicMarkdown: String?,
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
@@ -88,10 +90,22 @@ fun ProfileDetailScreen(
                         Icon(Icons.Default.Edit, contentDescription = "수정", tint = TextPrimary)
                     }
                     IconButton(onClick = {
-                        if (!markdown.isNullOrEmpty()) {
+                        val targetMarkdown = when (selectedDomainTab) {
+                            0 -> sajuMarkdown
+                            1 -> westernMarkdown
+                            2 -> vedicMarkdown
+                            else -> null
+                        }
+                        val domainName = when (selectedDomainTab) {
+                            0 -> "사주명리"
+                            1 -> "Western 점성학"
+                            2 -> "Vedic 점성학"
+                            else -> ""
+                        }
+                        if (!targetMarkdown.isNullOrEmpty()) {
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            clipboard.setPrimaryClip(ClipData.newPlainText("Fortune Note", markdown))
-                            Toast.makeText(context, "LLM 마크다운 프롬프트가 복사되었습니다.", Toast.LENGTH_SHORT).show()
+                            clipboard.setPrimaryClip(ClipData.newPlainText("Fortune Note $domainName", targetMarkdown))
+                            Toast.makeText(context, "$domainName 전용 LLM 프롬프트가 복사되었습니다.", Toast.LENGTH_SHORT).show()
                         }
                     }) {
                         Icon(Icons.Default.ContentCopy, contentDescription = "LLM 마크다운 복사", tint = TextPrimary)

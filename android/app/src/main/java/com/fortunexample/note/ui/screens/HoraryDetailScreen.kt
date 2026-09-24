@@ -37,7 +37,6 @@ fun HoraryDetailScreen(
     chart: FortuneChartOutput?,
     westernMarkdown: String?,
     prashnaMarkdown: String?,
-    integratedMarkdown: String?,
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
@@ -69,15 +68,15 @@ fun HoraryDetailScreen(
                     }
                     IconButton(onClick = {
                         if (selectedTab == 0) {
-                            copyToClipboard("Western Horary Prompt", westernMarkdown ?: integratedMarkdown, "호라리(서양) LLM 프롬프트가 복사되었습니다.")
+                            copyToClipboard("Western Horary Prompt", westernMarkdown, "호라리(서양) LLM 프롬프트가 복사되었습니다.")
                         } else {
-                            copyToClipboard("Vedic Prashna Prompt", prashnaMarkdown ?: integratedMarkdown, "프라슈나(베다) LLM 프롬프트가 복사되었습니다.")
+                            copyToClipboard("Vedic Prashna Prompt", prashnaMarkdown, "프라슈나(베다) LLM 프롬프트가 복사되었습니다.")
                         }
                     }) {
                         Icon(Icons.Default.ContentCopy, contentDescription = "현재 탭 복사", tint = TextPrimary)
                     }
                     IconButton(onClick = { showMenu = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "복사 옵션 및 메뉴", tint = TextPrimary)
+                        Icon(Icons.Default.MoreVert, contentDescription = "옵션 메뉴", tint = TextPrimary)
                     }
                     DropdownMenu(
                         expanded = showMenu,
@@ -88,21 +87,14 @@ fun HoraryDetailScreen(
                             text = { Text("호라리 (서양) 프롬프트 복사", color = TextPrimary, fontSize = 14.sp) },
                             onClick = {
                                 showMenu = false
-                                copyToClipboard("Western Horary Prompt", westernMarkdown ?: integratedMarkdown, "호라리(서양) LLM 프롬프트가 복사되었습니다.")
+                                copyToClipboard("Western Horary Prompt", westernMarkdown, "호라리(서양) LLM 프롬프트가 복사되었습니다.")
                             }
                         )
                         DropdownMenuItem(
                             text = { Text("프라슈나 (베다) 프롬프트 복사", color = TextPrimary, fontSize = 14.sp) },
                             onClick = {
                                 showMenu = false
-                                copyToClipboard("Vedic Prashna Prompt", prashnaMarkdown ?: integratedMarkdown, "프라슈나(베다) LLM 프롬프트가 복사되었습니다.")
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("호라리/프라슈나 통합 전체 복사", color = TextPrimary, fontSize = 14.sp) },
-                            onClick = {
-                                showMenu = false
-                                copyToClipboard("Integrated Prompt", integratedMarkdown, "통합 호라리/프라슈나 프롬프트가 복사되었습니다.")
+                                copyToClipboard("Vedic Prashna Prompt", prashnaMarkdown, "프라슈나(베다) LLM 프롬프트가 복사되었습니다.")
                             }
                         )
                         HorizontalDivider(color = BorderColor)

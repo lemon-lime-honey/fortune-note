@@ -140,18 +140,24 @@ class MainActivity : ComponentActivity() {
                         val id = backStackEntry.arguments?.getString("id") ?: return@composable
                         val profile = profiles.find { it.id == id }
                         var chart by remember { mutableStateOf<FortuneChartOutput?>(null) }
-                        var markdown by remember { mutableStateOf<String?>(null) }
+                        var sajuMarkdown by remember { mutableStateOf<String?>(null) }
+                        var westernMarkdown by remember { mutableStateOf<String?>(null) }
+                        var vedicMarkdown by remember { mutableStateOf<String?>(null) }
 
                         LaunchedEffect(id) {
                             FortuneApp.repository.calculateProfileChart(id).onSuccess { chart = it }
-                            FortuneApp.repository.exportProfileMarkdown(id).onSuccess { markdown = it }
+                            FortuneApp.repository.exportProfileSajuMarkdown(id).onSuccess { sajuMarkdown = it }
+                            FortuneApp.repository.exportProfileWesternMarkdown(id).onSuccess { westernMarkdown = it }
+                            FortuneApp.repository.exportProfileVedicMarkdown(id).onSuccess { vedicMarkdown = it }
                         }
 
                         if (profile != null) {
                             ProfileDetailScreen(
                                 profile = profile,
                                 chart = chart,
-                                markdown = markdown,
+                                sajuMarkdown = sajuMarkdown,
+                                westernMarkdown = westernMarkdown,
+                                vedicMarkdown = vedicMarkdown,
                                 onBack = { navController.popBackStack() },
                                 onEdit = { navController.navigate("profile_edit?id=$id") },
                                 onDelete = {
@@ -236,13 +242,11 @@ class MainActivity : ComponentActivity() {
                         var chart by remember { mutableStateOf<FortuneChartOutput?>(null) }
                         var westernMarkdown by remember { mutableStateOf<String?>(null) }
                         var prashnaMarkdown by remember { mutableStateOf<String?>(null) }
-                        var integratedMarkdown by remember { mutableStateOf<String?>(null) }
 
                         LaunchedEffect(id) {
                             FortuneApp.repository.calculateHoraryChart(id).onSuccess { chart = it }
                             FortuneApp.repository.exportHoraryWesternMarkdown(id).onSuccess { westernMarkdown = it }
                             FortuneApp.repository.exportPrashnaVedicMarkdown(id).onSuccess { prashnaMarkdown = it }
-                            FortuneApp.repository.exportHoraryMarkdown(id).onSuccess { integratedMarkdown = it }
                         }
 
                         if (horary != null) {
@@ -251,7 +255,6 @@ class MainActivity : ComponentActivity() {
                                 chart = chart,
                                 westernMarkdown = westernMarkdown,
                                 prashnaMarkdown = prashnaMarkdown,
-                                integratedMarkdown = integratedMarkdown,
                                 onBack = { navController.popBackStack() },
                                 onEdit = { navController.navigate("horary_edit?id=$id") },
                                 onDelete = {
