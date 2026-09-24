@@ -1,7 +1,7 @@
 use crate::db::{init_db, DbPool};
 use crate::markdown::{
-    format_horary_markdown, format_horary_western_markdown, format_prashna_vedic_markdown,
-    format_profile_markdown,
+    format_horary_western_markdown, format_prashna_vedic_markdown,
+    format_profile_saju_markdown, format_profile_vedic_markdown, format_profile_western_markdown,
 };
 use crate::models::{
     BackupData, CreateHoraryParams, CreateProfileParams, HoraryQuestion, ImportSummary, Profile,
@@ -202,12 +202,28 @@ impl FortuneBackendService {
         calculate_fortune(input).map_err(FortuneBackendError::CalculationError)
     }
 
-    pub fn export_profile_markdown(&self, id: &str) -> Result<String, FortuneBackendError> {
+    pub fn export_profile_saju_markdown(&self, id: &str) -> Result<String, FortuneBackendError> {
         let profile = self
             .get_profile(id)?
             .ok_or_else(|| FortuneBackendError::NotFoundError(format!("Profile {} not found", id)))?;
         let chart = self.calculate_profile_chart(id)?;
-        Ok(format_profile_markdown(&profile, &chart))
+        Ok(format_profile_saju_markdown(&profile, &chart))
+    }
+
+    pub fn export_profile_western_markdown(&self, id: &str) -> Result<String, FortuneBackendError> {
+        let profile = self
+            .get_profile(id)?
+            .ok_or_else(|| FortuneBackendError::NotFoundError(format!("Profile {} not found", id)))?;
+        let chart = self.calculate_profile_chart(id)?;
+        Ok(format_profile_western_markdown(&profile, &chart))
+    }
+
+    pub fn export_profile_vedic_markdown(&self, id: &str) -> Result<String, FortuneBackendError> {
+        let profile = self
+            .get_profile(id)?
+            .ok_or_else(|| FortuneBackendError::NotFoundError(format!("Profile {} not found", id)))?;
+        let chart = self.calculate_profile_chart(id)?;
+        Ok(format_profile_vedic_markdown(&profile, &chart))
     }
 
     pub fn create_horary(
@@ -359,13 +375,6 @@ impl FortuneBackendService {
         calculate_fortune(input).map_err(FortuneBackendError::CalculationError)
     }
 
-    pub fn export_horary_markdown(&self, id: &str) -> Result<String, FortuneBackendError> {
-        let item = self
-            .get_horary(id)?
-            .ok_or_else(|| FortuneBackendError::NotFoundError(format!("Horary {} not found", id)))?;
-        let chart = self.calculate_horary_chart(id)?;
-        Ok(format_horary_markdown(&item, &chart))
-    }
 
     pub fn export_horary_western_markdown(&self, id: &str) -> Result<String, FortuneBackendError> {
         let item = self
@@ -554,13 +563,27 @@ mod tests {
             .expect("chart calculation failed");
         assert_eq!(chart.saju.daeun_periods.len(), 10);
 
-        let markdown = service
-            .export_profile_markdown(&profile.id)
-            .expect("markdown export failed");
-        assert!(markdown.contains("테스트 인물"));
-        assert!(markdown.contains("사주팔자"));
-        assert!(markdown.contains("서양 점성술"));
-        assert!(markdown.contains("베다 점성술"));
+        let saju_md = service
+            .export_profile_saju_markdown(&profile.id)
+            .expect("saju markdown export failed");
+        assert!(saju_md.contains("테스트 인물"));
+        assert!(saju_md.contains("사주팔자"));
+        assert!(!saju_md.contains("Western Tropical"));
+        assert!(!saju_md.contains("Vedic Sidereal"));
+
+        let western_md = service
+            .export_profile_western_markdown(&profile.id)
+            .expect("western markdown export failed");
+        assert!(western_md.contains("Western Tropical Natal Chart"));
+        assert!(western_md.contains("Major Aspects"));
+        assert!(!saju_md.contains("Western Tropical"));
+
+        let vedic_md = service
+            .export_profile_vedic_markdown(&profile.id)
+            .expect("vedic markdown export failed");
+        assert!(vedic_md.contains("Vedic Sidereal & Vargas"));
+        assert!(vedic_md.contains("Vimshottari Dasha Sequence"));
+        assert!(!vedic_md.contains("사주팔자"));
     }
 
     #[test]
@@ -592,13 +615,6 @@ mod tests {
             .calculate_horary_chart(&horary.id)
             .expect("horary chart calculation failed");
         assert_eq!(chart.western.planets.len(), 7);
-
-        let markdown = service
-            .export_horary_markdown(&horary.id)
-            .expect("horary markdown failed");
-        assert!(markdown.contains("사업 확장 제안 수락 여부"));
-        assert!(markdown.contains("Horary Chart Placements"));
-        assert!(markdown.contains("Prashna Chart"));
 
         let western_md = service
             .export_horary_western_markdown(&horary.id)

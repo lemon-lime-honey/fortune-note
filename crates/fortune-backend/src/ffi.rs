@@ -112,8 +112,16 @@ impl FortuneClient {
         })
     }
 
-    pub fn export_profile_markdown(&self, id: String) -> Result<String, FortuneBackendFfiError> {
-        Ok(self.service.export_profile_markdown(&id)?)
+    pub fn export_profile_saju_markdown(&self, id: String) -> Result<String, FortuneBackendFfiError> {
+        Ok(self.service.export_profile_saju_markdown(&id)?)
+    }
+
+    pub fn export_profile_western_markdown(&self, id: String) -> Result<String, FortuneBackendFfiError> {
+        Ok(self.service.export_profile_western_markdown(&id)?)
+    }
+
+    pub fn export_profile_vedic_markdown(&self, id: String) -> Result<String, FortuneBackendFfiError> {
+        Ok(self.service.export_profile_vedic_markdown(&id)?)
     }
 
     pub fn create_horary(&self, params_json: String) -> Result<String, FortuneBackendFfiError> {
@@ -191,9 +199,6 @@ impl FortuneClient {
         })
     }
 
-    pub fn export_horary_markdown(&self, id: String) -> Result<String, FortuneBackendFfiError> {
-        Ok(self.service.export_horary_markdown(&id)?)
-    }
 
     pub fn export_horary_western_markdown(&self, id: String) -> Result<String, FortuneBackendFfiError> {
         Ok(self.service.export_horary_western_markdown(&id)?)
@@ -307,11 +312,21 @@ mod tests {
             .expect("calc profile chart failed");
         assert!(chart_json.contains("\"western\""));
 
-        let md = client
-            .export_profile_markdown(profile_id.clone())
-            .expect("export profile md failed");
-        assert!(md.contains("홍길동"));
-        assert!(md.contains("사주팔자"));
+        let saju_md = client
+            .export_profile_saju_markdown(profile_id.clone())
+            .expect("export profile saju md failed");
+        assert!(saju_md.contains("홍길동"));
+        assert!(saju_md.contains("사주팔자"));
+
+        let western_md = client
+            .export_profile_western_markdown(profile_id.clone())
+            .expect("export profile western md failed");
+        assert!(western_md.contains("Western Tropical Natal Chart"));
+
+        let vedic_md = client
+            .export_profile_vedic_markdown(profile_id.clone())
+            .expect("export profile vedic md failed");
+        assert!(vedic_md.contains("Vedic Sidereal & Vargas"));
 
         // Horary test
         let create_horary_json = format!(
@@ -345,10 +360,17 @@ mod tests {
             .expect("calc horary chart failed");
         assert!(horary_chart_json.contains("\"ephemeris\""));
 
-        let horary_md = client
-            .export_horary_markdown(horary_id.clone())
-            .expect("export horary md failed");
-        assert!(horary_md.contains("이직 문의"));
+        let horary_w_md = client
+            .export_horary_western_markdown(horary_id.clone())
+            .expect("export horary western md failed");
+        assert!(horary_w_md.contains("이직 문의"));
+        assert!(horary_w_md.contains("Western Tropical"));
+
+        let prashna_v_md = client
+            .export_prashna_vedic_markdown(horary_id.clone())
+            .expect("export prashna vedic md failed");
+        assert!(prashna_v_md.contains("이직 문의"));
+        assert!(prashna_v_md.contains("Vedic Sidereal"));
 
         assert!(client.delete_horary(horary_id).expect("delete horary failed"));
         assert!(client.delete_profile(profile_id).expect("delete profile failed"));
