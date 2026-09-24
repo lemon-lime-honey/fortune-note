@@ -1,27 +1,36 @@
-//! Astronomical Event Finder and Vedic Chart Generator (2026-09-24 to 2027-03-24).
+//! Universal Vedic Mundane Astronomical Event Generator & Chart Engine.
 //!
-//! Demonstrates:
-//! 1. Generalized 1D Newton-Raphson solver.
-//! 2. Independent Event Finders:
-//!    - Ingress Finder (Planetary / Solar sign ingress)
-//!    - New Moon Finder (Solar-Lunar conjunction: Δλ = 0°)
-//!    - Full Moon Finder (Solar-Lunar opposition: Δλ = 180°)
-//!    - Station Finder (Stationary retrograde / direct: dλ/dt = 0)
-//! 3. Deterministic UTC timestamp resolution -> Seoul Vedic chart generation.
-//! 4. Separation between Solver Convergence Tolerance and Ephemeris Intrinsic Precision.
+//! Features:
+//! 1. CLI Argument Parsing: Start Date, End Date, Latitude, Longitude (with defaults).
+//! 2. Decoupled Architecture:
+//!    - Pure (start_jd, end_jd) event finder engine.
+//!    - Global UTC determination before local chart calculation.
+//! 3. Distinct Event Categorization & Mundane Relevance:
+//!    - Primary: Mesha Sankranti, Solar/Lunar Eclipses, Surya Sankrantis, Major Stations
+//!    - Secondary: Regular Lunations (New Moon / Full Moon)
+//!    - Reference: Tropical Equinoxes & Solstices
+//! 4. Mathematical Presentation Layer:
+//!    - Boundary rollover normalization (30.0° -> next sign 0.0°).
+//! 5. Exact Accuracy Disclosure aligned with Vedaksha specifications.
 
 use fortune_core::ephemeris::{compute_ephemeris, EphemerisError};
 use fortune_core::vedic::calculate_vedic;
+use std::env;
+use vedaksha::astro::sidereal::{true_ayanamsha_value, Ayanamsha};
 use vedaksha::ephem::analytical::AnalyticalProvider;
 use vedaksha::ephem::bodies::Body;
 use vedaksha::ephem::coordinates::apparent_position;
 use vedaksha::ephem::julian::{calendar_to_jd, jd_to_calendar};
 use vedaksha::math::angle::normalize_degrees;
 
-const SEOUL_LAT: f64 = 37.5665;
-const SEOUL_LON: f64 = 126.9780;
+const DEFAULT_LAT: f64 = 37.5665;
+const DEFAULT_LON: f64 = 126.9780;
 
-/// Angular difference wrapped to [-180.0, 180.0) degrees.
+const RASHI_NAMES: [&str; 12] = [
+    "Mesha", "Vrishabha", "Mithuna", "Karka", "Simha", "Kanya",
+    "Tula", "Vrishchika", "Dhanu", "Makara", "Kumbha", "Meena",
+];
+
 fn wrap_diff(diff: f64) -> f64 {
     let mut d = normalize_degrees(diff);
     if d >= 180.0 {
@@ -30,10 +39,20 @@ fn wrap_diff(diff: f64) -> f64 {
     d
 }
 
-/// 1. Generalized Newton-Raphson Solver.
-///
-/// Iteratively finds the root of `f(jd) = 0` using derivative `df_djd`.
-/// Returns `(converged_jd, final_residual_deg, iterations)`.
+/// Normalizes sign boundary display (e.g. 30.0° rolls over to next sign 0.0°).
+fn normalize_placement_display(sign_idx: u8, deg: f64) -> (u8, f64) {
+    let rounded_deg = (deg * 10.0).round() / 10.0;
+    if rounded_deg >= 30.0 {
+        ((sign_idx + 1) % 12, 0.0)
+    } else {
+        (sign_idx, rounded_deg)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 1. Generalized Solver
+// ---------------------------------------------------------------------------
+
 pub fn solve_newton_raphson<F>(
     mut approx_jd: f64,
     max_iter: usize,
@@ -41,7 +60,7 @@ pub fn solve_newton_raphson<F>(
     mut eval: F,
 ) -> Result<(f64, f64, usize), EphemerisError>
 where
-    F: FnMut(f64) -> Result<(f64, f64), EphemerisError>, // returns (residual, rate_per_day)
+    F: FnMut(f64) -> Result<(f64, f64), EphemerisError>,
 {
     let mut iter = 0;
     let mut last_residual = f64::MAX;
@@ -69,88 +88,95 @@ where
 }
 
 // ---------------------------------------------------------------------------
-// 2. Independent Event Finders
+// 2. Individual Event Finders
 // ---------------------------------------------------------------------------
 
-/// Ingress Finder: finds when a body reaches a specific tropical longitude.
-pub fn find_ingress(
-    body: Body,
-    target_lon_deg: f64,
+/// Find exact moment Sun reaches a Tropical longitude (0°, 90°, 180°, 270°).
+pub fn find_tropical_solar_ingress(
+    target_lon: f64,
     approx_jd: f64,
 ) -> Result<(f64, f64, usize), EphemerisError> {
     let provider = AnalyticalProvider;
-    let target = normalize_degrees(target_lon_deg);
+    let target = normalize_degrees(target_lon);
 
-    solve_newton_raphson(approx_jd, 25, 1e-7, |jd| {
-        let pos = apparent_position(&provider, body, jd).map_err(|e| {
-            EphemerisError::BodyCalculationFailed(format!("{:?}", body), format!("{:?}", e))
+    solve_newton_raphson(approx_jd, 15, 1e-7, |jd| {
+        let sun = apparent_position(&provider, Body::Sun, jd).map_err(|e| {
+            EphemerisError::BodyCalculationFailed("Sun".to_string(), format!("{:?}", e))
         })?;
-        let current_lon = normalize_degrees(pos.ecliptic.longitude.to_degrees());
+        let current_lon = normalize_degrees(sun.ecliptic.longitude.to_degrees());
         let residual = wrap_diff(target - current_lon);
-        let rate = pos.longitude_speed.max(0.1);
+        let rate = sun.longitude_speed.max(0.9);
         Ok((residual, rate))
     })
 }
 
-/// New Moon Finder: finds when Moon tropical longitude equals Sun tropical longitude.
-pub fn find_new_moon(approx_jd: f64) -> Result<(f64, f64, usize), EphemerisError> {
-    let provider = AnalyticalProvider;
-
-    solve_newton_raphson(approx_jd, 25, 1e-7, |jd| {
-        let sun = apparent_position(&provider, Body::Sun, jd).map_err(|e| {
-            EphemerisError::BodyCalculationFailed("Sun".to_string(), format!("{:?}", e))
-        })?;
-        let moon = apparent_position(&provider, Body::Moon, jd).map_err(|e| {
-            EphemerisError::BodyCalculationFailed("Moon".to_string(), format!("{:?}", e))
-        })?;
-
-        let sun_lon = normalize_degrees(sun.ecliptic.longitude.to_degrees());
-        let moon_lon = normalize_degrees(moon.ecliptic.longitude.to_degrees());
-
-        // target: moon_lon - sun_lon = 0
-        let residual = wrap_diff(sun_lon - moon_lon); // positive when moon behind sun -> step forward
-        let relative_rate = moon.longitude_speed - sun.longitude_speed;
-        Ok((residual, relative_rate))
-    })
-}
-
-/// Full Moon Finder: finds when Moon is exactly 180° opposite Sun.
-pub fn find_full_moon(approx_jd: f64) -> Result<(f64, f64, usize), EphemerisError> {
-    let provider = AnalyticalProvider;
-
-    solve_newton_raphson(approx_jd, 25, 1e-7, |jd| {
-        let sun = apparent_position(&provider, Body::Sun, jd).map_err(|e| {
-            EphemerisError::BodyCalculationFailed("Sun".to_string(), format!("{:?}", e))
-        })?;
-        let moon = apparent_position(&provider, Body::Moon, jd).map_err(|e| {
-            EphemerisError::BodyCalculationFailed("Moon".to_string(), format!("{:?}", e))
-        })?;
-
-        let sun_lon = normalize_degrees(sun.ecliptic.longitude.to_degrees());
-        let moon_lon = normalize_degrees(moon.ecliptic.longitude.to_degrees());
-
-        // target: (moon_lon - sun_lon) = 180.0
-        let diff = wrap_diff(moon_lon - sun_lon);
-        let residual = if diff >= 0.0 {
-            180.0 - diff
-        } else {
-            -180.0 - diff
-        };
-
-        let relative_rate = moon.longitude_speed - sun.longitude_speed;
-        Ok((residual, relative_rate))
-    })
-}
-
-/// Station Finder: finds when a planet's apparent longitude speed crosses 0.
-pub fn find_station(
-    body: Body,
+/// Find exact moment Sun reaches a Sidereal Lahiri longitude (0°, 30°, ... 330°).
+pub fn find_sidereal_surya_sankranti(
+    target_sidereal_lon: f64,
     approx_jd: f64,
 ) -> Result<(f64, f64, usize), EphemerisError> {
     let provider = AnalyticalProvider;
-    let h = 0.005; // 7.2 minutes step for numerical acceleration
+    let target = normalize_degrees(target_sidereal_lon);
 
-    solve_newton_raphson(approx_jd, 30, 1e-6, |jd| {
+    solve_newton_raphson(approx_jd, 15, 1e-7, |jd| {
+        let sun = apparent_position(&provider, Body::Sun, jd).map_err(|e| {
+            EphemerisError::BodyCalculationFailed("Sun".to_string(), format!("{:?}", e))
+        })?;
+        let ayanamsha = true_ayanamsha_value(Ayanamsha::IndianOfficial, jd);
+        let current_sidereal_lon = normalize_degrees(sun.ecliptic.longitude.to_degrees() - ayanamsha);
+        let residual = wrap_diff(target - current_sidereal_lon);
+        let rate = sun.longitude_speed.max(0.9);
+        Ok((residual, rate))
+    })
+}
+
+/// Find exact New Moon (Moon-Sun tropical conjunction).
+pub fn find_new_moon(approx_jd: f64) -> Result<(f64, f64, usize), EphemerisError> {
+    let provider = AnalyticalProvider;
+
+    solve_newton_raphson(approx_jd, 15, 1e-7, |jd| {
+        let sun = apparent_position(&provider, Body::Sun, jd).map_err(|e| {
+            EphemerisError::BodyCalculationFailed("Sun".to_string(), format!("{:?}", e))
+        })?;
+        let moon = apparent_position(&provider, Body::Moon, jd).map_err(|e| {
+            EphemerisError::BodyCalculationFailed("Moon".to_string(), format!("{:?}", e))
+        })?;
+
+        let sun_lon = normalize_degrees(sun.ecliptic.longitude.to_degrees());
+        let moon_lon = normalize_degrees(moon.ecliptic.longitude.to_degrees());
+        let residual = wrap_diff(sun_lon - moon_lon);
+        let relative_rate = moon.longitude_speed - sun.longitude_speed;
+        Ok((residual, relative_rate))
+    })
+}
+
+/// Find exact Full Moon (Moon-Sun tropical opposition, 180°).
+pub fn find_full_moon(approx_jd: f64) -> Result<(f64, f64, usize), EphemerisError> {
+    let provider = AnalyticalProvider;
+
+    solve_newton_raphson(approx_jd, 15, 1e-7, |jd| {
+        let sun = apparent_position(&provider, Body::Sun, jd).map_err(|e| {
+            EphemerisError::BodyCalculationFailed("Sun".to_string(), format!("{:?}", e))
+        })?;
+        let moon = apparent_position(&provider, Body::Moon, jd).map_err(|e| {
+            EphemerisError::BodyCalculationFailed("Moon".to_string(), format!("{:?}", e))
+        })?;
+
+        let sun_lon = normalize_degrees(sun.ecliptic.longitude.to_degrees());
+        let moon_lon = normalize_degrees(moon.ecliptic.longitude.to_degrees());
+        let diff = wrap_diff(moon_lon - sun_lon);
+        let residual = if diff >= 0.0 { 180.0 - diff } else { -180.0 - diff };
+        let relative_rate = moon.longitude_speed - sun.longitude_speed;
+        Ok((residual, relative_rate))
+    })
+}
+
+/// Find planetary station (longitude_speed = 0).
+pub fn find_station(body: Body, approx_jd: f64) -> Result<(f64, f64, usize), EphemerisError> {
+    let provider = AnalyticalProvider;
+    let h = 0.01;
+
+    solve_newton_raphson(approx_jd, 20, 1e-6, |jd| {
         let p_curr = apparent_position(&provider, body, jd).map_err(|e| {
             EphemerisError::BodyCalculationFailed(format!("{:?}", body), format!("{:?}", e))
         })?;
@@ -163,15 +189,296 @@ pub fn find_station(
 
         let speed = p_curr.longitude_speed;
         let accel = (p_plus.longitude_speed - p_minus.longitude_speed) / (2.0 * h);
-
-        // root of speed: residual = 0.0 - speed
         let residual = -speed;
         Ok((residual, accel))
     })
 }
 
 // ---------------------------------------------------------------------------
-// 3. Formatting & Helpers
+// 3. Astronomical Event Data Model & Engine
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MundaneRelevance {
+    Primary,   // Core Medini markers: Mesha Sankranti, Eclipses, Sankrantis, Major Stations
+    Secondary, // Regular Lunations (Monthly New/Full Moons)
+    Reference, // Tropical Seasonals (Equinoxes/Solstices)
+}
+
+impl MundaneRelevance {
+    pub fn badge(&self) -> &'static str {
+        match self {
+            Self::Primary => "★ PRIMARY",
+            Self::Secondary => "• SECONDARY",
+            Self::Reference => "◇ REFERENCE",
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum EventCategory {
+    TropicalSolarIngress,
+    SiderealSuryaSankranti,
+    NewMoon,
+    FullMoon,
+    PlanetaryStation,
+}
+
+#[derive(Debug, Clone)]
+pub struct AstronomicalEvent {
+    pub category: EventCategory,
+    pub relevance: MundaneRelevance,
+    pub name: String,
+    pub jd_ut1: f64,
+    pub residual: f64,
+    pub iterations: usize,
+    pub unit: &'static str,
+    pub note: Option<String>,
+}
+
+/// Pure event finding engine decoupled from CLI and Local Charts.
+pub fn find_astronomical_events(start_jd: f64, end_jd: f64) -> Vec<AstronomicalEvent> {
+    let provider = AnalyticalProvider;
+    let mut events = Vec::new();
+
+    // --- A. Tropical Solar Ingress (Equinoxes & Solstices: 0°, 90°, 180°, 270°) ---
+    let cardinal_points = [
+        ("Tropical Vernal Equinox (춘분 0° Aries)", 0.0),
+        ("Tropical Summer Solstice (하지 90° Cancer)", 90.0),
+        ("Tropical Autumnal Equinox (추분 180° Libra)", 180.0),
+        ("Tropical Winter Solstice (동지 270° Capricorn)", 270.0),
+    ];
+
+    let start_sun = apparent_position(&provider, Body::Sun, start_jd).unwrap();
+    let start_sun_trop = normalize_degrees(start_sun.ecliptic.longitude.to_degrees());
+
+    for (name, target_deg) in cardinal_points {
+        let diff_deg = normalize_degrees(target_deg - start_sun_trop);
+        let approx_days = diff_deg / 0.9856;
+        let approx_jd = start_jd + approx_days;
+
+        if approx_jd >= start_jd - 5.0 && approx_jd <= end_jd + 5.0 {
+            if let Ok((jd, res, iters)) = find_tropical_solar_ingress(target_deg, approx_jd) {
+                if jd >= start_jd && jd <= end_jd {
+                    events.push(AstronomicalEvent {
+                        category: EventCategory::TropicalSolarIngress,
+                        relevance: MundaneRelevance::Reference,
+                        name: name.to_string(),
+                        jd_ut1: jd,
+                        residual: res,
+                        iterations: iters,
+                        unit: "deg",
+                        note: Some("Tropical Seasonal Reference Marker".to_string()),
+                    });
+                }
+            }
+        }
+    }
+
+    // --- B. Sidereal Surya Sankranti (Mesha 0°, Vrishabha 30°, ... 330°) ---
+    let start_ayanamsha = true_ayanamsha_value(Ayanamsha::IndianOfficial, start_jd);
+    let start_sun_sid = normalize_degrees(start_sun_trop - start_ayanamsha);
+
+    let mut next_rashi_idx = ((start_sun_sid / 30.0).floor() as usize + 1) % 12;
+    let mut current_search_jd = start_jd;
+
+    while current_search_jd <= end_jd + 35.0 {
+        let target_sid_deg = (next_rashi_idx as f64) * 30.0;
+        let sun_now = apparent_position(&provider, Body::Sun, current_search_jd).unwrap();
+        let aya_now = true_ayanamsha_value(Ayanamsha::IndianOfficial, current_search_jd);
+        let sid_now = normalize_degrees(sun_now.ecliptic.longitude.to_degrees() - aya_now);
+
+        let rem_deg = normalize_degrees(target_sid_deg - sid_now);
+        let days_to_jump = rem_deg / 0.9856;
+        let approx_jd = current_search_jd + days_to_jump;
+
+        if let Ok((jd, res, iters)) = find_sidereal_surya_sankranti(target_sid_deg, approx_jd) {
+            if jd >= start_jd && jd <= end_jd {
+                let rashi_title = RASHI_NAMES[next_rashi_idx];
+                let is_mesha = next_rashi_idx == 0;
+                let title = format!(
+                    "Surya {} Sankranti (Sun enters sidereal {}){}",
+                    rashi_title,
+                    rashi_title,
+                    if is_mesha { " [★ VEDIC NEW YEAR / 메샤 산크란티]" } else { "" }
+                );
+
+                events.push(AstronomicalEvent {
+                    category: EventCategory::SiderealSuryaSankranti,
+                    relevance: MundaneRelevance::Primary,
+                    name: title,
+                    jd_ut1: jd,
+                    residual: res,
+                    iterations: iters,
+                    unit: "deg",
+                    note: if is_mesha {
+                        Some("Core Mundane Year Marker".to_string())
+                    } else {
+                        Some("Mundane Solar Month Marker".to_string())
+                    },
+                });
+            }
+            current_search_jd = jd + 25.0;
+            next_rashi_idx = (next_rashi_idx + 1) % 12;
+        } else {
+            break;
+        }
+    }
+
+    // --- C. Predictive Leap Lunar Phases (New Moon / Full Moon with Eclipse Tagging) ---
+    let synodic_month = 29.530589;
+
+    let s0 = apparent_position(&provider, Body::Sun, start_jd).unwrap();
+    let m0 = apparent_position(&provider, Body::Moon, start_jd).unwrap();
+    let init_diff = normalize_degrees(m0.ecliptic.longitude.to_degrees() - s0.ecliptic.longitude.to_degrees());
+
+    let days_to_nm = (360.0 - init_diff) / 12.19;
+    let first_new_moon_approx = start_jd + days_to_nm;
+
+    let days_to_fm = if init_diff < 180.0 {
+        (180.0 - init_diff) / 12.19
+    } else {
+        (540.0 - init_diff) / 12.19
+    };
+    let first_full_moon_approx = start_jd + days_to_fm;
+
+    // Collect New Moons
+    let mut nm_approx = first_new_moon_approx;
+    while nm_approx <= end_jd + 5.0 {
+        if let Ok((jd, res, iters)) = find_new_moon(nm_approx) {
+            if jd >= start_jd && jd <= end_jd {
+                let sun_pos = apparent_position(&provider, Body::Sun, jd).unwrap();
+                let node_pos = apparent_position(&provider, Body::TrueNode, jd).unwrap();
+                let node_dist = wrap_diff(sun_pos.ecliptic.longitude.to_degrees() - node_pos.ecliptic.longitude.to_degrees()).abs();
+                let is_solar_eclipse = node_dist < 18.5 || (node_dist - 180.0).abs() < 18.5;
+
+                let (name, relevance, note) = if is_solar_eclipse {
+                    (
+                        "New Moon (삭) [SOLAR ECLIPSE / 일식]".to_string(),
+                        MundaneRelevance::Primary,
+                        Some("Major Mundane Syzygy (Solar Eclipse)".to_string()),
+                    )
+                } else {
+                    (
+                        "New Moon (삭)".to_string(),
+                        MundaneRelevance::Secondary,
+                        Some("Monthly Lunation Syzygy".to_string()),
+                    )
+                };
+
+                events.push(AstronomicalEvent {
+                    category: EventCategory::NewMoon,
+                    relevance,
+                    name,
+                    jd_ut1: jd,
+                    residual: res,
+                    iterations: iters,
+                    unit: "deg",
+                    note,
+                });
+            }
+            nm_approx = jd + synodic_month;
+        } else {
+            nm_approx += synodic_month;
+        }
+    }
+
+    // Collect Full Moons
+    let mut fm_approx = first_full_moon_approx;
+    while fm_approx <= end_jd + 5.0 {
+        if let Ok((jd, res, iters)) = find_full_moon(fm_approx) {
+            if jd >= start_jd && jd <= end_jd {
+                let sun_pos = apparent_position(&provider, Body::Sun, jd).unwrap();
+                let node_pos = apparent_position(&provider, Body::TrueNode, jd).unwrap();
+                let node_dist = wrap_diff(sun_pos.ecliptic.longitude.to_degrees() - node_pos.ecliptic.longitude.to_degrees()).abs();
+                let is_lunar_eclipse = node_dist < 12.5 || (node_dist - 180.0).abs() < 12.5;
+
+                let (name, relevance, note) = if is_lunar_eclipse {
+                    (
+                        "Full Moon (망) [LUNAR ECLIPSE / 월식]".to_string(),
+                        MundaneRelevance::Primary,
+                        Some("Major Mundane Syzygy (Lunar Eclipse)".to_string()),
+                    )
+                } else {
+                    (
+                        "Full Moon (망)".to_string(),
+                        MundaneRelevance::Secondary,
+                        Some("Monthly Opposition Syzygy".to_string()),
+                    )
+                };
+
+                events.push(AstronomicalEvent {
+                    category: EventCategory::FullMoon,
+                    relevance,
+                    name,
+                    jd_ut1: jd,
+                    residual: res,
+                    iterations: iters,
+                    unit: "deg",
+                    note,
+                });
+            }
+            fm_approx = jd + synodic_month;
+        } else {
+            fm_approx += synodic_month;
+        }
+    }
+
+    // --- D. Planetary Stations (Mercury, Mars, Jupiter, Saturn) via Bracket Search ---
+    let bodies = [
+        ("Mercury", Body::Mercury),
+        ("Mars", Body::Mars),
+        ("Jupiter", Body::Jupiter),
+        ("Saturn", Body::Saturn),
+    ];
+
+    let bracket_step = 2.0;
+
+    for (name, body) in bodies {
+        let mut t = start_jd;
+        let mut prev_speed = apparent_position(&provider, body, t).unwrap().longitude_speed;
+
+        while t < end_jd {
+            let next_t = (t + bracket_step).min(end_jd);
+            let next_speed = apparent_position(&provider, body, next_t).unwrap().longitude_speed;
+
+            if (prev_speed < 0.0 && next_speed >= 0.0) || (prev_speed > 0.0 && next_speed <= 0.0) {
+                let is_retro_start = prev_speed > 0.0;
+                let approx_station = t + bracket_step * 0.5;
+
+                if let Ok((jd, res, iters)) = find_station(body, approx_station) {
+                    if jd >= start_jd && jd <= end_jd {
+                        let title = format!(
+                            "{} Stationary {}",
+                            name,
+                            if is_retro_start { "Retrograde (역행 개시 정체)" } else { "Direct (순행 전환 정체)" }
+                        );
+
+                        events.push(AstronomicalEvent {
+                            category: EventCategory::PlanetaryStation,
+                            relevance: MundaneRelevance::Primary,
+                            name: title,
+                            jd_ut1: jd,
+                            residual: res,
+                            iterations: iters,
+                            unit: "deg/day",
+                            note: Some("Planetary Motion Direction Shift".to_string()),
+                        });
+                    }
+                }
+            }
+
+            prev_speed = next_speed;
+            t = next_t;
+        }
+    }
+
+    events.sort_by(|a, b| a.jd_ut1.partial_cmp(&b.jd_ut1).unwrap());
+    events
+}
+
+// ---------------------------------------------------------------------------
+// 4. Output Formatting & Vedic Chart Generator
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
@@ -213,7 +520,6 @@ impl ResolvedUtcTime {
     }
 
     pub fn to_kst_string(&self) -> String {
-        // Simple KST (+9h) projection for display
         let total_secs = self.hour as f64 * 3600.0 + self.minute as f64 * 60.0 + self.second + 9.0 * 3600.0;
         let mut d = self.day;
         let mut m = self.month;
@@ -222,7 +528,6 @@ impl ResolvedUtcTime {
         let kst_sec = total_secs % 86400.0;
         let add_days = (total_secs / 86400.0).floor() as u32;
         d += add_days;
-        // Naive display rollover for +9h display
         if d > 28 && m == 2 { d -= 28; m += 1; }
         else if d > 30 && [4, 6, 9, 11].contains(&m) { d -= 30; m += 1; }
         else if d > 31 { d -= 31; m += 1; }
@@ -237,31 +542,27 @@ impl ResolvedUtcTime {
     }
 }
 
-const RASHI_NAMES: [&str; 12] = [
-    "Mesha", "Vrishabha", "Mithuna", "Karka", "Simha", "Kanya",
-    "Tula", "Vrishchika", "Dhanu", "Makara", "Kumbha", "Meena",
-];
+fn print_event_report(event: &AstronomicalEvent, lat: f64, lon: f64, loc_name: &str) {
+    let utc = ResolvedUtcTime::from_jd(event.jd_ut1);
+    let category_tag = match event.category {
+        EventCategory::TropicalSolarIngress => "TROPICAL INGRESS",
+        EventCategory::SiderealSuryaSankranti => "SIDEREAL SANKRANTI",
+        EventCategory::NewMoon => "NEW MOON",
+        EventCategory::FullMoon => "FULL MOON",
+        EventCategory::PlanetaryStation => "PLANETARY STATION",
+    };
 
-fn print_event_block(
-    category: &str,
-    event_name: &str,
-    jd: f64,
-    residual: f64,
-    iterations: usize,
-    rate_unit: &str,
-) {
-    let utc = ResolvedUtcTime::from_jd(jd);
     println!("--------------------------------------------------------------------------------");
-    println!("[{}] {}", category, event_name);
-    println!("  1. Confirmed UTC Timestamp: {}", utc.to_utc_string());
-    println!("     (Seoul Reference Time  : {})", utc.to_kst_string());
-    println!("     (Julian Day UT1        : {:.6})", jd);
+    println!("[{}] [{}] {}", category_tag, event.relevance.badge(), event.name);
+    println!("  1. Global Event Moment : {}", utc.to_utc_string());
+    println!("     Local Reference ({}) : {}", loc_name, utc.to_kst_string());
+    println!("     Julian Day (UT1)   : {:.6}", event.jd_ut1);
     println!(
-        "  2. Solver Convergence     : residual = {:.2e} {}, iterations = {}",
-        residual.abs(), rate_unit, iterations
+        "  2. Solver Convergence  : residual = {:.2e} {}, iterations = {}",
+        event.residual.abs(), event.unit, event.iterations
     );
 
-    // Generate Seoul Vedic Chart
+    // Generate Vedic Chart for specified location
     let ephem = compute_ephemeris(
         utc.year,
         utc.month,
@@ -269,166 +570,132 @@ fn print_event_block(
         utc.hour,
         utc.minute,
         utc.second,
-        SEOUL_LAT,
-        SEOUL_LON,
-    ).expect("Ephemeris computation should succeed");
+        lat,
+        lon,
+    ).expect("Ephemeris computation failed");
 
-    let vedic = calculate_vedic(&ephem, SEOUL_LAT);
+    let vedic = calculate_vedic(&ephem, lat);
+    let raw_lagna_deg = vedic.lagna_sidereal % 30.0;
+    let (lagna_sign_idx, lagna_deg) = normalize_placement_display(vedic.lagna_sign, raw_lagna_deg);
 
-    let lagna_deg = vedic.lagna_sidereal % 30.0;
     println!(
-        "  3. Seoul Vedic Chart (Lahiri / Sidereal / Whole Sign / True Node):"
+        "  3. {} Vedic Chart (Lahiri Sidereal / Whole Sign / True Node):",
+        loc_name
     );
     println!(
-        "     - Sidereal Lagna : {} {:02.2}°",
-        RASHI_NAMES[vedic.lagna_sign as usize], lagna_deg
+        "     - Sidereal Lagna   : {} {:02.2}°",
+        RASHI_NAMES[lagna_sign_idx as usize], lagna_deg
     );
 
-    // List key planet positions
     let key_planets: Vec<_> = vedic.planets.iter().filter(|p| {
         ["Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Rahu"].contains(&p.name.as_str())
     }).map(|p| {
+        let (s_idx, s_deg) = normalize_placement_display(p.sign_index, p.sign_degree);
         let retro = if p.is_retrograde { " [R]" } else { "" };
         format!(
             "{}:{}{}({:02.1}°) in {}",
-            p.name, RASHI_NAMES[p.sign_index as usize], retro, p.sign_degree, p.nakshatra_name
+            p.name, RASHI_NAMES[s_idx as usize], retro, s_deg, p.nakshatra_name
         )
     }).collect();
 
-    println!("     - Key Placements : {}", key_planets.join(" | "));
+    println!("     - Key Placements   : {}", key_planets.join(" | "));
 }
 
 // ---------------------------------------------------------------------------
-// 4. Main Event Scanner & Runner
+// 5. CLI Entrypoint
 // ---------------------------------------------------------------------------
 
+fn parse_ymd(s: &str) -> Option<(i32, u32, u32)> {
+    let parts: Vec<&str> = s.split('-').collect();
+    if parts.len() != 3 { return None; }
+    let y = parts[0].parse().ok()?;
+    let m = parts[1].parse().ok()?;
+    let d = parts[2].parse().ok()?;
+    Some((y, m, d))
+}
+
 fn main() {
-    println!("================================================================================");
-    println!("  ASTRONOMICAL EVENT FINDER & SEOUL VEDIC CHART GENERATOR");
-    println!("  Target Interval: 2026-09-24 ~ 2027-03-24 (6 Months)");
-    println!("================================================================================\n");
+    let args: Vec<String> = env::args().collect();
+
+    let mut start_ymd = (2026, 9, 24);
+    let mut end_ymd = (2027, 4, 20);
+    let mut lat = DEFAULT_LAT;
+    let mut lon = DEFAULT_LON;
+    let mut loc_name = "Seoul".to_string();
+
+    let mut i = 1;
+    let mut positional_count = 0;
+
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "--lat" && i + 1 < args.len() {
+            lat = args[i + 1].parse().unwrap_or(DEFAULT_LAT);
+            loc_name = format!("Lat {:.2}", lat);
+            i += 2;
+        } else if arg == "--lon" && i + 1 < args.len() {
+            lon = args[i + 1].parse().unwrap_or(DEFAULT_LON);
+            i += 2;
+        } else if arg == "--help" || arg == "-h" {
+            println!("Usage: cargo run --release --example astronomical_events [START_DATE] [END_DATE] [--lat LAT] [--lon LON]");
+            println!("       Dates in YYYY-MM-DD format. Default: 2026-09-24 to 2027-04-20 (Seoul)");
+            return;
+        } else if !arg.starts_with("--") {
+            if positional_count == 0 {
+                if let Some(parsed) = parse_ymd(arg) {
+                    start_ymd = parsed;
+                }
+                positional_count += 1;
+            } else if positional_count == 1 {
+                if let Some(parsed) = parse_ymd(arg) {
+                    end_ymd = parsed;
+                }
+                positional_count += 1;
+            }
+            i += 1;
+        } else {
+            i += 1;
+        }
+    }
+
+    let start_jd = calendar_to_jd(start_ymd.0, start_ymd.1, start_ymd.2 as f64);
+    let end_jd = calendar_to_jd(end_ymd.0, end_ymd.1, end_ymd.2 as f64);
 
     println!("================================================================================");
-    println!("ACCURACY SPECIFICATIONS");
+    println!("  VEDIC MUNDANE ASTRONOMICAL EVENT ENGINE");
+    println!(
+        "  Target Interval: {:04}-{:02}-{:02} ~ {:04}-{:02}-{:02} (Location: {}, Lat {:.4}, Lon {:.4})",
+        start_ymd.0, start_ymd.1, start_ymd.2, end_ymd.0, end_ymd.1, end_ymd.2, loc_name, lat, lon
+    );
+    println!("================================================================================\n");
+
+    println!("ACCURACY SPECIFICATIONS & METHODOLOGICAL BOUNDS");
     println!("--------------------------------------------------------------------------------");
     println!("1. Solver Convergence Tolerance (Root Finding Precision):");
-    println!("   - Target Angular Residual : < 1.0e-7 degrees (~0.00036 arcsec)");
-    println!("   - Equivalent Time Residual: Sun ~0.008s | Moon ~0.0007s | Station speed < 1.0e-6 deg/day");
-    println!("   - Guarantee: Numerical root convergence is mathematically exact to sub-millisecond.");
+    println!("   - Angular Residual : < 1.0e-7 degrees (~0.00036 arcsec mathematical convergence)");
+    println!("   - Boundary Note    : Root-finding convergence is mathematically exact to sub-millisecond,");
+    println!("                        but DOES NOT constitute an ephemeris accuracy guarantee.");
     println!();
-    println!("2. Ephemeris Intrinsic Precision (Vedaksha Analytical Model Theory):");
-    println!("   - Earth / Sun / Major Planets : VSOP87 analytical series (~0.1 - 1.0 arcsec)");
-    println!("   - Lunar Orbit (ELP2000-82B)   : Truncated analytical series (~1.0 - 3.0 arcsec)");
-    println!("   - Nutation / Obliquity        : IAU 1980 / 2000 analytical (~0.01 arcsec)");
-    println!("   - Ayanamsha Formulation       : Indian Official Lahiri True Ayanamsha (~0.01 arcsec)");
+    println!("2. Ephemeris Intrinsic Precision (Vedaksha Analytical Model):");
+    println!("   - Major Bodies     : Analytical series (VSOP87A + ELP/MPP02).");
+    println!("   - Benchmarks       : Validated against JPL Horizons 1900-2025 with mean error < 0.25 arcsec.");
+    println!("   - Physical Note    : Real-world physical time variance depends on body velocity and provider.");
+    println!();
+    println!("3. Ayanamsha Implementation:");
+    println!("   - Formulation      : Indian Official Lahiri True Ayanamsha anchored to primary source.");
+    println!("   - Cross-Validation : No independent external cross-validation claimed by engine.");
     println!("================================================================================\n");
 
-    let provider = AnalyticalProvider;
-    let start_jd = calendar_to_jd(2026, 9, 24.0);
-    let end_jd = calendar_to_jd(2027, 3, 24.0);
+    let timer = std::time::Instant::now();
+    let events = find_astronomical_events(start_jd, end_jd);
+    let scan_duration = timer.elapsed();
 
-    // -----------------------------------------------------------------------
-    // Category A: Solar Ingresses (Equinoxes, Solstices & Zodiac Entrances)
-    // -----------------------------------------------------------------------
-    println!("\n>>> CATEGORY A: SOLAR INGRESSES (2026-09-24 to 2027-03-24)\n");
-    let ingresses = [
-        ("Sun enters Scorpio (상강)", 210.0, calendar_to_jd(2026, 10, 23.0)),
-        ("Sun enters Sagittarius (소설)", 240.0, calendar_to_jd(2026, 11, 22.0)),
-        ("Sun enters Capricorn (동지, Winter Solstice)", 270.0, calendar_to_jd(2026, 12, 21.0)),
-        ("Sun enters Aquarius (대한)", 300.0, calendar_to_jd(2027, 1, 20.0)),
-        ("Sun enters Pisces (우수)", 330.0, calendar_to_jd(2027, 2, 18.0)),
-        ("Sun enters Aries (춘분, Vernal Equinox 0°)", 0.0, calendar_to_jd(2027, 3, 20.0)),
-    ];
+    println!("Found {} astronomical events in {:.2?} (High-speed periodic leap scan).\n", events.len(), scan_duration);
 
-    for (name, target_deg, approx) in ingresses {
-        let (jd, res, iters) = find_ingress(Body::Sun, target_deg, approx)
-            .expect("Ingress solver failed");
-        print_event_block("SOLAR INGRESS", name, jd, res, iters, "deg");
-    }
-
-    // -----------------------------------------------------------------------
-    // Category B & C: New Moons (삭) & Full Moons (망) by Scanning Phase
-    // -----------------------------------------------------------------------
-    println!("\n>>> CATEGORY B & C: LUNAR PHASES (NEW MOONS & FULL MOONS)\n");
-    let mut scan_jd = start_jd;
-    let step_days = 0.5;
-
-    let mut prev_diff = {
-        let sun = apparent_position(&provider, Body::Sun, scan_jd).unwrap();
-        let moon = apparent_position(&provider, Body::Moon, scan_jd).unwrap();
-        wrap_diff(moon.ecliptic.longitude.to_degrees() - sun.ecliptic.longitude.to_degrees())
-    };
-
-    while scan_jd < end_jd {
-        scan_jd += step_days;
-        let sun = apparent_position(&provider, Body::Sun, scan_jd).unwrap();
-        let moon = apparent_position(&provider, Body::Moon, scan_jd).unwrap();
-        let curr_diff = wrap_diff(moon.ecliptic.longitude.to_degrees() - sun.ecliptic.longitude.to_degrees());
-
-        // Check 0-degree crossing (New Moon): prev_diff < 0 and curr_diff >= 0 (wrapping across 0)
-        if prev_diff < 0.0 && curr_diff >= 0.0 && (curr_diff - prev_diff).abs() < 30.0 {
-            let (jd, res, iters) = find_new_moon(scan_jd - step_days * 0.5).expect("New Moon solver failed");
-            let utc = ResolvedUtcTime::from_jd(jd);
-            let eclipse_note = if utc.month == 2 && utc.day == 6 {
-                " [Annular Solar Eclipse / 금환일식]"
-            } else {
-                ""
-            };
-            let title = format!("New Moon (삭){}", eclipse_note);
-            print_event_block("LUNAR PHASE", &title, jd, res, iters, "deg");
-        }
-
-        // Check 180-degree crossing (Full Moon): diff wraps around 180 / -180
-        // i.e., prev_diff > 160.0 and curr_diff < -160.0
-        if prev_diff > 150.0 && curr_diff < -150.0 {
-            let (jd, res, iters) = find_full_moon(scan_jd - step_days * 0.5).expect("Full Moon solver failed");
-            let utc = ResolvedUtcTime::from_jd(jd);
-            let eclipse_note = if utc.month == 2 && (utc.day == 20 || utc.day == 21) {
-                " [Penumbral Lunar Eclipse / 반영월식]"
-            } else {
-                ""
-            };
-            let title = format!("Full Moon (망){}", eclipse_note);
-            print_event_block("LUNAR PHASE", &title, jd, res, iters, "deg");
-        }
-
-        prev_diff = curr_diff;
-    }
-
-    // -----------------------------------------------------------------------
-    // Category D: Planetary Stations (Stationary Retrograde / Direct)
-    // -----------------------------------------------------------------------
-    println!("\n>>> CATEGORY D: PLANETARY STATIONS (RETROGRADE / DIRECT TRANSITIONS)\n");
-    let test_bodies = [
-        ("Mercury", Body::Mercury),
-        ("Mars", Body::Mars),
-        ("Jupiter", Body::Jupiter),
-        ("Saturn", Body::Saturn),
-    ];
-
-    for (name, body) in test_bodies {
-        let mut t = start_jd;
-        let mut prev_speed = apparent_position(&provider, body, t).unwrap().longitude_speed;
-
-        while t < end_jd {
-            t += step_days;
-            let curr_speed = apparent_position(&provider, body, t).unwrap().longitude_speed;
-
-            if (prev_speed < 0.0 && curr_speed >= 0.0) || (prev_speed > 0.0 && curr_speed <= 0.0) {
-                let station_type = if prev_speed > 0.0 {
-                    "Stationary Retrograde (역행 개시 정체)"
-                } else {
-                    "Stationary Direct (순행 전환 정체)"
-                };
-                let (jd, res, iters) = find_station(body, t - step_days * 0.5).expect("Station solver failed");
-                let title = format!("{} {}", name, station_type);
-                print_event_block("PLANETARY STATION", &title, jd, res, iters, "deg/day");
-            }
-            prev_speed = curr_speed;
-        }
+    for event in &events {
+        print_event_report(event, lat, lon, &loc_name);
     }
 
     println!("\n================================================================================");
-    println!("  EXECUTION COMPLETE: ALL ASTRONOMICAL EVENTS COMPUTED SUCCESSFULLY");
+    println!("  ALL {} EVENTS PROCESSED IN {:.2?} TOTAL TIME", events.len(), timer.elapsed());
     println!("================================================================================\n");
 }
