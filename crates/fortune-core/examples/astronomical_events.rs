@@ -1,7 +1,7 @@
 //! Universal Vedic Mundane Astronomical Event Generator & Chart Engine.
 //!
 //! Features:
-//! 1. CLI Argument Parsing: Start Date, End Date, Latitude, Longitude (with defaults).
+//! 1. CLI Argument Parsing: Start Date, End Date, Latitude, Longitude, Export Directory.
 //! 2. Decoupled Architecture:
 //!    - Pure (start_jd, end_jd) event finder engine.
 //!    - Global UTC determination before local chart calculation.
@@ -11,11 +11,16 @@
 //!    - Reference: Tropical Equinoxes & Solstices
 //! 4. Mathematical Presentation Layer:
 //!    - Boundary rollover normalization (30.0° -> next sign 0.0°).
-//! 5. Exact Accuracy Disclosure aligned with Vedaksha specifications.
+//! 5. Hybrid Export Engine:
+//!    - events.json: Full structured machine-readable payload.
+//!    - SUMMARY.md: Markdown executive briefing grouped by Mundane Relevance.
 
 use fortune_core::ephemeris::{compute_ephemeris, EphemerisError};
 use fortune_core::vedic::calculate_vedic;
+use serde::Serialize;
 use std::env;
+use std::fs;
+use std::path::Path;
 use vedaksha::astro::sidereal::{true_ayanamsha_value, Ayanamsha};
 use vedaksha::ephem::analytical::AnalyticalProvider;
 use vedaksha::ephem::bodies::Body;
@@ -198,11 +203,11 @@ pub fn find_station(body: Body, approx_jd: f64) -> Result<(f64, f64, usize), Eph
 // 3. Astronomical Event Data Model & Engine
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum MundaneRelevance {
-    Primary,   // Core Medini markers: Mesha Sankranti, Eclipses, Sankrantis, Major Stations
-    Secondary, // Regular Lunations (Monthly New/Full Moons)
-    Reference, // Tropical Seasonals (Equinoxes/Solstices)
+    Primary,
+    Secondary,
+    Reference,
 }
 
 impl MundaneRelevance {
@@ -213,15 +218,35 @@ impl MundaneRelevance {
             Self::Reference => "◇ REFERENCE",
         }
     }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Primary => "PRIMARY",
+            Self::Secondary => "SECONDARY",
+            Self::Reference => "REFERENCE",
+        }
+    }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum EventCategory {
     TropicalSolarIngress,
     SiderealSuryaSankranti,
     NewMoon,
     FullMoon,
     PlanetaryStation,
+}
+
+impl EventCategory {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::TropicalSolarIngress => "TROPICAL INGRESS",
+            Self::SiderealSuryaSankranti => "SIDEREAL SANKRANTI",
+            Self::NewMoon => "NEW MOON",
+            Self::FullMoon => "FULL MOON",
+            Self::PlanetaryStation => "PLANETARY STATION",
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -478,8 +503,58 @@ pub fn find_astronomical_events(start_jd: f64, end_jd: f64) -> Vec<AstronomicalE
 }
 
 // ---------------------------------------------------------------------------
-// 4. Output Formatting & Vedic Chart Generator
+// 4. Output Formatting, Export Models & Vedic Chart Generator
 // ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ExportedPlanet {
+    pub name: String,
+    pub sign: String,
+    pub sign_index: u8,
+    pub sign_degree: f64,
+    pub nakshatra: String,
+    pub nakshatra_pada: u8,
+    pub is_retrograde: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ExportedChart {
+    pub location_name: String,
+    pub latitude: f64,
+    pub longitude: f64,
+    pub ayanamsha_deg: f64,
+    pub lagna_sign: String,
+    pub lagna_sign_index: u8,
+    pub lagna_degree: f64,
+    pub planets: Vec<ExportedPlanet>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ExportedEvent {
+    pub id: String,
+    pub category: String,
+    pub relevance: String,
+    pub name: String,
+    pub utc_moment: String,
+    pub local_moment: String,
+    pub julian_day_ut1: f64,
+    pub solver_residual: f64,
+    pub solver_iterations: usize,
+    pub note: Option<String>,
+    pub chart: ExportedChart,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct MundaneExportPayload {
+    pub engine: String,
+    pub start_date: String,
+    pub end_date: String,
+    pub location_name: String,
+    pub latitude: f64,
+    pub longitude: f64,
+    pub total_events: usize,
+    pub events: Vec<ExportedEvent>,
+}
 
 #[derive(Debug, Clone)]
 pub struct ResolvedUtcTime {
@@ -540,29 +615,22 @@ impl ResolvedUtcTime {
 
         format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02} KST", y, m, d, kh, km, ks.round() as u32)
     }
+
+    pub fn to_compact_id(&self, prefix: &str) -> String {
+        format!(
+            "{}_{:04}{:02}{:02}_{:02}{:02}",
+            prefix, self.year, self.month, self.day, self.hour, self.minute
+        )
+    }
 }
 
-fn print_event_report(event: &AstronomicalEvent, lat: f64, lon: f64, loc_name: &str) {
+fn build_exported_event(
+    event: &AstronomicalEvent,
+    lat: f64,
+    lon: f64,
+    loc_name: &str,
+) -> ExportedEvent {
     let utc = ResolvedUtcTime::from_jd(event.jd_ut1);
-    let category_tag = match event.category {
-        EventCategory::TropicalSolarIngress => "TROPICAL INGRESS",
-        EventCategory::SiderealSuryaSankranti => "SIDEREAL SANKRANTI",
-        EventCategory::NewMoon => "NEW MOON",
-        EventCategory::FullMoon => "FULL MOON",
-        EventCategory::PlanetaryStation => "PLANETARY STATION",
-    };
-
-    println!("--------------------------------------------------------------------------------");
-    println!("[{}] [{}] {}", category_tag, event.relevance.badge(), event.name);
-    println!("  1. Global Event Moment : {}", utc.to_utc_string());
-    println!("     Local Reference ({}) : {}", loc_name, utc.to_kst_string());
-    println!("     Julian Day (UT1)   : {:.6}", event.jd_ut1);
-    println!(
-        "  2. Solver Convergence  : residual = {:.2e} {}, iterations = {}",
-        event.residual.abs(), event.unit, event.iterations
-    );
-
-    // Generate Vedic Chart for specified location
     let ephem = compute_ephemeris(
         utc.year,
         utc.month,
@@ -578,27 +646,141 @@ fn print_event_report(event: &AstronomicalEvent, lat: f64, lon: f64, loc_name: &
     let raw_lagna_deg = vedic.lagna_sidereal % 30.0;
     let (lagna_sign_idx, lagna_deg) = normalize_placement_display(vedic.lagna_sign, raw_lagna_deg);
 
+    let planets = vedic.planets.iter().map(|p| {
+        let (s_idx, s_deg) = normalize_placement_display(p.sign_index, p.sign_degree);
+        ExportedPlanet {
+            name: p.name.clone(),
+            sign: RASHI_NAMES[s_idx as usize].to_string(),
+            sign_index: s_idx,
+            sign_degree: s_deg,
+            nakshatra: p.nakshatra_name.clone(),
+            nakshatra_pada: p.nakshatra_pada,
+            is_retrograde: p.is_retrograde,
+        }
+    }).collect();
+
+    let chart = ExportedChart {
+        location_name: loc_name.to_string(),
+        latitude: lat,
+        longitude: lon,
+        ayanamsha_deg: ephem.true_ayanamsha_deg,
+        lagna_sign: RASHI_NAMES[lagna_sign_idx as usize].to_string(),
+        lagna_sign_index: lagna_sign_idx,
+        lagna_degree: lagna_deg,
+        planets,
+    };
+
+    let prefix = match event.category {
+        EventCategory::TropicalSolarIngress => "trop_ingress",
+        EventCategory::SiderealSuryaSankranti => "sankranti",
+        EventCategory::NewMoon => "new_moon",
+        EventCategory::FullMoon => "full_moon",
+        EventCategory::PlanetaryStation => "station",
+    };
+
+    ExportedEvent {
+        id: utc.to_compact_id(prefix),
+        category: event.category.as_str().to_string(),
+        relevance: event.relevance.as_str().to_string(),
+        name: event.name.clone(),
+        utc_moment: utc.to_utc_string(),
+        local_moment: utc.to_kst_string(),
+        julian_day_ut1: event.jd_ut1,
+        solver_residual: event.residual.abs(),
+        solver_iterations: event.iterations,
+        note: event.note.clone(),
+        chart,
+    }
+}
+
+fn print_console_event(exported: &ExportedEvent) {
+    println!("--------------------------------------------------------------------------------");
+    println!("[{}] [{}] {}", exported.category, exported.relevance, exported.name);
+    println!("  1. Global Event Moment : {}", exported.utc_moment);
+    println!("     Local Reference ({}) : {}", exported.chart.location_name, exported.local_moment);
+    println!("     Julian Day (UT1)   : {:.6}", exported.julian_day_ut1);
+    println!(
+        "  2. Solver Convergence  : residual = {:.2e}, iterations = {}",
+        exported.solver_residual, exported.solver_iterations
+    );
     println!(
         "  3. {} Vedic Chart (Lahiri Sidereal / Whole Sign / True Node):",
-        loc_name
+        exported.chart.location_name
     );
     println!(
         "     - Sidereal Lagna   : {} {:02.2}°",
-        RASHI_NAMES[lagna_sign_idx as usize], lagna_deg
+        exported.chart.lagna_sign, exported.chart.lagna_degree
     );
 
-    let key_planets: Vec<_> = vedic.planets.iter().filter(|p| {
+    let key_planets: Vec<_> = exported.chart.planets.iter().filter(|p| {
         ["Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Rahu"].contains(&p.name.as_str())
     }).map(|p| {
-        let (s_idx, s_deg) = normalize_placement_display(p.sign_index, p.sign_degree);
         let retro = if p.is_retrograde { " [R]" } else { "" };
         format!(
             "{}:{}{}({:02.1}°) in {}",
-            p.name, RASHI_NAMES[s_idx as usize], retro, s_deg, p.nakshatra_name
+            p.name, p.sign, retro, p.sign_degree, p.nakshatra
         )
     }).collect();
 
     println!("     - Key Placements   : {}", key_planets.join(" | "));
+}
+
+/// Generates human/LLM-readable executive briefing markdown report.
+fn generate_markdown_report(payload: &MundaneExportPayload) -> String {
+    let mut out = String::with_capacity(16384);
+    out.push_str("# Vedic Mundane Astronomical Event Briefing\n\n");
+    out.push_str(&format!("- **Engine**: {}\n", payload.engine));
+    out.push_str(&format!("- **Interval**: {} to {}\n", payload.start_date, payload.end_date));
+    out.push_str(&format!("- **Reference Location**: {} (Lat {:.4}°, Lon {:.4}°)\n", payload.location_name, payload.latitude, payload.longitude));
+    out.push_str(&format!("- **Total Events Detected**: {}\n", payload.total_events));
+    out.push_str("- **Zodiac & Calculation Frame**: Lahiri Sidereal, Whole Sign Bhavas, True Osculating Lunar Node\n\n");
+
+    out.push_str("## Executive Hierarchy Overview\n\n");
+    let primary_count = payload.events.iter().filter(|e| e.relevance == "PRIMARY").count();
+    let secondary_count = payload.events.iter().filter(|e| e.relevance == "SECONDARY").count();
+    let reference_count = payload.events.iter().filter(|e| e.relevance == "REFERENCE").count();
+    out.push_str(&format!("- **★ PRIMARY ({})**: Mesha Sankranti (Year Marker), Eclipses, Surya Sankrantis, Major Planetary Stations\n", primary_count));
+    out.push_str(&format!("- **• SECONDARY ({})**: Regular Monthly New Moons & Full Moons\n", secondary_count));
+    out.push_str(&format!("- **◇ REFERENCE ({})**: Tropical Seasonal Equinoxes & Solstices\n\n", reference_count));
+
+    for (section_title, rel_filter) in [
+        ("Section 1: Primary Mundane Indicators (★ PRIMARY)", "PRIMARY"),
+        ("Section 2: Regular Lunations (• SECONDARY)", "SECONDARY"),
+        ("Section 3: Tropical Seasonal Reference Points (◇ REFERENCE)", "REFERENCE"),
+    ] {
+        out.push_str(&format!("## {}\n\n", section_title));
+
+        let matching: Vec<_> = payload.events.iter().filter(|e| e.relevance == rel_filter).collect();
+        if matching.is_empty() {
+            out.push_str("_No events found in this category for the target interval._\n\n");
+            continue;
+        }
+
+        for ev in matching {
+            out.push_str(&format!("### {}\n\n", ev.name));
+            out.push_str(&format!("- **UTC Moment**: `{}`\n", ev.utc_moment));
+            out.push_str(&format!("- **Local ({})**: `{}`\n", ev.chart.location_name, ev.local_moment));
+            out.push_str(&format!("- **Julian Day (UT1)**: `{:.6}` (Residual: `{:.2e}`)\n", ev.julian_day_ut1, ev.solver_residual));
+            if let Some(ref note) = ev.note {
+                out.push_str(&format!("- **Mundane Note**: {}\n", note));
+            }
+            out.push_str(&format!("- **Sidereal Lagna**: **{} {:02.2}°**\n", ev.chart.lagna_sign, ev.chart.lagna_degree));
+            out.push_str(&format!("- **Lahiri Ayanamsha**: `{:.4}°`\n\n", ev.chart.ayanamsha_deg));
+
+            out.push_str("| Body | Sign | Degree | Nakshatra | Motion |\n");
+            out.push_str("| :--- | :--- | :---: | :--- | :---: |\n");
+            for p in &ev.chart.planets {
+                let motion = if p.is_retrograde { "Retrograde [R]" } else { "Direct" };
+                out.push_str(&format!(
+                    "| {} | {} | {:04.1}° | {} (Pada {}) | {} |\n",
+                    p.name, p.sign, p.sign_degree, p.nakshatra, p.nakshatra_pada, motion
+                ));
+            }
+            out.push_str("\n---\n\n");
+        }
+    }
+
+    out
 }
 
 // ---------------------------------------------------------------------------
@@ -622,6 +804,7 @@ fn main() {
     let mut lat = DEFAULT_LAT;
     let mut lon = DEFAULT_LON;
     let mut loc_name = "Seoul".to_string();
+    let mut export_dir: Option<String> = None;
 
     let mut i = 1;
     let mut positional_count = 0;
@@ -635,9 +818,13 @@ fn main() {
         } else if arg == "--lon" && i + 1 < args.len() {
             lon = args[i + 1].parse().unwrap_or(DEFAULT_LON);
             i += 2;
+        } else if (arg == "--export" || arg == "-o") && i + 1 < args.len() {
+            export_dir = Some(args[i + 1].clone());
+            i += 2;
         } else if arg == "--help" || arg == "-h" {
-            println!("Usage: cargo run --release --example astronomical_events [START_DATE] [END_DATE] [--lat LAT] [--lon LON]");
+            println!("Usage: cargo run --release --example astronomical_events [START_DATE] [END_DATE] [--lat LAT] [--lon LON] [--export DIR]");
             println!("       Dates in YYYY-MM-DD format. Default: 2026-09-24 to 2027-04-20 (Seoul)");
+            println!("       --export DIR : Exports events.json and SUMMARY.md to the specified directory.");
             return;
         } else if !arg.starts_with("--") {
             if positional_count == 0 {
@@ -666,6 +853,9 @@ fn main() {
         "  Target Interval: {:04}-{:02}-{:02} ~ {:04}-{:02}-{:02} (Location: {}, Lat {:.4}, Lon {:.4})",
         start_ymd.0, start_ymd.1, start_ymd.2, end_ymd.0, end_ymd.1, end_ymd.2, loc_name, lat, lon
     );
+    if let Some(ref dir) = export_dir {
+        println!("  Export Target  : {}", dir);
+    }
     println!("================================================================================\n");
 
     println!("ACCURACY SPECIFICATIONS & METHODOLOGICAL BOUNDS");
@@ -691,11 +881,45 @@ fn main() {
 
     println!("Found {} astronomical events in {:.2?} (High-speed periodic leap scan).\n", events.len(), scan_duration);
 
+    let mut exported_events = Vec::with_capacity(events.len());
     for event in &events {
-        print_event_report(event, lat, lon, &loc_name);
+        let exported = build_exported_event(event, lat, lon, &loc_name);
+        print_console_event(&exported);
+        exported_events.push(exported);
+    }
+
+    let payload = MundaneExportPayload {
+        engine: "Vedaksha Analytical Engine (fortune-core)".to_string(),
+        start_date: format!("{:04}-{:02}-{:02}", start_ymd.0, start_ymd.1, start_ymd.2),
+        end_date: format!("{:04}-{:02}-{:02}", end_ymd.0, end_ymd.1, end_ymd.2),
+        location_name: loc_name.clone(),
+        latitude: lat,
+        longitude: lon,
+        total_events: exported_events.len(),
+        events: exported_events,
+    };
+
+    if let Some(ref dir_str) = export_dir {
+        let out_path = Path::new(dir_str);
+        if let Err(e) = fs::create_dir_all(out_path) {
+            eprintln!("Failed to create export directory {}: {}", dir_str, e);
+        } else {
+            let json_file = out_path.join("events.json");
+            let md_file = out_path.join("SUMMARY.md");
+
+            let json_content = serde_json::to_string_pretty(&payload).expect("JSON serialization failed");
+            let md_content = generate_markdown_report(&payload);
+
+            fs::write(&json_file, json_content).expect("Failed to write events.json");
+            fs::write(&md_file, md_content).expect("Failed to write SUMMARY.md");
+
+            println!("\n[EXPORT SUCCESS] Files saved to {}:", dir_str);
+            println!("  - JSON Payload   : {}", json_file.display());
+            println!("  - Markdown Report: {}", md_file.display());
+        }
     }
 
     println!("\n================================================================================");
-    println!("  ALL {} EVENTS PROCESSED IN {:.2?} TOTAL TIME", events.len(), timer.elapsed());
+    println!("  ALL {} EVENTS PROCESSED IN {:.2?} TOTAL TIME", payload.total_events, timer.elapsed());
     println!("================================================================================\n");
 }
