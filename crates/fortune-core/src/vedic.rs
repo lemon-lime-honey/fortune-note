@@ -109,7 +109,7 @@ pub fn calculate_varga_sign_and_degree(sidereal_lon: f64, div: VargaDivision) ->
             // Parashari Shashthamsha: 5-degree divisions (0..5)
             // Odd signs start from the sign itself; Even signs start from 7th sign (+6)
             let part = ((pos_in_sign / 5.0).floor() as u8).min(5);
-            let start = if sign_idx % 2 == 0 {
+            let start = if sign_idx.is_multiple_of(2) {
                 sign_idx
             } else {
                 (sign_idx + 6) % 12
@@ -124,7 +124,7 @@ pub fn calculate_varga_sign_and_degree(sidereal_lon: f64, div: VargaDivision) ->
             // Odd signs start from sign itself; Even signs start from 7th sign (+6)
             let span = 30.0 / 7.0;
             let part = ((pos_in_sign / span).floor() as u8).min(6);
-            let start = if sign_idx % 2 == 0 {
+            let start = if sign_idx.is_multiple_of(2) {
                 sign_idx
             } else {
                 (sign_idx + 6) % 12
@@ -167,7 +167,7 @@ pub fn calculate_varga_sign_and_degree(sidereal_lon: f64, div: VargaDivision) ->
             // Parashari Dashamsha: 3-degree divisions (0..9)
             // Odd signs start from sign itself; Even signs start from 9th sign (+8)
             let part = ((pos_in_sign / 3.0).floor() as u8).min(9);
-            let start = if sign_idx % 2 == 0 {
+            let start = if sign_idx.is_multiple_of(2) {
                 sign_idx
             } else {
                 (sign_idx + 8) % 12
