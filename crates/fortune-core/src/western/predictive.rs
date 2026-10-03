@@ -512,8 +512,44 @@ pub fn calculate_transits(
 }
 
 // ---------------------------------------------------------------------------
-// 6. Primary Directions (Ptolemaic / Naibod Key)
+// 6. Primary Directions (Ptolemaic / Placidean Equatorial Arc & Naibod Key)
 // ---------------------------------------------------------------------------
+
+/// Convert ecliptic longitude (at ecliptic latitude = 0) to equatorial coordinates (RA, Dec).
+pub fn ecliptic_to_equatorial(longitude_deg: f64, obliquity_deg: f64) -> (f64, f64) {
+    let l_rad = longitude_deg.to_radians();
+    let eps_rad = obliquity_deg.to_radians();
+
+    let sin_delta = eps_rad.sin() * l_rad.sin();
+    let delta_rad = sin_delta.clamp(-1.0, 1.0).asin();
+    let delta_deg = delta_rad.to_degrees();
+
+    let alpha_rad = (eps_rad.cos() * l_rad.sin()).atan2(l_rad.cos());
+    let alpha_deg = alpha_rad.to_degrees().rem_euclid(360.0);
+
+    (alpha_deg, delta_deg)
+}
+
+/// Calculate ascensional difference (AD) in degrees: sin(AD) = tan(phi) * tan(delta).
+pub fn ascensional_difference(declination_deg: f64, latitude_deg: f64) -> f64 {
+    let tan_phi = latitude_deg.to_radians().tan();
+    let tan_delta = declination_deg.to_radians().tan();
+    let product = (tan_phi * tan_delta).clamp(-1.0, 1.0);
+    product.asin().to_degrees()
+}
+
+/// Calculate Oblique Ascension (OA): OA = RA - AD.
+pub fn oblique_ascension(ra_deg: f64, ad_deg: f64) -> f64 {
+    (ra_deg - ad_deg).rem_euclid(360.0)
+}
+
+fn normalize_western_body_name(name: &str) -> String {
+    match name {
+        "Rahu" => "North Node".to_string(),
+        "Ketu" => "South Node".to_string(),
+        other => other.to_string(),
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrimaryDirectionContact {
@@ -524,52 +560,110 @@ pub struct PrimaryDirectionContact {
     pub realization_age: f64,
 }
 
+/// Computes Ptolemaic / Placidean Primary Directions with equatorial arcs and Naibod key.
+/// Formatted and windowed around `target_age` to prevent the infant-direction lock defect.
 pub fn calculate_primary_directions(
     natal_planets: &[(&str, f64)],
     natal_ascendant: f64,
     natal_midheaven: f64,
+    latitude: f64,
+    target_age: f64,
     max_age: f64,
 ) -> Vec<PrimaryDirectionContact> {
-    let significators = [
-        ("ASC", natal_ascendant),
-        ("MC", natal_midheaven),
-    ];
-
-    let naibod_key = 59.0 / 60.0 + 8.0 / 3600.0; // 0.98565 deg per year
+    const MEAN_OBLIQUITY: f64 = 23.4392911; // J2000 standard mean obliquity
+    let naibod_key = 59.0 / 60.0 + 8.0 / 3600.0; // 0.985647 deg per tropical year
     let max_arc = max_age * naibod_key;
 
-    let mut directions = Vec::new();
+    // 1. Compute equatorial coordinates for primary significators
+    let (ramc, _) = ecliptic_to_equatorial(natal_midheaven, MEAN_OBLIQUITY);
+    // In celestial mechanics, OA of Ascendant = RA - AD of natal Ascendant
+    let (ra_asc, dec_asc) = ecliptic_to_equatorial(natal_ascendant, MEAN_OBLIQUITY);
+    let ad_asc = ascensional_difference(dec_asc, latitude);
+    let oa_asc = oblique_ascension(ra_asc, ad_asc);
 
-    for &(prom_name, prom_lon) in natal_planets {
-        for &(sig_name, sig_lon) in &significators {
-            let aspects = [
-                (0.0, "Conjunction"),
-                (60.0, "Sextile"),
-                (90.0, "Square"),
-                (120.0, "Trine"),
-                (180.0, "Opposition"),
-            ];
+    let aspects: [(f64, &str); 5] = [
+        (0.0, "Conjunction"),
+        (60.0, "Sextile"),
+        (90.0, "Square"),
+        (120.0, "Trine"),
+        (180.0, "Opposition"),
+    ];
 
-            for (angle, asp_name) in aspects {
-                let target_point = (sig_lon + angle).rem_euclid(360.0);
-                let arc = (target_point - prom_lon).rem_euclid(360.0);
+    let mut all_directions = Vec::new();
 
-                if arc > 0.01 && arc <= max_arc {
-                    let realization_age = arc / naibod_key;
-                    directions.push(PrimaryDirectionContact {
-                        promittor: prom_name.to_string(),
-                        significator: sig_name.to_string(),
+    for &(prom_raw_name, prom_lon) in natal_planets {
+        let prom_name = normalize_western_body_name(prom_raw_name);
+
+        for (angle, asp_name) in aspects {
+            // Test both forward and backward aspect rays (except for 0° and 180°)
+            let ray_offsets = if angle == 0.0 || angle == 180.0 {
+                vec![angle]
+            } else {
+                vec![angle, 360.0 - angle]
+            };
+
+            for ray_offset in ray_offsets {
+                let asp_ecliptic_lon = (prom_lon + ray_offset).rem_euclid(360.0);
+                let (ra_asp, dec_asp) = ecliptic_to_equatorial(asp_ecliptic_lon, MEAN_OBLIQUITY);
+                let ad_asp = ascensional_difference(dec_asp, latitude);
+                let oa_asp = oblique_ascension(ra_asp, ad_asp);
+
+                // A. Direct direction to MC: Diurnal motion carries promittor to Meridian
+                let arc_mc = (ra_asp - ramc).rem_euclid(360.0);
+                if arc_mc > 0.05 && arc_mc <= max_arc && arc_mc <= 110.0 {
+                    let age = arc_mc / naibod_key;
+                    all_directions.push(PrimaryDirectionContact {
+                        promittor: prom_name.clone(),
+                        significator: "MC".to_string(),
                         aspect_type: asp_name.to_string(),
-                        direction_arc_deg: arc,
-                        realization_age,
+                        direction_arc_deg: arc_mc,
+                        realization_age: age,
+                    });
+                }
+
+                // B. Direct direction to ASC: Diurnal motion carries promittor to Horizon
+                let arc_asc = (oa_asp - oa_asc).rem_euclid(360.0);
+                if arc_asc > 0.05 && arc_asc <= max_arc && arc_asc <= 110.0 {
+                    let age = arc_asc / naibod_key;
+                    all_directions.push(PrimaryDirectionContact {
+                        promittor: prom_name.clone(),
+                        significator: "ASC".to_string(),
+                        aspect_type: asp_name.to_string(),
+                        direction_arc_deg: arc_asc,
+                        realization_age: age,
                     });
                 }
             }
         }
     }
 
-    directions.sort_by(|a, b| a.realization_age.partial_cmp(&b.realization_age).unwrap());
-    directions
+    // Deduplicate any duplicate contacts that might arise from ray symmetry
+    all_directions.sort_by(|a, b| {
+        a.realization_age.partial_cmp(&b.realization_age).unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    let mut unique_directions: Vec<PrimaryDirectionContact> = Vec::new();
+    for d in all_directions {
+        let is_dup = unique_directions.iter().any(|u| {
+            u.promittor == d.promittor
+                && u.significator == d.significator
+                && u.aspect_type == d.aspect_type
+                && (u.direction_arc_deg - d.direction_arc_deg).abs() < 0.01
+        });
+        if !is_dup {
+            unique_directions.push(d);
+        }
+    }
+
+    // Window around target_age: prioritize directions within target_age ± 5 years,
+    // then sort by proximity to target_age so the user sees relevant life milestones.
+    unique_directions.sort_by(|a, b| {
+        let diff_a = (a.realization_age - target_age).abs();
+        let diff_b = (b.realization_age - target_age).abs();
+        diff_a.partial_cmp(&diff_b).unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    unique_directions
 }
 
 // ---------------------------------------------------------------------------
@@ -637,11 +731,11 @@ pub fn calculate_predictive_suite(
         latitude, longitude, natal_planets,
     ).unwrap_or_default();
 
-    let primary = calculate_primary_directions(
-        natal_planets, natal_ascendant, natal_midheaven, 100.0,
-    );
-
     let age = if target_year >= birth_year { (target_year - birth_year) as u32 } else { 0 };
+
+    let primary = calculate_primary_directions(
+        natal_planets, natal_ascendant, natal_midheaven, latitude, age as f64, 100.0,
+    );
 
     PredictiveSuite {
         target_year,
@@ -671,6 +765,7 @@ mod tests {
             ("Mars", 15.0),
             ("Jupiter", 195.0),
             ("Saturn", 120.0),
+            ("Rahu", 10.0),
         ];
 
         let suite = calculate_predictive_suite(
@@ -685,5 +780,55 @@ mod tests {
         assert_eq!(suite.profection.profected_house, 1);
         assert!(suite.solar_arc.arc_degrees > 30.0);
         assert!(suite.solar_return.is_some());
+        assert!(!suite.primary_directions.is_empty());
+
+        // The top direction must be windowed near age 36, not locked at infancy (age 0-4)
+        let top_dir = &suite.primary_directions[0];
+        assert!((top_dir.realization_age - 36.0).abs() < 10.0, "Top direction realization age was {}", top_dir.realization_age);
+
+        // Ensure Rahu was normalized to North Node
+        let rahu_found = suite.primary_directions.iter().any(|d| d.promittor == "Rahu");
+        assert!(!rahu_found, "Rahu must not be present in western primary directions");
+        let north_node_found = suite.primary_directions.iter().any(|d| d.promittor == "North Node");
+        assert!(north_node_found, "North Node must be present in western primary directions");
+    }
+
+    #[test]
+    fn test_equatorial_coordinates() {
+        let eps = 23.4392911;
+        // Vernal Equinox 0°: RA = 0°, Dec = 0°
+        let (ra0, dec0) = ecliptic_to_equatorial(0.0, eps);
+        assert!((ra0 - 0.0).abs() < 1e-5);
+        assert!((dec0 - 0.0).abs() < 1e-5);
+
+        // Summer Solstice 90°: RA = 90°, Dec = +23.439°
+        let (ra90, dec90) = ecliptic_to_equatorial(90.0, eps);
+        assert!((ra90 - 90.0).abs() < 1e-5);
+        assert!((dec90 - eps).abs() < 1e-5);
+
+        // Autumnal Equinox 180°: RA = 180°, Dec = 0°
+        let (ra180, dec180) = ecliptic_to_equatorial(180.0, eps);
+        assert!((ra180 - 180.0).abs() < 1e-5);
+        assert!((dec180 - 0.0).abs() < 1e-5);
+
+        // Winter Solstice 270°: RA = 270°, Dec = -23.439°
+        let (ra270, dec270) = ecliptic_to_equatorial(270.0, eps);
+        assert!((ra270 - 270.0).abs() < 1e-5);
+        assert!((dec270 + eps).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_ascensional_difference() {
+        // At equator (lat = 0), AD is always 0
+        let ad_equator = ascensional_difference(20.0, 0.0);
+        assert!((ad_equator - 0.0).abs() < 1e-5);
+
+        // At Dec = 0, AD is always 0
+        let ad_zero_dec = ascensional_difference(0.0, 37.5);
+        assert!((ad_zero_dec - 0.0).abs() < 1e-5);
+
+        // At Seoul (lat = 37.5665), Dec = +23.44 gives positive AD
+        let ad_seoul = ascensional_difference(23.439, 37.5665);
+        assert!(ad_seoul > 15.0 && ad_seoul < 25.0);
     }
 }
