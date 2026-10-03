@@ -158,15 +158,15 @@ fun SelectiveCopyBottomSheet(
                         CopyCheckboxItem(label = "10년 주기 대운 흐름 및 대운수", checked = incSajuDaeun, onCheckedChange = { incSajuDaeun = it })
                     }
                     1 -> {
-                        CopyCheckboxItem(label = "천체 및 하우스 기본 배치 (행성/노드/ASC/MC)", checked = incWesternPlanets, onCheckedChange = { incWesternPlanets = it })
-                        CopyCheckboxItem(label = "메이저 아스펙트 (Major Aspects)", checked = incWesternAspects, onCheckedChange = { incWesternAspects = it })
-                        CopyCheckboxItem(label = "윌리엄 릴리 5중 본질적 품계 & 위계 총점", checked = incWesternDignities, onCheckedChange = { incWesternDignities = it })
-                        CopyCheckboxItem(label = "달의 상태 (VOC, Via Combusta, 다음 각)", checked = incWesternMoon, onCheckedChange = { incWesternMoon = it })
-                        CopyCheckboxItem(label = "플래너터리 아워 & 차트 적격성 (Radicality)", checked = incWesternHours, onCheckedChange = { incWesternHours = it })
-                        CopyCheckboxItem(label = "전통 동적 아스펙트 (접근/분리, 모이어티)", checked = incWesternDynamicAspects, onCheckedChange = { incWesternDynamicAspects = it })
-                        CopyCheckboxItem(label = "상호 리셉션 및 포위 (Mutual Reception)", checked = incWesternReceptions, onCheckedChange = { incWesternReceptions = it })
-                        CopyCheckboxItem(label = "주요 항성 회합 (Fixed Star Conjunctions ≤ 1.5°)", checked = incWesternStars, onCheckedChange = { incWesternStars = it })
-                        CopyCheckboxItem(label = "하우스 커스프 알무텐 & 아라빅 파트", checked = incWesternParts, onCheckedChange = { incWesternParts = it })
+                        CopyCheckboxItem(label = "Placements & House Cusps (Planets, Nodes, Angles)", checked = incWesternPlanets, onCheckedChange = { incWesternPlanets = it })
+                        CopyCheckboxItem(label = "Major Aspects", checked = incWesternAspects, onCheckedChange = { incWesternAspects = it })
+                        CopyCheckboxItem(label = "Essential Dignities & Lilly Scores", checked = incWesternDignities, onCheckedChange = { incWesternDignities = it })
+                        CopyCheckboxItem(label = "Moon Condition (VOC, Via Combusta, Applying)", checked = incWesternMoon, onCheckedChange = { incWesternMoon = it })
+                        CopyCheckboxItem(label = "Planetary Hours & Radicality", checked = incWesternHours, onCheckedChange = { incWesternHours = it })
+                        CopyCheckboxItem(label = "Traditional Dynamic Aspects (Applying/Separating, Moiety)", checked = incWesternDynamicAspects, onCheckedChange = { incWesternDynamicAspects = it })
+                        CopyCheckboxItem(label = "Mutual Receptions & Besiegement", checked = incWesternReceptions, onCheckedChange = { incWesternReceptions = it })
+                        CopyCheckboxItem(label = "Fixed Star Conjunctions (Orb ≤ 1.5°)", checked = incWesternStars, onCheckedChange = { incWesternStars = it })
+                        CopyCheckboxItem(label = "Arabic Parts & House Cusp Almutens", checked = incWesternParts, onCheckedChange = { incWesternParts = it })
                     }
                     2 -> {
                         CopyCheckboxItem(label = "라그나 및 D1 라시 차트 배치", checked = incVedicRasi, onCheckedChange = { incVedicRasi = it })
@@ -300,53 +300,53 @@ private fun generateSelectiveMarkdown(
             if (incWesternPlanets) {
                 val ascSign = ZODIAC_NAMES.getOrElse((chart.western.ascendant / 30.0).toInt() % 12) { "" }
                 val mcSign = ZODIAC_NAMES.getOrElse((chart.western.midheaven / 30.0).toInt() % 12) { "" }
-                sb.append("## 2. 천체 및 하우스 기본 배치\n")
+                sb.append("## 2. Celestial Placements & House Cusps\n")
                 sb.append("- Ascendant: ${String.format("%.2f°", chart.western.ascendant)} ($ascSign)\n")
                 sb.append("- Midheaven (MC): ${String.format("%.2f°", chart.western.midheaven)} ($mcSign)\n")
-                chart.western.house_system?.let { sb.append("- 하우스 시스템: $it\n") }
-                sb.append("- 행성 배치:\n")
+                chart.western.house_system?.let { sb.append("- House System: $it\n") }
+                sb.append("- Planetary Placements:\n")
                 chart.western.planets.forEach { p ->
                     val sign = ZODIAC_NAMES.getOrElse(p.sign_index % 12) { "" }
                     val rx = if (p.is_retrograde) " [Rx]" else ""
                     sb.append("  * ${p.name}: ${String.format("%.2f°", p.longitude)} ($sign) - House ${p.house_number}$rx\n")
                 }
-                sb.append("- 노드 배치:\n")
+                sb.append("- Lunar Nodes:\n")
                 chart.western.nodes.forEach { n ->
                     val sign = ZODIAC_NAMES.getOrElse(n.sign_index % 12) { "" }
                     sb.append("  * ${n.name}: ${String.format("%.2f°", n.longitude)} ($sign) - House ${n.house_number}\n")
                 }
             }
             if (incWesternAspects) {
-                sb.append("- 메이저 아스펙트 (Major Aspects):\n")
+                sb.append("- Major Aspects:\n")
                 if (chart.western.aspects.isEmpty()) {
                     sb.append("  * No major aspects within orb\n")
                 } else {
                     chart.western.aspects.forEach { a ->
-                        sb.append("  * ${a.planet1} - ${a.planet2}: ${a.aspect_type} (오차: ${String.format("%.2f°", a.orb)})\n")
+                        sb.append("  * ${a.planet1} - ${a.planet2}: ${a.aspect_type} (Orb: ${String.format("%.2f°", a.orb)})\n")
                     }
                 }
             }
 
             chart.western.traditional?.let { trad ->
-                sb.append("\n## 3. 윌리엄 릴리 전통 점성술 정밀 분석\n")
+                sb.append("\n## 3. William Lilly Traditional Analysis\n")
                 if (incWesternHours) {
-                    sb.append("- 플래너터리 아워: ${trad.planetary_hours.day_ruler}의 날, ${trad.planetary_hours.hour_ruler}의 시간 (적격성: ${if (trad.planetary_hours.is_radical) "적격" else "부적격"} - ${trad.planetary_hours.radicality_reason})\n")
+                    sb.append("- Planetary Hours: Day of ${trad.planetary_hours.day_ruler}, Hour of ${trad.planetary_hours.hour_ruler} (Radicality: ${if (trad.planetary_hours.is_radical) "Radical" else "Non-radical"} - ${trad.planetary_hours.radicality_reason})\n")
                     if (trad.planetary_hours.considerations.isNotEmpty()) {
-                        sb.append("- 판단 전 고려사항 (Considerations Before Judgment):\n")
+                        sb.append("- Considerations Before Judgment:\n")
                         trad.planetary_hours.considerations.forEach { c ->
                             sb.append("  * $c\n")
                         }
                     }
                 }
                 if (incWesternMoon) {
-                    sb.append("- 달의 상태: 위상 [${trad.moon_condition.lunar_phase_name}], VOC [${if (trad.moon_condition.is_void_of_course) "보이드 오브 코스" else "정상"}], Via Combusta [${if (trad.moon_condition.is_via_combusta) "연소도" else "정상"}]\n")
+                    sb.append("- Moon Condition: Phase [${trad.moon_condition.lunar_phase_name}], VOC [${if (trad.moon_condition.is_void_of_course) "Void of Course" else "None"}], Via Combusta [${if (trad.moon_condition.is_via_combusta) "Via Combusta (15° Lib - 15° Sco)" else "None"}]\n")
                     trad.moon_condition.next_applying_aspect?.let {
-                        sb.append("  * 달의 다음 접근 각: $it\n")
+                        sb.append("  * Next Applying Aspect: $it\n")
                     }
                 }
                 if (incWesternDignities && trad.planet_dignities.isNotEmpty()) {
-                    sb.append("\n### 5중 본질적 품계 및 릴리 위계 총점\n")
-                    sb.append("| 행성 | 황경 | 하우스 | 품계 상태 | 본질 점수 | 우발 점수 | 릴리 총점 |\n")
+                    sb.append("\n### Essential Dignities & Lilly Scores\n")
+                    sb.append("| Planet | Longitude | House | Dignity Status | Essential | Accidental | Total Lilly Score |\n")
                     sb.append("| :--- | :--- | :---: | :--- | :---: | :---: | :---: |\n")
                     trad.planet_dignities.forEach { d ->
                         val st = mutableListOf<String>()
@@ -363,30 +363,30 @@ private fun generateSelectiveMarkdown(
                     }
                 }
                 if (incWesternDynamicAspects && trad.traditional_aspects.isNotEmpty()) {
-                    sb.append("\n### 전통 동적 아스펙트 (접근 / 분리 및 모이어티 오브)\n")
+                    sb.append("\n### Traditional Dynamic Aspects (Applying / Separating, Moiety Orb)\n")
                     trad.traditional_aspects.forEach { ta ->
-                        val dyn = if (ta.is_applying) "접근 (Applying)" else "분리 (Separating)"
+                        val dyn = if (ta.is_applying) "Applying" else "Separating"
                         val partile = if (ta.is_partile) " [Partile]" else ""
-                        sb.append("- ${ta.planet1} - ${ta.planet2}: ${ta.aspect_type} (오차: ${String.format("%.2f°", ta.orb)} / 허용: ${String.format("%.2f°", ta.max_allowed_orb)})$partile, $dyn\n")
+                        sb.append("- ${ta.planet1} - ${ta.planet2}: ${ta.aspect_type} (Orb: ${String.format("%.2f°", ta.orb)} / Max: ${String.format("%.2f°", ta.max_allowed_orb)})$partile, $dyn\n")
                     }
                 }
                 if (incWesternReceptions && trad.mutual_receptions.isNotEmpty()) {
-                    sb.append("\n### 상호 리셉션 (Mutual Reception)\n")
+                    sb.append("\n### Mutual Reception & Besiegement\n")
                     trad.mutual_receptions.forEach { mr ->
                         sb.append("- ${mr.planet1} - ${mr.planet2}: [${mr.reception_type}] ${mr.description}\n")
                     }
                 }
                 if (incWesternStars && trad.fixed_star_conjunctions.isNotEmpty()) {
-                    sb.append("\n### 주요 항성 회합 (Fixed Star Conjunctions, Orb ≤ 1.5°)\n")
+                    sb.append("\n### Fixed Star Conjunctions (Orb ≤ 1.5°)\n")
                     trad.fixed_star_conjunctions.forEach { fs ->
-                        sb.append("- ${fs.star_name} - ${fs.planet_name}: 오차 ${String.format("%.2f°", fs.orb)} (본성: ${fs.nature}, 광도: ${fs.magnitude}등급) - ${fs.description}\n")
+                        sb.append("- ${fs.star_name} ☌ ${fs.planet_name}: Orb ${String.format("%.2f°", fs.orb)} (Nature: ${fs.nature}, Mag: ${fs.magnitude}) - ${fs.description}\n")
                     }
                 }
                 if (incWesternParts && trad.arabic_parts.isNotEmpty()) {
-                    sb.append("\n### 아라빅 파트 (Arabic Parts)\n")
+                    sb.append("\n### Arabic Parts\n")
                     trad.arabic_parts.forEach { part ->
                         val sign = ZODIAC_NAMES.getOrElse(part.sign_index % 12) { "" }
-                        sb.append("- ${part.name}: ${String.format("%.2f°", part.longitude)} ($sign, House ${part.house_number}) [공식: ${part.formula}]\n")
+                        sb.append("- ${part.name}: ${String.format("%.2f°", part.longitude)} ($sign, House ${part.house_number}) [Formula: ${part.formula}]\n")
                     }
                 }
             }

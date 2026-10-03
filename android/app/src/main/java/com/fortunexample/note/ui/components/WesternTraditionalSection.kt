@@ -49,13 +49,13 @@ fun WesternTraditionalSection(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("플래너터리 아워 & 차트 적격성", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text("Planetary Hours & Radicality", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     Surface(
                         shape = RoundedCornerShape(6.dp),
                         color = if (traditional.planetary_hours.is_radical) VedicGreen.copy(alpha = 0.12f) else AstrologicalRed.copy(alpha = 0.12f)
                     ) {
                         Text(
-                            text = if (traditional.planetary_hours.is_radical) "적격 (Radical)" else "부적격 (Non-radical)",
+                            text = if (traditional.planetary_hours.is_radical) "Radical" else "Non-radical",
                             color = if (traditional.planetary_hours.is_radical) VedicGreen else AstrologicalRed,
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp,
@@ -65,7 +65,7 @@ fun WesternTraditionalSection(
                 }
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = "${traditional.planetary_hours.day_ruler}의 날 · ${traditional.planetary_hours.hour_ruler}의 시간 (제${traditional.planetary_hours.hour_number}시, ${if (traditional.planetary_hours.is_day_hour) "주간" else "야간"})",
+                    text = "Day of ${traditional.planetary_hours.day_ruler} · Hour of ${traditional.planetary_hours.hour_ruler} (Hour ${traditional.planetary_hours.hour_number}, ${if (traditional.planetary_hours.is_day_hour) "Day" else "Night"})",
                     color = TextPrimary,
                     fontSize = 13.sp
                 )
@@ -78,7 +78,7 @@ fun WesternTraditionalSection(
                 if (traditional.planetary_hours.considerations.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "판단 전 고려사항 (Considerations):",
+                        text = "Considerations Before Judgment:",
                         color = AstrologicalRed,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 12.sp
@@ -105,7 +105,7 @@ fun WesternTraditionalSection(
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("달의 상태 (Moon Condition)", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text("Moon Condition", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Row(
@@ -131,7 +131,7 @@ fun WesternTraditionalSection(
                             color = AstrologicalRed.copy(alpha = 0.12f)
                         ) {
                             Text(
-                                text = "Void of Course (공허)",
+                                text = "Void of Course",
                                 color = AstrologicalRed,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
@@ -146,7 +146,7 @@ fun WesternTraditionalSection(
                             color = AstrologicalRed.copy(alpha = 0.12f)
                         ) {
                             Text(
-                                text = "Via Combusta (연소도)",
+                                text = "Via Combusta",
                                 color = AstrologicalRed,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
@@ -159,7 +159,7 @@ fun WesternTraditionalSection(
                 traditional.moon_condition.next_applying_aspect?.let { nextAsp ->
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "달의 다음 접근 각: $nextAsp",
+                        text = "Next Applying Aspect: $nextAsp",
                         color = TextSecondary,
                         fontSize = 13.sp
                     )
@@ -184,7 +184,7 @@ fun WesternTraditionalSection(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("5중 본질적 품계 & 릴리 총점", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text("Essential Dignities & Lilly Scores", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     Icon(
                         if (isDignityExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                         contentDescription = null,
@@ -224,7 +224,7 @@ fun WesternTraditionalSection(
                                         modifier = Modifier.padding(top = 2.dp)
                                     ) {
                                         if (statusBadges.isEmpty()) {
-                                            Text("중립 (Neutral)", color = TextSecondary, fontSize = 11.sp)
+                                            Text("Neutral", color = TextSecondary, fontSize = 11.sp)
                                         } else {
                                             statusBadges.forEach { (badge, isPositive) ->
                                                 Surface(
@@ -252,7 +252,7 @@ fun WesternTraditionalSection(
                                         color = if (d.total_lilly_score >= 0) CelestialBlue else AstrologicalRed
                                     )
                                     Text(
-                                        text = "본질 ${String.format("%+d", d.essential_score)} / 우발 ${String.format("%+d", d.accidental_score)}",
+                                        text = "Essential ${String.format("%+d", d.essential_score)} / Accidental ${String.format("%+d", d.accidental_score)}",
                                         color = TextSecondary,
                                         fontSize = 11.sp
                                     )
@@ -283,7 +283,7 @@ fun WesternTraditionalSection(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "주요 항성 회합 (${traditional.fixed_star_conjunctions.size}개 접촉)",
+                        text = "Fixed Star Conjunctions (${traditional.fixed_star_conjunctions.size} in orb)",
                         color = TextPrimary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp
@@ -299,7 +299,7 @@ fun WesternTraditionalSection(
                     Column(modifier = Modifier.padding(top = 10.dp)) {
                         if (traditional.fixed_star_conjunctions.isEmpty()) {
                             Text(
-                                text = "1.5° 허용오차 이내에 회합하는 주요 항성이 없습니다.",
+                                text = "No fixed stars conjunct within 1.5° orb.",
                                 color = TextSecondary,
                                 fontSize = 13.sp
                             )
@@ -354,7 +354,7 @@ fun WesternTraditionalSection(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("아라빅 파트 & 커스프 알무텐", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text("Arabic Parts & House Cusp Almutens", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     Icon(
                         if (isPartsExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                         contentDescription = null,
@@ -364,7 +364,7 @@ fun WesternTraditionalSection(
 
                 AnimatedVisibility(visible = isPartsExpanded) {
                     Column(modifier = Modifier.padding(top = 10.dp)) {
-                        Text("아라빅 파트 (Arabic Parts):", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
+                        Text("Arabic Parts (Lots):", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
                         traditional.arabic_parts.forEach { part ->
                             val sign = ZODIAC_NAMES.getOrElse(part.sign_index % 12) { "" }
                             Row(
@@ -381,7 +381,7 @@ fun WesternTraditionalSection(
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("12개 하우스 커스프 알무텐:", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
+                        Text("House Cusp Almutens:", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
                         traditional.house_almutens.forEach { ha ->
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
@@ -389,7 +389,7 @@ fun WesternTraditionalSection(
                             ) {
                                 Text(text = "House ${ha.house_number} Cusp", color = TextPrimary, fontSize = 12.sp)
                                 Text(
-                                    text = "알무텐: ${ha.almuten_planet} (${ha.score}점)",
+                                    text = "Almuten: ${ha.almuten_planet} (${ha.score} pts)",
                                     color = CelestialBlue,
                                     fontWeight = FontWeight.Medium,
                                     fontSize = 12.sp

@@ -39,12 +39,12 @@ fun WesternPredictiveSection(
 ) {
     var selectedTechTab by remember { mutableStateOf(0) }
     val techTabs = listOf(
-        "프로펙션",
-        "솔라 아크",
-        "세컨더리",
-        "솔라 리턴",
-        "트랜짓",
-        "프라이머리"
+        "Profections",
+        "Solar Arc",
+        "Progressions",
+        "Solar Return",
+        "Transits",
+        "Primary Dir"
     )
 
     Card(
@@ -62,13 +62,13 @@ fun WesternPredictiveSection(
             ) {
                 Column {
                     Text(
-                        text = "서양 점성술 6대 예측 기법",
+                        text = "Predictive Astrology Suite",
                         color = TextPrimary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp
                     )
                     Text(
-                        text = "${targetYear}년 (${targetYear - profile.birth_year}세) 기준 분석",
+                        text = "Target: Year $targetYear (${targetYear - profile.birth_year} yrs)",
                         color = TextSecondary,
                         fontSize = 12.sp
                     )
@@ -167,20 +167,20 @@ fun WesternPredictiveSection(
 private fun ProfectionCard(data: PredictiveSuiteData) {
     val prof = data.profection
     Column {
-        Text("Annual Profections (연간 프로펙션)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
+        Text("Annual Profections", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
         Spacer(modifier = Modifier.height(8.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("도달 하우스 및 사인", color = TextSecondary, fontSize = 13.sp)
+            Text("Profected House & Sign", color = TextSecondary, fontSize = 13.sp)
             Text("House ${prof.profected_house} · ${prof.profected_sign_name}", fontWeight = FontWeight.Bold, color = CelestialBlue, fontSize = 13.sp)
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("올해의 주재성 (Lord of Year)", color = TextSecondary, fontSize = 13.sp)
+            Text("Lord of the Year", color = TextSecondary, fontSize = 13.sp)
             Text(prof.lord_of_the_year, fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 13.sp)
         }
         if (prof.active_natal_planets.isNotEmpty()) {
             Spacer(modifier = Modifier.height(4.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("해당 사인 출생 행성", color = TextSecondary, fontSize = 13.sp)
+                Text("Natal Planets in Sign", color = TextSecondary, fontSize = 13.sp)
                 Text(prof.active_natal_planets.joinToString(", "), fontWeight = FontWeight.Medium, color = VedicGreen, fontSize = 13.sp)
             }
         }
@@ -191,14 +191,14 @@ private fun ProfectionCard(data: PredictiveSuiteData) {
 private fun SolarArcCard(data: PredictiveSuiteData) {
     val arc = data.solar_arc
     Column {
-        Text("Solar Arc Directions (솔라 아크)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
-        Text("진행 태양 호 각도: ${String.format("+%.2f°", arc.arc_degrees)}", color = TextSecondary, fontSize = 12.sp)
+        Text("Solar Arc Directions", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
+        Text("Solar Arc Degrees: ${String.format("+%.2f°", arc.arc_degrees)}", color = TextSecondary, fontSize = 12.sp)
         Spacer(modifier = Modifier.height(8.dp))
 
         if (arc.contacts.isEmpty()) {
-            Text("1° 이내 주요 접촉각(Major Aspects)이 없습니다.", color = TextSecondary, fontSize = 12.sp)
+            Text("No major aspect contacts within 1° orb.", color = TextSecondary, fontSize = 12.sp)
         } else {
-            Text("출생 차트 접촉각 (Orb ≤ 1°):", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = TextPrimary)
+            Text("Contacts to Natal Chart (Orb ≤ 1°):", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = TextPrimary)
             arc.contacts.forEach { c ->
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
@@ -216,13 +216,13 @@ private fun SolarArcCard(data: PredictiveSuiteData) {
 private fun SecondaryProgressionCard(data: PredictiveSuiteData) {
     val sec = data.secondary_progression
     if (sec == null) {
-        Text("세컨더리 프로그레션 데이터가 없습니다.", color = TextSecondary, fontSize = 12.sp)
+        Text("Secondary progression data unavailable.", color = TextSecondary, fontSize = 12.sp)
         return
     }
 
     Column {
-        Text("Secondary Progressions (1일 = 1년)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
-        Text("진행 기준일: ${sec.progressed_date_utc} UTC (경과 ${String.format("%.1f", sec.elapsed_tropical_years)}년)", color = TextSecondary, fontSize = 12.sp)
+        Text("Secondary Progressions (1 day = 1 year)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
+        Text("Progressed Date: ${sec.progressed_date_utc} UTC (${String.format("%.1f", sec.elapsed_tropical_years)} yrs elapsed)", color = TextSecondary, fontSize = 12.sp)
         Spacer(modifier = Modifier.height(6.dp))
 
         Surface(
@@ -230,7 +230,7 @@ private fun SecondaryProgressionCard(data: PredictiveSuiteData) {
             color = CelestialBlue.copy(alpha = 0.1f)
         ) {
             Text(
-                text = "진행 달 위상: ${sec.progressed_lunar_phase}",
+                text = "Progressed Moon Phase: ${sec.progressed_lunar_phase}",
                 color = CelestialBlue,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -240,9 +240,9 @@ private fun SecondaryProgressionCard(data: PredictiveSuiteData) {
 
         Spacer(modifier = Modifier.height(8.dp))
         if (sec.contacts.isEmpty()) {
-            Text("출생 차트와의 1° 이내 접촉각이 없습니다.", color = TextSecondary, fontSize = 12.sp)
+            Text("No contacts to natal chart within 1° orb.", color = TextSecondary, fontSize = 12.sp)
         } else {
-            Text("출생 차트 접촉각:", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = TextPrimary)
+            Text("Contacts to Natal Chart:", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = TextPrimary)
             sec.contacts.forEach { c ->
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
@@ -260,7 +260,7 @@ private fun SecondaryProgressionCard(data: PredictiveSuiteData) {
 private fun SolarReturnCard(data: PredictiveSuiteData) {
     val sr = data.solar_return
     if (sr == null) {
-        Text("솔라 리턴 데이터가 없습니다.", color = TextSecondary, fontSize = 12.sp)
+        Text("Solar return data unavailable.", color = TextSecondary, fontSize = 12.sp)
         return
     }
 
@@ -268,8 +268,8 @@ private fun SolarReturnCard(data: PredictiveSuiteData) {
     val mcSign = ZODIAC_NAMES.getOrElse((sr.midheaven / 30.0).toInt() % 12) { "" }
 
     Column {
-        Text("Solar Return (${sr.return_year}년 솔라 리턴)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
-        Text("태양 복귀 시각: ${sr.return_date_utc}", color = TextSecondary, fontSize = 12.sp)
+        Text("Solar Return (${sr.return_year})", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
+        Text("Exact Return Moment: ${sr.return_date_utc}", color = TextSecondary, fontSize = 12.sp)
         Spacer(modifier = Modifier.height(8.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -286,11 +286,11 @@ private fun SolarReturnCard(data: PredictiveSuiteData) {
 @Composable
 private fun TransitsCard(data: PredictiveSuiteData) {
     Column {
-        Text("Transits (${data.target_year}년 트랜짓 접촉각)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
+        Text("Transits (${data.target_year})", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
         Spacer(modifier = Modifier.height(8.dp))
 
         if (data.transits.isEmpty()) {
-            Text("2° 이내 주요 행성 트랜짓 접촉각이 없습니다.", color = TextSecondary, fontSize = 12.sp)
+            Text("No major transiting aspects within 2° orb.", color = TextSecondary, fontSize = 12.sp)
         } else {
             data.transits.take(10).forEach { t ->
                 Row(
@@ -308,11 +308,11 @@ private fun TransitsCard(data: PredictiveSuiteData) {
 @Composable
 private fun PrimaryDirectionsCard(data: PredictiveSuiteData) {
     Column {
-        Text("Primary Directions (프라이머리 디렉션, Naibod Key)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
+        Text("Primary Directions (Naibod Key)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
         Spacer(modifier = Modifier.height(8.dp))
 
         if (data.primary_directions.isEmpty()) {
-            Text("계산된 프라이머리 디렉션이 없습니다.", color = TextSecondary, fontSize = 12.sp)
+            Text("No primary directions calculated.", color = TextSecondary, fontSize = 12.sp)
         } else {
             data.primary_directions.take(8).forEach { pd ->
                 Row(
@@ -320,7 +320,7 @@ private fun PrimaryDirectionsCard(data: PredictiveSuiteData) {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text("${pd.promittor} → ${pd.significator} ${pd.aspect_type}", fontSize = 12.sp, color = TextPrimary)
-                    Text("실현: 약 ${String.format("%.1f", pd.realization_age)}세 (호: ${String.format("%.2f°", pd.direction_arc_deg)})", fontSize = 12.sp, color = CelestialBlue, fontWeight = FontWeight.Medium)
+                    Text("Realization: ~${String.format("%.1f", pd.realization_age)} yrs (Arc: ${String.format("%.2f°", pd.direction_arc_deg)})", fontSize = 12.sp, color = CelestialBlue, fontWeight = FontWeight.Medium)
                 }
             }
         }

@@ -71,7 +71,7 @@ pub fn format_profile_saju_markdown(profile: &Profile, chart: &FortuneCalculatio
 fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput) {
     let asc_sign = (chart.western.ascendant / 30.0).floor() as usize % 12;
     let mc_sign = (chart.western.midheaven / 30.0).floor() as usize % 12;
-    out.push_str("## 2. 천체 및 하우스 기본 배치\n");
+    out.push_str("## 2. Celestial Placements & House Cusps\n");
     out.push_str(&format!(
         "- Ascendant: {:.2}° ({})\n",
         chart.western.ascendant, ZODIAC_SIGNS[asc_sign]
@@ -80,8 +80,8 @@ fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput) {
         "- Midheaven (MC): {:.2}° ({})\n",
         chart.western.midheaven, ZODIAC_SIGNS[mc_sign]
     ));
-    out.push_str(&format!("- 하우스 시스템: {}\n", chart.western.house_system.display_name()));
-    out.push_str("- 행성 배치:\n");
+    out.push_str(&format!("- House System: {}\n", chart.western.house_system.display_name()));
+    out.push_str("- Planetary Placements:\n");
     for p in &chart.western.planets {
         let sign_name = ZODIAC_SIGNS[p.sign_index as usize % 12];
         let retro_str = if p.is_retrograde { " [Rx]" } else { "" };
@@ -90,7 +90,7 @@ fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput) {
             p.name, p.longitude, sign_name, p.house_number, retro_str
         ));
     }
-    out.push_str("- 노드 배치:\n");
+    out.push_str("- Lunar Nodes:\n");
     for n in &chart.western.nodes {
         let sign_name = ZODIAC_SIGNS[n.sign_index as usize % 12];
         out.push_str(&format!(
@@ -98,13 +98,13 @@ fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput) {
             n.name, n.longitude, sign_name, n.house_number
         ));
     }
-    out.push_str("- 메이저 아스펙트 (Major Aspects):\n");
+    out.push_str("- Major Aspects:\n");
     if chart.western.aspects.is_empty() {
         out.push_str("  * No major aspects within orb\n");
     } else {
         for a in &chart.western.aspects {
             out.push_str(&format!(
-                "  * {} - {}: {} (오차: {:.2}°)\n",
+                "  * {} - {}: {} (Orb: {:.2}°)\n",
                 a.planet1, a.planet2, a.aspect_type, a.orb
             ));
         }
@@ -112,33 +112,33 @@ fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput) {
     out.push('\n');
 
     if let Some(ref trad) = chart.western.traditional {
-        out.push_str("## 3. 윌리엄 릴리 전통 점성술 정밀 분석\n");
+        out.push_str("## 3. William Lilly Traditional Analysis\n");
         out.push_str(&format!(
-            "- 플래너터리 아워: {}의 날, {}의 시간 (적격성: {} - {})\n",
+            "- Planetary Hours: Day of {}, Hour of {} (Radicality: {} - {})\n",
             trad.planetary_hours.day_ruler,
             trad.planetary_hours.hour_ruler,
-            if trad.planetary_hours.is_radical { "적격 (Radical)" } else { "부적격 (Non-radical)" },
+            if trad.planetary_hours.is_radical { "Radical" } else { "Non-radical" },
             trad.planetary_hours.radicality_reason
         ));
         out.push_str(&format!(
-            "- 달의 상태: 위상 [{}], VOC [{}], Via Combusta [{}]\n",
+            "- Moon Condition: Phase [{}], VOC [{}], Via Combusta [{}]\n",
             trad.moon_condition.lunar_phase_name,
-            if trad.moon_condition.is_void_of_course { "보이드 오브 코스 (VOC)" } else { "정상 운행" },
-            if trad.moon_condition.is_via_combusta { "연소도 (Via Combusta)" } else { "정상 위치" },
+            if trad.moon_condition.is_void_of_course { "Void of Course" } else { "None" },
+            if trad.moon_condition.is_via_combusta { "Via Combusta (15° Lib - 15° Sco)" } else { "None" },
         ));
         if let Some(ref next_asp) = trad.moon_condition.next_applying_aspect {
-            out.push_str(&format!("  * 달의 다음 접근 각: {}\n", next_asp));
+            out.push_str(&format!("  * Next Applying Aspect: {}\n", next_asp));
         }
 
         if !trad.planetary_hours.considerations.is_empty() {
-            out.push_str("- 판단 전 고려사항 (Considerations Before Judgment):\n");
+            out.push_str("- Considerations Before Judgment:\n");
             for c in &trad.planetary_hours.considerations {
                 out.push_str(&format!("  * {}\n", c));
             }
         }
 
-        out.push_str("\n### 5중 본질적 품계 및 릴리 위계 총점\n");
-        out.push_str("| 행성 | 황경 | 하우스 | 품계 상태 | 본질 점수 | 우발 점수 | 릴리 총점 |\n");
+        out.push_str("\n### Essential Dignities & Lilly Scores\n");
+        out.push_str("| Planet | Longitude | House | Dignity Status | Essential | Accidental | Total Lilly Score |\n");
         out.push_str("| :--- | :--- | :---: | :--- | :---: | :---: | :---: |\n");
         for d in &trad.planet_dignities {
             let mut status = Vec::new();
@@ -165,33 +165,33 @@ fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput) {
         }
 
         if !trad.traditional_aspects.is_empty() {
-            out.push_str("\n### 전통 동적 아스펙트 (접근 / 분리 및 모이어티 오브)\n");
+            out.push_str("\n### Traditional Dynamic Aspects (Applying / Separating, Moiety Orb)\n");
             for ta in &trad.traditional_aspects {
-                let dynamic_str = if ta.is_applying { "접근 (Applying, 미래)" } else { "분리 (Separating, 과거)" };
+                let dynamic_str = if ta.is_applying { "Applying" } else { "Separating" };
                 let partile_str = if ta.is_partile { " [Partile]" } else { "" };
                 out.push_str(&format!(
-                    "- {} - {}: {} (오차: {:.2}° / 허용: {:.2}°){}, {}\n",
+                    "- {} - {}: {} (Orb: {:.2}° / Max: {:.2}°){}, {}\n",
                     ta.planet1, ta.planet2, ta.aspect_type, ta.orb, ta.max_allowed_orb, partile_str, dynamic_str
                 ));
             }
         }
 
         if !trad.fixed_star_conjunctions.is_empty() {
-            out.push_str("\n### 주요 항성 회합 (Fixed Star Conjunctions, Orb ≤ 1.5°)\n");
+            out.push_str("\n### Fixed Star Conjunctions (Orb ≤ 1.5°)\n");
             for sc in &trad.fixed_star_conjunctions {
                 out.push_str(&format!(
-                    "- {} ({}) ☌ {} (오차: {:.2}°, 본성: {}): {}\n",
-                    sc.star_name, sc.korean_name, sc.body_name, sc.orb, sc.nature, sc.meaning
+                    "- {} ☌ {} (Orb: {:.2}°, Nature: {}): {}\n",
+                    sc.star_name, sc.body_name, sc.orb, sc.nature, sc.meaning
                 ));
             }
         }
 
         if !trad.arabic_parts.is_empty() {
-            out.push_str("\n### 주요 아라빅 파트 (가상점)\n");
+            out.push_str("\n### Arabic Parts\n");
             for part in &trad.arabic_parts {
                 let sign_name = ZODIAC_SIGNS[part.sign_index as usize % 12];
                 out.push_str(&format!(
-                    "- {}: {:.2}° ({}) - House {} (지배성: {})\n",
+                    "- {}: {:.2}° ({}) - House {} (Ruler: {})\n",
                     part.name, part.longitude, sign_name, part.house_number, part.ruler
                 ));
             }
