@@ -436,8 +436,12 @@ private fun PlanetaryReturnsCard(data: PredictiveSuiteData) {
     val mcSign = getZodiacSign(sr.midheaven)
     val mcDeg = getSignDegree(sr.midheaven)
 
-    val classicalPlanets = sr.planets.filter { it.name != "Rahu" && it.name != "Ketu" }
-    val lunarNodes = sr.planets.filter { it.name == "Rahu" || it.name == "Ketu" }
+    val classicalPlanets = sr.planets.filter { 
+        it.name != "Rahu" && it.name != "Ketu" && it.name != "North Node" && it.name != "South Node" 
+    }
+    val lunarNodes = sr.planets.filter { 
+        it.name == "Rahu" || it.name == "Ketu" || it.name == "North Node" || it.name == "South Node" 
+    }
 
     Column {
         // 1행: 카드 제목과 복사 버튼
