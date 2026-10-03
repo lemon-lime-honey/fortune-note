@@ -71,7 +71,8 @@ fun WesternPredictiveSection(
     isLoading: Boolean,
     onYearChange: (Int) -> Unit,
     onDateChange: ((Int, Int, Int) -> Unit)? = null,
-    onTimeChange: ((Int?, Int?) -> Unit)? = null
+    onTimeChange: ((Int?, Int?) -> Unit)? = null,
+    onDateTimeChange: ((Int, Int, Int, Int?, Int?) -> Unit)? = null
 ) {
     var selectedTechTab by remember { mutableStateOf(0) }
     val techTabs = listOf(
@@ -196,7 +197,7 @@ fun WesternPredictiveSection(
                     1 -> SolarArcCard(predictiveData)
                     2 -> SecondaryProgressionCard(predictiveData)
                     3 -> PlanetaryReturnsCard(predictiveData)
-                    4 -> TransitsCard(predictiveData, profile, onDateChange, onTimeChange)
+                    4 -> TransitsCard(predictiveData, profile, onDateChange, onTimeChange, onDateTimeChange)
                     5 -> PrimaryDirectionsCard(predictiveData)
                 }
             } else if (isLoading) {
@@ -666,15 +667,25 @@ private fun TransitsCard(
     data: PredictiveSuiteData,
     profile: ProfileDto,
     onDateChange: ((Int, Int, Int) -> Unit)? = null,
-    onTimeChange: ((Int?, Int?) -> Unit)? = null
+    onTimeChange: ((Int?, Int?) -> Unit)? = null,
+    onDateTimeChange: ((Int, Int, Int, Int?, Int?) -> Unit)? = null
 ) {
     val context = LocalContext.current
+
+    val applyDateTime = { year: Int, month: Int, day: Int, hour: Int?, minute: Int? ->
+        if (onDateTimeChange != null) {
+            onDateTimeChange(year, month, day, hour, minute)
+        } else {
+            onDateChange?.invoke(year, month, day)
+            onTimeChange?.invoke(hour, minute)
+        }
+    }
 
     val openDatePicker = {
         val dpd = android.app.DatePickerDialog(
             context,
             { _, year, monthOfYear, dayOfMonth ->
-                onDateChange?.invoke(year, monthOfYear + 1, dayOfMonth)
+                applyDateTime(year, monthOfYear + 1, dayOfMonth, data.target_hour, data.target_minute)
             },
             data.target_year,
             (data.target_month.toInt() - 1).coerceIn(0, 11),
@@ -683,31 +694,75 @@ private fun TransitsCard(
         dpd.show()
     }
 
+    val openTimePicker = {
+        val tpd = android.app.TimePickerDialog(
+            context,
+            { _, hourOfDay, minute ->
+                applyDateTime(data.target_year, data.target_month.toInt(), data.target_day.toInt(), hourOfDay, minute)
+            },
+            data.target_hour,
+            data.target_minute,
+            true
+        )
+        tpd.show()
+    }
+
     val shiftDays = { days: Int ->
         val cal = java.util.Calendar.getInstance()
-        cal.set(data.target_year, (data.target_month.toInt() - 1).coerceIn(0, 11), data.target_day.toInt())
+        cal.set(
+            data.target_year,
+            (data.target_month.toInt() - 1).coerceIn(0, 11),
+            data.target_day.toInt(),
+            data.target_hour,
+            data.target_minute
+        )
         cal.add(java.util.Calendar.DAY_OF_MONTH, days)
-        onDateChange?.invoke(
+        applyDateTime(
             cal.get(java.util.Calendar.YEAR),
             cal.get(java.util.Calendar.MONTH) + 1,
-            cal.get(java.util.Calendar.DAY_OF_MONTH)
+            cal.get(java.util.Calendar.DAY_OF_MONTH),
+            data.target_hour,
+            data.target_minute
+        )
+    }
+
+    val shiftHours = { hours: Int ->
+        val cal = java.util.Calendar.getInstance()
+        cal.set(
+            data.target_year,
+            (data.target_month.toInt() - 1).coerceIn(0, 11),
+            data.target_day.toInt(),
+            data.target_hour,
+            data.target_minute
+        )
+        cal.add(java.util.Calendar.HOUR_OF_DAY, hours)
+        applyDateTime(
+            cal.get(java.util.Calendar.YEAR),
+            cal.get(java.util.Calendar.MONTH) + 1,
+            cal.get(java.util.Calendar.DAY_OF_MONTH),
+            cal.get(java.util.Calendar.HOUR_OF_DAY),
+            cal.get(java.util.Calendar.MINUTE)
         )
     }
 
     val setToToday = {
         val now = java.util.Calendar.getInstance()
-        onDateChange?.invoke(
+        applyDateTime(
             now.get(java.util.Calendar.YEAR),
             now.get(java.util.Calendar.MONTH) + 1,
-            now.get(java.util.Calendar.DAY_OF_MONTH)
+            now.get(java.util.Calendar.DAY_OF_MONTH),
+            data.target_hour,
+            data.target_minute
         )
     }
 
     val setToBirthDay = {
-        onDateChange?.invoke(
+        applyDateTime(
             data.target_year,
             profile.birth_month.toInt(),
-            profile.birth_day.toInt()
+            profile.birth_day.toInt(),
+            data.target_hour,
+            data.target_minute
         )
     }
 
@@ -719,7 +774,7 @@ private fun TransitsCard(
         ) {
             Column {
                 Text("Transits (${data.target_year})", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
-                // 트랜짓 계산 기준 시점 명시 (출생 시각 및 분 기준)
+                // 트랜짓 계산 기준 시점 명시 (클릭 시 날짜 선택 대화상자 오픈)
                 Text(
                     text = "${data.target_year}-${String.format("%02d", data.target_month)}-${String.format("%02d", data.target_day)} ${String.format("%02d:%02d", data.target_hour, data.target_minute)} Local",
                     color = CelestialBlue,
@@ -790,7 +845,7 @@ private fun TransitsCard(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // 트랜짓 시간 조정 빠른 칩
+        // 트랜짓 시간 조정 빠른 칩 (출생시각, 시간 선택, 12:00 정오, -1시간, +1시간)
         Text(
             text = "시각 (Time)",
             fontSize = 11.sp,
@@ -807,28 +862,27 @@ private fun TransitsCard(
         ) {
             FilterChip(
                 selected = false,
-                onClick = { onTimeChange?.invoke(null, null) },
+                onClick = { applyDateTime(data.target_year, data.target_month.toInt(), data.target_day.toInt(), null, null) },
                 label = { Text("출생시각", fontSize = 11.sp) }
             )
             FilterChip(
+                selected = false,
+                onClick = { openTimePicker() },
+                label = { Text("시간 선택...", fontSize = 11.sp) }
+            )
+            FilterChip(
                 selected = data.target_hour == 12 && data.target_minute == 0,
-                onClick = { onTimeChange?.invoke(12, 0) },
+                onClick = { applyDateTime(data.target_year, data.target_month.toInt(), data.target_day.toInt(), 12, 0) },
                 label = { Text("12:00 정오", fontSize = 11.sp) }
             )
             FilterChip(
                 selected = false,
-                onClick = {
-                    val prev = (data.target_hour + 23) % 24
-                    onTimeChange?.invoke(prev, data.target_minute)
-                },
+                onClick = { shiftHours(-1) },
                 label = { Text("-1시간", fontSize = 11.sp) }
             )
             FilterChip(
                 selected = false,
-                onClick = {
-                    val next = (data.target_hour + 1) % 24
-                    onTimeChange?.invoke(next, data.target_minute)
-                },
+                onClick = { shiftHours(1) },
                 label = { Text("+1시간", fontSize = 11.sp) }
             )
         }

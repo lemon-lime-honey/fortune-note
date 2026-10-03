@@ -622,6 +622,13 @@ fun ProfileDetailScreen(
                                 onTimeChange = { h, m ->
                                     predictiveTargetHour = h
                                     predictiveTargetMinute = m
+                                },
+                                onDateTimeChange = { y, m, d, h, min ->
+                                    predictiveTargetYear = y
+                                    predictiveTargetMonth = m
+                                    predictiveTargetDay = d
+                                    predictiveTargetHour = h
+                                    predictiveTargetMinute = min
                                 }
                             )
                             }
