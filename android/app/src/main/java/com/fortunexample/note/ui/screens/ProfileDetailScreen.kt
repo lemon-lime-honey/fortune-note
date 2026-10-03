@@ -24,7 +24,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -48,6 +50,7 @@ fun ProfileDetailScreen(
     onDelete: () -> Unit
 ) {
     val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
     var selectedDomainTab by remember { mutableStateOf(0) }
     var selectedVarga by remember { mutableStateOf("D1") }
@@ -126,16 +129,19 @@ fun ProfileDetailScreen(
 
     // 4. Lazy-load predictive suite only when user enters Western tab (tab index 1)
     LaunchedEffect(profile.id, predictiveTargetYear, selectedDomainTab) {
-        if (selectedDomainTab == 1 && predictiveData == null) {
+        if (selectedDomainTab == 1 && (predictiveData == null || predictiveData?.target_year != predictiveTargetYear)) {
             isPredictiveLoading = true
             FortuneApp.repository.calculateProfilePredictiveSuite(
                 profile.id,
                 predictiveTargetYear,
                 profile.birth_month,
                 profile.birth_day
-            ).onSuccess { predictiveData = it }
-                .onFailure { predictiveData = null }
-            isPredictiveLoading = false
+            ).onSuccess {
+                predictiveData = it
+                isPredictiveLoading = false
+            }.onFailure {
+                isPredictiveLoading = false
+            }
         }
     }
 
@@ -338,7 +344,38 @@ fun ProfileDetailScreen(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
-                                    Text("Planets & Points", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("Planets & Points", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                        IconButton(
+                                            onClick = {
+                                                val sb = StringBuilder()
+                                                sb.appendLine("[Western Tropical Chart - Planets & Points]")
+                                                sb.appendLine("Ascendant: ${String.format("%.2f°", westernChart.ascendant)} (${getSignName((westernChart.ascendant / 30.0).toInt() % 12)})")
+                                                sb.appendLine("Midheaven (MC): ${String.format("%.2f°", westernChart.midheaven)} (${getSignName((westernChart.midheaven / 30.0).toInt() % 12)})")
+                                                westernChart.planets.forEach { p ->
+                                                    val rx = if (p.is_retrograde) " [Rx]" else ""
+                                                    sb.appendLine("• ${p.name}$rx: ${String.format("%.2f°", p.sign_degree)} ${getSignName(p.sign_index)} · House ${p.house_number}")
+                                                }
+                                                westernChart.nodes.forEach { n ->
+                                                    sb.appendLine("• ${n.name}: ${String.format("%.2f°", n.sign_degree)} ${getSignName(n.sign_index)} · House ${n.house_number}")
+                                                }
+                                                clipboardManager.setText(AnnotatedString(sb.toString().trimEnd()))
+                                                Toast.makeText(context, "Planets & Points 복사 완료", Toast.LENGTH_SHORT).show()
+                                            },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.ContentCopy,
+                                                contentDescription = "Planets & Points 복사",
+                                                tint = TextSecondary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
                                     Spacer(modifier = Modifier.height(10.dp))
                                     westernChart.planets.forEach { p ->
                                         val rx = if (p.is_retrograde) " [Rx]" else ""
@@ -384,7 +421,32 @@ fun ProfileDetailScreen(
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("Major Aspects", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text("Major Aspects", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                            IconButton(
+                                                onClick = {
+                                                    val sb = StringBuilder()
+                                                    sb.appendLine("[Western Tropical Chart - Major Aspects]")
+                                                    westernChart.aspects.forEach { a ->
+                                                        sb.appendLine("• ${a.planet1} · ${a.planet2}: ${a.aspect_type} (Orb ${String.format("%.2f°", a.orb)})")
+                                                    }
+                                                    clipboardManager.setText(AnnotatedString(sb.toString().trimEnd()))
+                                                    Toast.makeText(context, "Major Aspects 복사 완료", Toast.LENGTH_SHORT).show()
+                                                },
+                                                modifier = Modifier.size(28.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.ContentCopy,
+                                                    contentDescription = "Major Aspects 복사",
+                                                    tint = TextSecondary,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        }
                                         Spacer(modifier = Modifier.height(10.dp))
                                         westernChart.aspects.forEach { a ->
                                             Row(
@@ -419,7 +481,6 @@ fun ProfileDetailScreen(
                                 isLoading = isPredictiveLoading,
                                 onYearChange = {
                                     predictiveTargetYear = it
-                                    predictiveData = null
                                 }
                             )
                             }

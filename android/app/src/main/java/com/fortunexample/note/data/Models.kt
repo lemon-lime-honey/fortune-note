@@ -410,6 +410,7 @@ data class SolarReturnData(
     val sun_longitude: Double,
     val ascendant: Double,
     val midheaven: Double,
+    val house_cusps: List<Double> = emptyList(),
     val planets: List<ProgressedBodyData> = emptyList()
 )
 
