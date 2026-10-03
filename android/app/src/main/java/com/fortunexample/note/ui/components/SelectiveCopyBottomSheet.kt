@@ -292,7 +292,7 @@ private fun generateSelectiveMarkdown(
         sb.append("- 성별: ${if (profile.gender == "male") "남성" else "여성"}\n")
         sb.append("- 출생 일시: ${profile.birth_year}-${String.format("%02d", profile.birth_month)}-${String.format("%02d", profile.birth_day)} ${String.format("%02d:%02d", profile.birth_hour, profile.birth_minute)} (현지 기준)\n")
         sb.append("- 관측 위치: 위도 ${String.format("%.4f°", profile.latitude)}, 경도 ${String.format("%.4f°", profile.longitude)}\n")
-        sb.append("- 시간대 보정: $timezoneId (UTC ${String.format("%+0.1f시간", utcOffsetHours)})\n")
+        sb.append("- 시간대 보정: $timezoneId (UTC ${String.format("%+.1f시간", utcOffsetHours)})\n")
         if (profile.notes.isNotEmpty()) {
             sb.append("- 비고: ${profile.notes}\n")
         }
@@ -328,7 +328,7 @@ private fun generateSelectiveMarkdown(
                     w.planets.forEach { p ->
                         val sign = ZODIAC_NAMES.getOrElse(p.sign_index % 12) { "" }
                         val rx = if (p.is_retrograde) " [Rx]" else ""
-                        val speedStr = String.format("%+0.2f°/day", p.speed)
+                        val speedStr = String.format("%+.2f°/day", p.speed)
                         sb.append("  * ${p.name}: ${String.format("%.2f°", p.longitude)} ($sign) - House ${p.house_number}$rx (Speed: $speedStr)\n")
                     }
                     sb.append("- Lunar Nodes:\n")

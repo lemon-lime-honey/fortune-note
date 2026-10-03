@@ -363,7 +363,7 @@ fun ProfileDetailScreen(
                                                 sb.appendLine("Midheaven (MC): ${String.format("%.2f°", westernChart.midheaven)} (${getSignName((westernChart.midheaven / 30.0).toInt() % 12)})")
                                                 westernChart.planets.forEach { p ->
                                                     val rx = if (p.is_retrograde) " [Rx]" else ""
-                                                    val speedStr = String.format("%+0.2f°/d", p.speed)
+                                                    val speedStr = String.format("%+.2f°/d", p.speed)
                                                     sb.appendLine("• ${p.name}$rx: ${String.format("%.2f°", p.sign_degree)} ${getSignName(p.sign_index)} · House ${p.house_number} · $speedStr")
                                                 }
                                                 westernChart.nodes.forEach { n ->
@@ -385,7 +385,7 @@ fun ProfileDetailScreen(
                                     Spacer(modifier = Modifier.height(10.dp))
                                     westernChart.planets.forEach { p ->
                                         val rx = if (p.is_retrograde) " [Rx]" else ""
-                                        val speedStr = String.format("%+0.2f°/d", p.speed)
+                                        val speedStr = String.format("%+.2f°/d", p.speed)
                                         Row(
                                             modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
                                             horizontalArrangement = Arrangement.SpaceBetween,
