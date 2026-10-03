@@ -770,6 +770,154 @@ pub fn find_transit_events(
     Ok(hits)
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InOrbTransitDay {
+    pub date_formatted: String,
+    pub jd: f64,
+    pub trigger_contacts: Vec<TransitContact>,
+    pub snapshot_planets: Vec<TransitPlanetSnapshot>,
+    pub all_active_transits: Vec<TransitContact>,
+}
+
+/// Scan every day within the bounded range and return complete transit snapshots
+/// for all dates where any transiting planet touches the target natal points within `orb_limit`.
+pub fn find_in_orb_transit_days(
+    query: &TransitSearchQuery,
+    natal_points: &[(&str, f64)],
+    orb_limit: f64,
+) -> Result<Vec<InOrbTransitDay>, String> {
+    let start_jd = calendar_to_jd(query.start_year, query.start_month, query.start_day as f64);
+    let end_jd = calendar_to_jd(query.end_year, query.end_month, (query.end_day as f64) + 0.9999);
+
+    if end_jd <= start_jd {
+        return Err("End date must be after start date".to_string());
+    }
+
+    let default_moving = vec![
+        "Saturn".to_string(),
+        "Jupiter".to_string(),
+        "Mars".to_string(),
+        "Sun".to_string(),
+        "Venus".to_string(),
+        "Mercury".to_string(),
+    ];
+    let moving_list = query.moving_bodies.as_ref().unwrap_or(&default_moving);
+
+    let aspect_defs: &[(&str, &[f64])] = &[
+        ("Conjunction", &[0.0]),
+        ("Sextile", &[60.0, 300.0]),
+        ("Square", &[90.0, 270.0]),
+        ("Trine", &[120.0, 240.0]),
+        ("Opposition", &[180.0]),
+    ];
+
+    let mut filtered_natal = Vec::new();
+    for &(name, lon) in natal_points {
+        if let Some(ref targets) = query.natal_targets {
+            if targets.iter().any(|t| t.eq_ignore_ascii_case(name)) {
+                filtered_natal.push((name, lon));
+            }
+        } else {
+            filtered_natal.push((name, lon));
+        }
+    }
+
+    let mut active_aspects = Vec::new();
+    for &(asp_name, targets) in aspect_defs {
+        if let Some(ref selected_asps) = query.aspect_types {
+            if selected_asps.iter().any(|s| s.eq_ignore_ascii_case(asp_name)) {
+                active_aspects.push((asp_name, targets));
+            }
+        } else {
+            active_aspects.push((asp_name, targets));
+        }
+    }
+
+    let mut moving_parsed = Vec::new();
+    for name in moving_list {
+        if let Some(b) = body_from_name(name) {
+            moving_parsed.push((name.clone(), b));
+        }
+    }
+
+    let mut result_days = Vec::new();
+    let mut cur_jd = start_jd + 0.5; // Noon UT1
+
+    while cur_jd <= end_jd {
+        let mut triggers = Vec::new();
+
+        for (m_name, vbody) in &moving_parsed {
+            if let Ok(m_lon) = get_body_tropical_lon(*vbody, cur_jd) {
+                for &(nat_name, nat_lon) in &filtered_natal {
+                    for &(asp_name, targets) in &active_aspects {
+                        for &target_sep in targets {
+                            let err = separation_error(m_lon, nat_lon, target_sep).abs();
+                            if err <= orb_limit {
+                                triggers.push(TransitContact {
+                                    transiting_planet: m_name.clone(),
+                                    transiting_longitude: m_lon,
+                                    natal_planet: nat_name.to_string(),
+                                    natal_longitude: nat_lon,
+                                    aspect_type: asp_name.to_string(),
+                                    orb: err,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if !triggers.is_empty() {
+            let (y, m, d, _, _, _) = jd_to_calendar(cur_jd);
+            if let Ok(ephem) = compute_ephemeris(y, m, d, 12, 0, 0.0, 0.0, 0.0) {
+                let mut snapshots = Vec::new();
+                for b in &ephem.bodies {
+                    let sign_idx = ((b.tropical_longitude / 30.0).floor() as u32) % 12;
+                    let sign_deg = b.tropical_longitude - (sign_idx as f64 * 30.0);
+                    snapshots.push(TransitPlanetSnapshot {
+                        name: b.name.clone(),
+                        tropical_longitude: b.tropical_longitude,
+                        speed: b.speed,
+                        is_retrograde: b.is_retrograde,
+                        sign_index: sign_idx,
+                        sign_degree: sign_deg,
+                    });
+                }
+
+                let mut all_transits = Vec::new();
+                for b in &ephem.bodies {
+                    for &(nat_name, nat_lon) in natal_points {
+                        if let Some((asp, orb)) = find_aspect(b.tropical_longitude, nat_lon, 2.0) {
+                            all_transits.push(TransitContact {
+                                transiting_planet: b.name.clone(),
+                                transiting_longitude: b.tropical_longitude,
+                                natal_planet: nat_name.to_string(),
+                                natal_longitude: nat_lon,
+                                aspect_type: asp.to_string(),
+                                orb,
+                            });
+                        }
+                    }
+                }
+
+                result_days.push(InOrbTransitDay {
+                    date_formatted: format!("{:04}-{:02}-{:02}", y, m, d),
+                    jd: cur_jd,
+                    trigger_contacts: triggers,
+                    snapshot_planets: snapshots,
+                    all_active_transits: all_transits,
+                });
+            }
+        }
+
+        cur_jd += 1.0;
+    }
+
+    Ok(result_days)
+}
+
+
 
 // ---------------------------------------------------------------------------
 // 6. Primary Directions (Ptolemaic / Placidean Equatorial Arc & Naibod Key)
@@ -1140,4 +1288,38 @@ mod tests {
             assert!(!hit.snapshot_planets.is_empty(), "Snapshot planets must be present");
         }
     }
+
+    #[test]
+    fn test_find_in_orb_transit_days() {
+        let query = TransitSearchQuery {
+            start_year: 2026,
+            start_month: 1,
+            start_day: 1,
+            end_year: 2026,
+            end_month: 3,
+            end_day: 31,
+            moving_bodies: Some(vec!["Sun".to_string(), "Mars".to_string()]),
+            natal_targets: Some(vec!["Jupiter".to_string()]),
+            aspect_types: Some(vec!["Conjunction".to_string(), "Trine".to_string()]),
+        };
+
+        let natal_points = [
+            ("Jupiter", 100.0),
+            ("Sun", 50.0),
+        ];
+
+        let days = find_in_orb_transit_days(&query, &natal_points, 1.0).expect("Search should succeed");
+        assert!(!days.is_empty(), "Expected qualifying days for Sun/Mars in 3 months within 1 degree");
+
+        for day in &days {
+            assert!(!day.trigger_contacts.is_empty());
+            for c in &day.trigger_contacts {
+                assert!(c.orb <= 1.0);
+                assert_eq!(c.natal_planet, "Jupiter");
+                assert!(c.transiting_planet == "Sun" || c.transiting_planet == "Mars");
+            }
+            assert!(!day.snapshot_planets.is_empty());
+        }
+    }
 }
+

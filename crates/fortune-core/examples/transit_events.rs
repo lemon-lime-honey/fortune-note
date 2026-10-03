@@ -1,14 +1,21 @@
 //! Bounded Range Transit Events Timeline CLI Tool.
 //!
-//! Searches exact transit aspect hits (orb = 0.00°) between transiting planets
-//! and natal points (Planets, ASC, MC) within a strictly bounded date range.
+//! Searches exact transit aspect hits (orb = 0.00°) or in-orb date windows (e.g. orb <= 1.0°)
+//! between transiting planets and natal points (Planets, ASC, MC) within a strictly bounded date range.
 //!
 //! Usage:
-//!   cargo run --example transit_events -- <birth_year> <birth_month> <birth_day> <birth_hour> <birth_minute> <latitude> <longitude> <start_year> <start_month> <start_day> <end_year> <end_month> <end_day> [moving_bodies] [natal_targets]
+//!   cargo run --example transit_events -- <birth_year> <birth_month> <birth_day> <birth_hour> <birth_minute> <latitude> <longitude> <start_year> <start_month> <start_day> <end_year> <end_month> <end_day> [moving_bodies] [natal_targets] [--orb <deg>]
 //!
-//! If no arguments are provided, defaults to a sample natal chart for the year 2026.
+//! Examples:
+//!   # 1. Exact transit hits timeline (Jupiter & Saturn to ASC & MC in 2026):
+//!   cargo run --example transit_events -- 1990 5 15 14 30 37.5665 126.9780 2026 1 1 2026 12 31 Saturn,Jupiter ASC,MC
+//!
+//!   # 2. Daily in-orb transit data where transit planets touch natal Jupiter within 1.0°:
+//!   cargo run --example transit_events -- 1990 5 15 14 30 37.5665 126.9780 2026 1 1 2026 12 31 Saturn,Jupiter,Mars Jupiter --orb 1.0
 
-use fortune_core::western::predictive::{find_transit_events, TransitSearchQuery};
+use fortune_core::western::predictive::{
+    find_in_orb_transit_days, find_transit_events, TransitSearchQuery,
+};
 use fortune_core::{calculate_fortune_western, FortuneCalculationInput, Gender, WesternHouseSystem};
 use std::env;
 
@@ -26,7 +33,24 @@ fn format_deg(deg: f64) -> String {
 }
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let raw_args: Vec<String> = env::args().collect();
+
+    // Check for --orb <val> flag
+    let mut orb_limit: Option<f64> = None;
+    let mut args: Vec<String> = Vec::new();
+    let mut skip_next = false;
+    for (i, arg) in raw_args.iter().enumerate() {
+        if skip_next {
+            skip_next = false;
+            continue;
+        }
+        if arg == "--orb" && i + 1 < raw_args.len() {
+            orb_limit = raw_args[i + 1].parse().ok();
+            skip_next = true;
+            continue;
+        }
+        args.push(arg.clone());
+    }
 
     let (
         birth_year, birth_month, birth_day, birth_hour, birth_minute,
@@ -51,13 +75,13 @@ fn main() {
         let em: u32 = args[12].parse().expect("Invalid end_month");
         let ed: u32 = args[13].parse().expect("Invalid end_day");
 
-        let moving = if args.len() > 14 {
+        let moving = if args.len() > 14 && !args[14].is_empty() && args[14] != "all" {
             Some(args[14].split(',').map(|s| s.trim().to_string()).collect())
         } else {
             None
         };
 
-        let targets = if args.len() > 15 {
+        let targets = if args.len() > 15 && !args[15].is_empty() && args[15] != "all" {
             Some(args[15].split(',').map(|s| s.trim().to_string()).collect())
         } else {
             None
@@ -68,7 +92,7 @@ fn main() {
         println!("===============================================================================");
         println!(" Bounded Range Transit Events Timeline CLI");
         println!("===============================================================================");
-        println!("Usage: cargo run --example transit_events -- <by> <bm> <bd> <bh> <bmin> <lat> <lon> <sy> <sm> <sd> <ey> <em > <ed> [moving] [targets]");
+        println!("Usage: cargo run --example transit_events -- <by> <bm> <bd> <bh> <bmin> <lat> <lon> <sy> <sm> <sd> <ey> <em > <ed> [moving] [targets] [--orb <deg>]");
         println!("(No arguments provided: Running with default 1990-05-15 Seoul Natal & 2026 Year Range)");
         println!("-------------------------------------------------------------------------------");
         (1990, 5, 15, 14, 30, 37.5665, 126.9780, 2026, 1, 1, 2026, 12, 31, None, None)
@@ -130,34 +154,88 @@ fn main() {
         ]),
     };
 
-    println!(
-        "Searching exact transit hits between {:04}-{:02}-{:02} and {:04}-{:02}-{:02}...",
-        start_year, start_month, start_day, end_year, end_month, end_day
-    );
-
-    let start_time = std::time::Instant::now();
-    let hits = find_transit_events(&query, &natal_points).expect("Search failed");
-    let elapsed = start_time.elapsed();
-
-    println!("Found {} exact transit events in {:.2?}:", hits.len(), elapsed);
-    println!();
-    println!("| Exact UTC Date/Time | Transiting Planet | Aspect | Natal Target | Tr Lon | Nat Lon | Status |");
-    println!("|---|---|---|---|---|---|---|");
-
-    for hit in &hits {
-        let rx_str = if hit.is_retrograde { "Rx" } else { "Direct" };
-        let speed_str = format!("{:+0.2}°/d", hit.moving_speed);
+    if let Some(orb) = orb_limit {
         println!(
-            "| {} | {:<10} | {:<11} | {:<12} | {} | {} | {} ({}) |",
-            hit.utc_date_time,
-            hit.moving_body,
-            hit.aspect_type,
-            hit.natal_point,
-            format_deg(hit.moving_longitude),
-            format_deg(hit.natal_longitude),
-            rx_str,
-            speed_str
+            "Scanning dates where transit planets touch target within {:.2}° between {:04}-{:02}-{:02} and {:04}-{:02}-{:02}...",
+            orb, start_year, start_month, start_day, end_year, end_month, end_day
         );
+
+        let start_time = std::time::Instant::now();
+        let days = find_in_orb_transit_days(&query, &natal_points, orb).expect("Search failed");
+        let elapsed = start_time.elapsed();
+
+        println!("Found {} qualifying transit dates in {:.2?}:", days.len(), elapsed);
+        println!();
+
+        for (idx, day) in days.iter().enumerate() {
+            println!("### [{:02}] Date: {} (JD: {:.2})", idx + 1, day.date_formatted, day.jd);
+            println!("* Trigger Contacts (orb <= {:.2}°):", orb);
+            for c in &day.trigger_contacts {
+                println!(
+                    "  - Tr {:<8} {:<11} Nat {:<8} (Orb: {:.2}° | Tr: {}, Nat: {})",
+                    c.transiting_planet,
+                    c.aspect_type,
+                    c.natal_planet,
+                    c.orb,
+                    format_deg(c.transiting_longitude),
+                    format_deg(c.natal_longitude)
+                );
+            }
+
+            println!("* Transit Planetary Positions on {}:", day.date_formatted);
+            for p in &day.snapshot_planets {
+                let rx_str = if p.is_retrograde { " [Rx]" } else { "" };
+                let speed_str = format!("{:+0.2}°/d", p.speed);
+                println!(
+                    "  • {:<8}{}: {} ({})",
+                    p.name,
+                    rx_str,
+                    format_deg(p.tropical_longitude),
+                    speed_str
+                );
+            }
+
+            if !day.all_active_transits.is_empty() {
+                println!("* All Active Natal Transits (Orb <= 2.0°):");
+                for t in &day.all_active_transits {
+                    println!(
+                        "  - Tr {:<8} {:<11} Nat {:<8} (Orb: {:.2}°)",
+                        t.transiting_planet, t.aspect_type, t.natal_planet, t.orb
+                    );
+                }
+            }
+            println!("-------------------------------------------------------------------------------");
+        }
+    } else {
+        println!(
+            "Searching exact transit hits between {:04}-{:02}-{:02} and {:04}-{:02}-{:02}...",
+            start_year, start_month, start_day, end_year, end_month, end_day
+        );
+
+        let start_time = std::time::Instant::now();
+        let hits = find_transit_events(&query, &natal_points).expect("Search failed");
+        let elapsed = start_time.elapsed();
+
+        println!("Found {} exact transit events in {:.2?}:", hits.len(), elapsed);
+        println!();
+        println!("| Exact UTC Date/Time | Transiting Planet | Aspect | Natal Target | Tr Lon | Nat Lon | Status |");
+        println!("|---|---|---|---|---|---|---|");
+
+        for hit in &hits {
+            let rx_str = if hit.is_retrograde { "Rx" } else { "Direct" };
+            let speed_str = format!("{:+0.2}°/d", hit.moving_speed);
+            println!(
+                "| {} | {:<10} | {:<11} | {:<12} | {} | {} | {} ({}) |",
+                hit.utc_date_time,
+                hit.moving_body,
+                hit.aspect_type,
+                hit.natal_point,
+                format_deg(hit.moving_longitude),
+                format_deg(hit.natal_longitude),
+                rx_str,
+                speed_str
+            );
+        }
     }
 
     println!();

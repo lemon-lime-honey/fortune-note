@@ -4,3 +4,6 @@ members = [
     "crates/fortune-core",
     "crates/fortune-backend",
 ]
+
+[profile.dev.package."*"]
+opt-level = 2
