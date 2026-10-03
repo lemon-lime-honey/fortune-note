@@ -66,7 +66,7 @@ fun WesternTraditionalSection(
     var isPartsExpanded by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        // 1. Planetary Hours & Radicality Card
+        // 1. Planetary Hours & Radicality Card (상하 2행 분리로 배지 잘림 방지)
         Card(
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
@@ -74,45 +74,44 @@ fun WesternTraditionalSection(
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
+                // 1행: 제목 + 복사 버튼
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("Planetary Hours & Radicality", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = if (traditional.planetary_hours.is_radical) VedicGreen.copy(alpha = 0.12f) else AstrologicalRed.copy(alpha = 0.12f)
-                        ) {
-                            Text(
-                                text = if (traditional.planetary_hours.is_radical) "Radical" else "Non-radical",
-                                color = if (traditional.planetary_hours.is_radical) VedicGreen else AstrologicalRed,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                maxLines = 1,
-                                softWrap = false,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
+                    SectionCopyButton(title = "Planetary Hours") {
+                        val sb = StringBuilder()
+                        sb.appendLine("[Planetary Hours & Radicality]")
+                        sb.appendLine("• Status: ${if (traditional.planetary_hours.is_radical) "Radical" else "Non-radical"}")
+                        sb.appendLine("• Day of ${traditional.planetary_hours.day_ruler} · Hour of ${traditional.planetary_hours.hour_ruler} (Hour ${traditional.planetary_hours.hour_number}, ${if (traditional.planetary_hours.is_day_hour) "Day" else "Night"})")
+                        sb.appendLine("• Reason: ${traditional.planetary_hours.radicality_reason}")
+                        if (traditional.planetary_hours.considerations.isNotEmpty()) {
+                            sb.appendLine("• Considerations Before Judgment:")
+                            traditional.planetary_hours.considerations.forEach { c -> sb.appendLine("  - $c") }
                         }
-                        SectionCopyButton(title = "Planetary Hours") {
-                            val sb = StringBuilder()
-                            sb.appendLine("[Planetary Hours & Radicality]")
-                            sb.appendLine("• Status: ${if (traditional.planetary_hours.is_radical) "Radical" else "Non-radical"}")
-                            sb.appendLine("• Day of ${traditional.planetary_hours.day_ruler} · Hour of ${traditional.planetary_hours.hour_ruler} (Hour ${traditional.planetary_hours.hour_number}, ${if (traditional.planetary_hours.is_day_hour) "Day" else "Night"})")
-                            sb.appendLine("• Reason: ${traditional.planetary_hours.radicality_reason}")
-                            if (traditional.planetary_hours.considerations.isNotEmpty()) {
-                                sb.appendLine("• Considerations Before Judgment:")
-                                traditional.planetary_hours.considerations.forEach { c -> sb.appendLine("  - $c") }
-                            }
-                            sb.toString().trimEnd()
-                        }
+                        sb.toString().trimEnd()
                     }
                 }
-                Spacer(modifier = Modifier.height(10.dp))
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // 2행: Radicality 배지 (단독 행으로 잘림 원천 차단)
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = if (traditional.planetary_hours.is_radical) VedicGreen.copy(alpha = 0.12f) else AstrologicalRed.copy(alpha = 0.12f)
+                ) {
+                    Text(
+                        text = if (traditional.planetary_hours.is_radical) "Radical" else "Non-radical",
+                        color = if (traditional.planetary_hours.is_radical) VedicGreen else AstrologicalRed,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "Day of ${traditional.planetary_hours.day_ruler} · Hour of ${traditional.planetary_hours.hour_ruler} (Hour ${traditional.planetary_hours.hour_number}, ${if (traditional.planetary_hours.is_day_hour) "Day" else "Night"})",
                     color = TextPrimary,
@@ -188,8 +187,6 @@ fun WesternTraditionalSection(
                             color = CelestialBlue,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            softWrap = false,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         )
                     }
@@ -204,8 +201,6 @@ fun WesternTraditionalSection(
                                 color = AstrologicalRed,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                softWrap = false,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
@@ -221,8 +216,6 @@ fun WesternTraditionalSection(
                                 color = AstrologicalRed,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                softWrap = false,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
@@ -334,8 +327,6 @@ fun WesternTraditionalSection(
                                                         color = if (isPositive) VedicGreen else AstrologicalRed,
                                                         fontSize = 10.sp,
                                                         fontWeight = FontWeight.SemiBold,
-                                                        maxLines = 1,
-                                                        softWrap = false,
                                                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
                                                     )
                                                 }
@@ -367,7 +358,7 @@ fun WesternTraditionalSection(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // 4. Fixed Star Conjunctions Card (Orb <= 1.5°)
+        // 4. Fixed Star Conjunctions Card (순수 수직 3단 컬럼 배치)
         Card(
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
@@ -406,7 +397,8 @@ fun WesternTraditionalSection(
                             sb.appendLine("  (None in orb)")
                         } else {
                             traditional.fixed_star_conjunctions.forEach { fs ->
-                                sb.appendLine("• ${fs.star_name} · ${fs.body_name} (Orb ${String.format("%.2f°", fs.orb)} · ${fs.nature})")
+                                sb.appendLine("• ${fs.star_name} · ${fs.body_name}")
+                                sb.appendLine("  - Orb ${String.format("%.2f°", fs.orb)} · Nature: ${fs.nature}")
                                 if (fs.meaning.isNotBlank()) {
                                     sb.appendLine("  - Meaning: ${fs.meaning}")
                                 }
@@ -431,28 +423,24 @@ fun WesternTraditionalSection(
                                         .fillMaxWidth()
                                         .padding(vertical = 6.dp)
                                 ) {
-                                    // 1단: 항성명 및 결합 천체
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "${fs.star_name} · ${fs.body_name}",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 13.sp,
-                                            color = TextPrimary
-                                        )
-                                        Text(
-                                            text = "Orb ${String.format("%.2f°", fs.orb)} · ${fs.nature}",
-                                            color = CelestialBlue,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
-                                    // 2단: 해석 및 의미
+                                    // 1행: 항성명 · 결합 천체
+                                    Text(
+                                        text = "${fs.star_name} · ${fs.body_name}",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = TextPrimary
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    // 2행: 오차 · 성질
+                                    Text(
+                                        text = "Orb ${String.format("%.2f°", fs.orb)} · Nature: ${fs.nature}",
+                                        color = CelestialBlue,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    // 3행: 전통 의미 및 해석
                                     if (fs.meaning.isNotBlank()) {
-                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Spacer(modifier = Modifier.height(2.dp))
                                         Text(
                                             text = fs.meaning,
                                             color = TextSecondary,
@@ -470,7 +458,7 @@ fun WesternTraditionalSection(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // 5. Arabic Parts & Cusp Almutens Card
+        // 5. Arabic Parts & Almutens Card (제목 축약 및 Almuten 중복 라벨 제거)
         Card(
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
@@ -490,16 +478,16 @@ fun WesternTraditionalSection(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text("Arabic Parts & House Cusp Almutens", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Text("Arabic Parts & Almutens", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                         Icon(
                             if (isPartsExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                             contentDescription = null,
                             tint = TextSecondary
                         )
                     }
-                    SectionCopyButton(title = "Arabic Parts") {
+                    SectionCopyButton(title = "Arabic Parts & Almutens") {
                         val sb = StringBuilder()
-                        sb.appendLine("[Arabic Parts & House Cusp Almutens]")
+                        sb.appendLine("[Arabic Parts & Almutens]")
                         sb.appendLine("Arabic Parts (Lots):")
                         traditional.arabic_parts.forEach { p ->
                             val s = ZODIAC_NAMES.getOrElse(p.sign_index % 12) { "" }
@@ -533,7 +521,7 @@ fun WesternTraditionalSection(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
                         Text("House Cusp Almutens:", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
                         traditional.house_almutens.forEach { ha ->
                             Row(
@@ -542,9 +530,9 @@ fun WesternTraditionalSection(
                                     .padding(vertical = 3.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(text = "House ${ha.house_number} Cusp", color = TextPrimary, fontSize = 12.sp)
+                                Text(text = "House ${ha.house_number}", color = TextPrimary, fontSize = 12.sp)
                                 Text(
-                                    text = "Almuten: ${ha.almuten} (${ha.almuten_score} pts)",
+                                    text = "${ha.almuten} (${ha.almuten_score} pts)",
                                     color = CelestialBlue,
                                     fontWeight = FontWeight.Medium,
                                     fontSize = 12.sp

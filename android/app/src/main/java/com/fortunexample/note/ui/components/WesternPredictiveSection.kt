@@ -348,7 +348,7 @@ private fun SecondaryProgressionCard(data: PredictiveSuiteData) {
                 val sb = StringBuilder()
                 sb.appendLine("[Secondary Progressions - ${data.target_year}년]")
                 sb.appendLine("• Progressed Date: ${sec.progressed_date_utc}")
-                sb.appendLine("• Progressed Lunar Phase: ${sec.progressed_lunar_phase}")
+                sb.appendLine("• Progressed Moon Phase: ${sec.progressed_lunar_phase}")
                 sb.appendLine("• Contacts to Natal Chart:")
                 if (sec.contacts.isEmpty()) {
                     sb.appendLine("  (None)")
@@ -360,20 +360,25 @@ private fun SecondaryProgressionCard(data: PredictiveSuiteData) {
                 sb.toString().trimEnd()
             }
         }
-        Text("Progressed Date: ${sec.progressed_date_utc} (${String.format("%.1f", sec.elapsed_tropical_years)} yrs elapsed)", color = TextSecondary, fontSize = 12.sp)
+        // 불필요한 Progressed Date 라벨 제거하고 날짜와 경과 연도만 명시
+        Text(
+            text = "${sec.progressed_date_utc} · ${String.format("%.1f", sec.elapsed_tropical_years)} yrs elapsed",
+            color = TextSecondary,
+            fontSize = 12.sp
+        )
         Spacer(modifier = Modifier.height(6.dp))
 
+        // 긴 중복 접두어 제거하여 배지 잘림 방지
+        val cleanPhase = sec.progressed_lunar_phase.removePrefix("Progressed ")
         Surface(
             shape = RoundedCornerShape(4.dp),
             color = CelestialBlue.copy(alpha = 0.1f)
         ) {
             Text(
-                text = "Progressed Moon Phase: ${sec.progressed_lunar_phase}",
+                text = "Moon Phase: $cleanPhase",
                 color = CelestialBlue,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                softWrap = false,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
             )
         }
@@ -402,6 +407,9 @@ private fun SecondaryProgressionCard(data: PredictiveSuiteData) {
 @Composable
 private fun PlanetaryReturnsCard(data: PredictiveSuiteData) {
     val sr = data.solar_return
+    var selectedPlanetIdx by remember { mutableStateOf(0) }
+    val planetOptions = listOf("Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn")
+
     if (sr == null) {
         Text("Planetary return data unavailable.", color = TextSecondary, fontSize = 12.sp)
         return
@@ -413,18 +421,16 @@ private fun PlanetaryReturnsCard(data: PredictiveSuiteData) {
     val mcDeg = getSignDegree(sr.midheaven)
 
     Column {
+        // 1행: 카드 제목과 복사 버튼
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text("Planetary Returns (Solar Return)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
-                Text("Return Year: ${sr.return_year} · Exact: ${sr.return_date_utc}", color = TextSecondary, fontSize = 11.sp)
-            }
+            Text("Planetary Returns", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = TextPrimary)
             SectionCopyButton(title = "Planetary Returns") {
                 val sb = StringBuilder()
-                sb.appendLine("[Planetary Returns (Solar Return) - ${sr.return_year}년]")
+                sb.appendLine("[Planetary Returns (${planetOptions[selectedPlanetIdx]}) - ${sr.return_year}년]")
                 sb.appendLine("• Return Moment: ${sr.return_date_utc}")
                 sb.appendLine("• ASC: ${String.format("%.2f°", ascDeg)} $ascSign (Abs: ${String.format("%.2f°", sr.ascendant)})")
                 sb.appendLine("• MC: ${String.format("%.2f°", mcDeg)} $mcSign (Abs: ${String.format("%.2f°", sr.midheaven)})")
@@ -448,6 +454,51 @@ private fun PlanetaryReturnsCard(data: PredictiveSuiteData) {
                 sb.toString().trimEnd()
             }
         }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // 행성 선택 칩 인터페이스
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            planetOptions.forEachIndexed { idx, pName ->
+                FilterChip(
+                    selected = selectedPlanetIdx == idx,
+                    onClick = { selectedPlanetIdx = idx },
+                    label = {
+                        Text(
+                            text = if (idx == 0) "$pName (Solar)" else pName,
+                            fontSize = 11.sp,
+                            fontWeight = if (selectedPlanetIdx == idx) FontWeight.Bold else FontWeight.Normal
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = CelestialBlue,
+                        selectedLabelColor = BackgroundWhite,
+                        containerColor = SurfaceLight,
+                        labelColor = TextSecondary
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = selectedPlanetIdx == idx,
+                        borderColor = BorderColor,
+                        selectedBorderColor = CelestialBlue
+                    )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // 중복 Return Year 라벨 제거하고 정확한 회귀 시각만 표시
+        Text(
+            text = "Exact Return Moment: ${sr.return_date_utc}",
+            color = TextSecondary,
+            fontSize = 12.sp
+        )
 
         Spacer(modifier = Modifier.height(10.dp))
 
@@ -538,10 +589,18 @@ private fun TransitsCard(data: PredictiveSuiteData) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Transits (${data.target_year})", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
+            Column {
+                Text("Transits (${data.target_year})", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
+                // 트랜짓 계산 기준 시점 명시 (생일 12:00 정오 스냅샷)
+                Text(
+                    text = "${data.target_year}-${String.format("%02d", data.target_month)}-${String.format("%02d", data.target_day)} 12:00 Local (Birthday)",
+                    color = TextSecondary,
+                    fontSize = 11.sp
+                )
+            }
             SectionCopyButton(title = "Transits") {
                 val sb = StringBuilder()
-                sb.appendLine("[Transits - ${data.target_year}년]")
+                sb.appendLine("[Transits - ${data.target_year}년 (${data.target_year}-${String.format("%02d", data.target_month)}-${String.format("%02d", data.target_day)} 12:00 Local)]")
                 if (data.transits.isEmpty()) {
                     sb.appendLine("  (No major aspects within 2° orb)")
                 } else {

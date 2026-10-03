@@ -109,12 +109,12 @@ fun WesternChartWheel(
                 val a1 = Math.toRadians(p1.longitude - chart.ascendant + 180.0)
                 val a2 = Math.toRadians(p2.longitude - chart.ascendant + 180.0)
                 val pos1 = Offset(
-                    center.x + (aspectRadius * 0.95f * cos(a1)).toFloat(),
-                    center.y - (aspectRadius * 0.95f * sin(a1)).toFloat()
+                    center.x + (innerRadius * cos(a1)).toFloat(),
+                    center.y - (innerRadius * sin(a1)).toFloat()
                 )
                 val pos2 = Offset(
-                    center.x + (aspectRadius * 0.95f * cos(a2)).toFloat(),
-                    center.y - (aspectRadius * 0.95f * sin(a2)).toFloat()
+                    center.x + (innerRadius * cos(a2)).toFloat(),
+                    center.y - (innerRadius * sin(a2)).toFloat()
                 )
 
                 val color = when (aspect.aspect_type) {
