@@ -155,7 +155,8 @@ pub fn calculate_fortune_western(
 ) -> Result<WesternCalculationOutput, String> {
     let (tz_res, ephem) = resolve_fortune_context(&input)?;
     let house_sys = input.western_house_system.unwrap_or_default();
-    let western = calculate_western(&ephem, input.latitude, house_sys);
+    let is_male = input.gender == Gender::Male;
+    let western = calculate_western(&ephem, input.latitude, house_sys, is_male);
 
     Ok(WesternCalculationOutput {
         timezone_id: tz_res.timezone_id,
@@ -185,7 +186,8 @@ pub fn calculate_fortune(
 ) -> Result<FortuneCalculationOutput, String> {
     let (tz_res, ephem) = resolve_fortune_context(&input)?;
     let house_sys = input.western_house_system.unwrap_or_default();
-    let western = calculate_western(&ephem, input.latitude, house_sys);
+    let is_male = input.gender == Gender::Male;
+    let western = calculate_western(&ephem, input.latitude, house_sys, is_male);
     let vedic = calculate_vedic(&ephem, input.latitude);
     let saju = calculate_saju(&ephem, input.year, input.longitude, input.gender)
         .map_err(|e| format!("Saju error: {}", e))?;
@@ -287,5 +289,37 @@ mod tests {
 
         let v_out = calculate_fortune_vedic(input).expect("vedic should succeed");
         assert_eq!(v_out.vedic.vargas.len(), 11);
+    }
+
+    #[test]
+    fn test_calculate_fortune_western_gender_part_of_marriage() {
+        let mut male_input = FortuneCalculationInput {
+            year: 1995,
+            month: 10,
+            day: 25,
+            hour: 14,
+            minute: 30,
+            second: 0.0,
+            latitude: 37.5665,
+            longitude: 126.9780,
+            gender: Gender::Male,
+            western_house_system: None,
+            timezone_id: Some("Asia/Seoul".to_string()),
+        };
+        let male_out = calculate_fortune_western(male_input.clone()).expect("male western should succeed");
+
+        male_input.gender = Gender::Female;
+        let female_out = calculate_fortune_western(male_input).expect("female western should succeed");
+
+        let male_parts = &male_out.western.traditional.unwrap().arabic_parts;
+        let female_parts = &female_out.western.traditional.unwrap().arabic_parts;
+
+        let male_marriage = male_parts.iter().find(|p| p.name == "Part of Marriage").unwrap();
+        let female_marriage = female_parts.iter().find(|p| p.name == "Part of Marriage").unwrap();
+
+        assert_ne!(
+            male_marriage.longitude, female_marriage.longitude,
+            "Male and female Part of Marriage must have different longitudes"
+        );
     }
 }

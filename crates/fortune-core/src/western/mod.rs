@@ -165,6 +165,7 @@ pub fn calculate_western(
     ephem: &EphemerisSnapshot,
     latitude: f64,
     system: WesternHouseSystem,
+    is_male: bool,
 ) -> WesternChart {
     let house_result = compute_houses(
         ephem.ramc,
@@ -365,7 +366,7 @@ pub fn calculate_western(
         saturn_lon,
         &cusps,
         is_day_chart,
-        true,
+        is_male,
     );
 
     // 3.9 Fixed Stars
@@ -414,7 +415,7 @@ mod tests {
         let ephem = compute_ephemeris(2024, 3, 20, 12, 0, 0.0, 51.5074, -0.1278) // London
             .expect("ephem should succeed");
 
-        let chart = calculate_western(&ephem, 51.5074, WesternHouseSystem::Regiomontanus);
+        let chart = calculate_western(&ephem, 51.5074, WesternHouseSystem::Regiomontanus, true);
 
         assert_eq!(chart.house_cusps.len(), 12);
         assert_eq!(chart.planets.len(), 7, "Strictly 7 classical planets in western chart");
@@ -433,7 +434,7 @@ mod tests {
         let ephem = compute_ephemeris(2024, 6, 21, 12, 0, 0.0, 70.0, 25.0)
             .expect("ephem should succeed");
 
-        let chart = calculate_western(&ephem, 70.0, WesternHouseSystem::Placidus);
+        let chart = calculate_western(&ephem, 70.0, WesternHouseSystem::Placidus, true);
         assert_eq!(chart.house_cusps.len(), 12);
         assert_eq!(chart.planets.len(), 7);
         assert_eq!(chart.nodes.len(), 2);
@@ -445,7 +446,7 @@ mod tests {
         let ephem = compute_ephemeris(2000, 1, 1, 3, 0, 0.0, 37.5665, 126.9780)
             .expect("ephem should succeed");
 
-        let chart = calculate_western(&ephem, 37.5665, WesternHouseSystem::Placidus);
+        let chart = calculate_western(&ephem, 37.5665, WesternHouseSystem::Placidus, true);
         let trad = chart.traditional.expect("traditional data should exist");
 
         // 1. Planetary Hours: Daytime on Saturday at noon
@@ -482,5 +483,31 @@ mod tests {
         assert!(star_names.contains(&"Scheat"));
         assert!(star_names.contains(&"Markab"));
         assert!(star_names.contains(&"Deneb Algedi"));
+    }
+
+    #[test]
+    fn test_lot_of_marriage_gender_branch() {
+        let ephem = compute_ephemeris(2000, 1, 1, 3, 0, 0.0, 37.5665, 126.9780)
+            .expect("ephem should succeed");
+
+        let male_chart = calculate_western(&ephem, 37.5665, WesternHouseSystem::Placidus, true);
+        let female_chart = calculate_western(&ephem, 37.5665, WesternHouseSystem::Placidus, false);
+
+        let male_parts = &male_chart.traditional.as_ref().unwrap().arabic_parts;
+        let female_parts = &female_chart.traditional.as_ref().unwrap().arabic_parts;
+
+        let male_marriage = male_parts.iter().find(|p| p.name == "Part of Marriage").unwrap();
+        let female_marriage = female_parts.iter().find(|p| p.name == "Part of Marriage").unwrap();
+
+        // Male formula: ASC + Venus - Saturn
+        // Female formula: ASC + Saturn - Venus
+        // They must differ unless Venus == Saturn
+        assert_ne!(male_marriage.longitude, female_marriage.longitude);
+        assert_eq!(
+            (male_marriage.longitude + female_marriage.longitude - 2.0 * male_chart.ascendant).rem_euclid(360.0).abs() < 1e-6
+                || (360.0 - (male_marriage.longitude + female_marriage.longitude - 2.0 * male_chart.ascendant).rem_euclid(360.0)).abs() < 1e-6,
+            true,
+            "Male and female marriage lots should be symmetric about the ascendant"
+        );
     }
 }
