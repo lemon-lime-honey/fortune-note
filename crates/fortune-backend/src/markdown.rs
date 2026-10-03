@@ -210,6 +210,57 @@ fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput) {
             }
         }
 
+        if !trad.cusp_dignities.is_empty() {
+            out.push_str("\n### House Cusp Dignities & Almutens\n");
+            out.push_str("| House | Cusp Degree | Domicile | Exaltation | Triplicity | Term | Face | Almuten (Score) |\n");
+            out.push_str("| :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n");
+            for cd in &trad.cusp_dignities {
+                let sign_name = ZODIAC_SIGNS[cd.sign_index as usize % 12];
+                let exalt_str = cd.exaltation.as_deref().unwrap_or("-");
+                out.push_str(&format!(
+                    "| H{:02} | {:.2}° ({}) | {} | {} | {} | {} | {} | **{}** ({}) |\n",
+                    cd.house_number, cd.sign_degree, sign_name,
+                    cd.domicile, exalt_str, cd.triplicity, cd.term, cd.face,
+                    cd.almuten, cd.almuten_score
+                ));
+            }
+        }
+
+        if !trad.mutual_receptions.is_empty() {
+            out.push_str("\n### Mutual Receptions\n");
+            for mr in &trad.mutual_receptions {
+                out.push_str(&format!("- [{}] {}\n", mr.reception_type, mr.description));
+            }
+        }
+
+        let has_perfection = !trad.perfection.translation_of_light.is_empty()
+            || !trad.perfection.collection_of_light.is_empty()
+            || !trad.perfection.besiegement.is_empty();
+
+        if has_perfection {
+            out.push_str("\n### Horary Perfection & Besiegement\n");
+            for tol in &trad.perfection.translation_of_light {
+                out.push_str(&format!("- [Translation of Light] {}\n", tol));
+            }
+            for col in &trad.perfection.collection_of_light {
+                out.push_str(&format!("- [Collection of Light] {}\n", col));
+            }
+            for bsg in &trad.perfection.besiegement {
+                out.push_str(&format!("- [Besiegement] {}\n", bsg));
+            }
+        }
+
+        if !trad.antiscia.is_empty() {
+            out.push_str("\n### Antiscia & Contra-Antiscia (Solstice Reflection)\n");
+            for a in &trad.antiscia {
+                let ant_sign = ZODIAC_SIGNS[a.antiscion_sign_index as usize % 12];
+                out.push_str(&format!(
+                    "- {}: Antiscion {:.2}° ({}) | Contra-Antiscion {:.2}°\n",
+                    a.body_name, a.antiscion_degree, ant_sign, a.contra_antiscion_longitude
+                ));
+            }
+        }
+
         if !trad.arabic_parts.is_empty() {
             out.push_str("\n### Arabic Parts\n");
             for part in &trad.arabic_parts {
