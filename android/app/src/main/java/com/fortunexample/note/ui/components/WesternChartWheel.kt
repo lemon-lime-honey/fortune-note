@@ -76,11 +76,11 @@ fun WesternChartWheel(
             val angleRad = Math.toRadians(cuspDeg - chart.ascendant + 180.0)
             val start = Offset(
                 center.x + (aspectRadius * cos(angleRad)).toFloat(),
-                center.y + (aspectRadius * sin(angleRad)).toFloat()
+                center.y - (aspectRadius * sin(angleRad)).toFloat()
             )
             val end = Offset(
                 center.x + (outerRadius * cos(angleRad)).toFloat(),
-                center.y + (outerRadius * sin(angleRad)).toFloat()
+                center.y - (outerRadius * sin(angleRad)).toFloat()
             )
             val isAxis = (i == 0 || i == 9)
             val strokeColor = if (isAxis) AccentPrimary else TextSecondary.copy(alpha = 0.45f)
@@ -97,7 +97,7 @@ fun WesternChartWheel(
             val midAngleRad = Math.toRadians(cuspDeg + span / 2.0 - chart.ascendant + 180.0)
             val numRadius = (innerRadius + aspectRadius) / 2f
             val numX = center.x + (numRadius * cos(midAngleRad)).toFloat()
-            val numY = center.y + (numRadius * sin(midAngleRad)).toFloat() + 8f
+            val numY = center.y - (numRadius * sin(midAngleRad)).toFloat() + 8f
             drawContext.canvas.nativeCanvas.drawText("${i + 1}", numX, numY, houseNumPaint)
         }
 
@@ -110,11 +110,11 @@ fun WesternChartWheel(
                 val a2 = Math.toRadians(p2.longitude - chart.ascendant + 180.0)
                 val pos1 = Offset(
                     center.x + (aspectRadius * 0.95f * cos(a1)).toFloat(),
-                    center.y + (aspectRadius * 0.95f * sin(a1)).toFloat()
+                    center.y - (aspectRadius * 0.95f * sin(a1)).toFloat()
                 )
                 val pos2 = Offset(
                     center.x + (aspectRadius * 0.95f * cos(a2)).toFloat(),
-                    center.y + (aspectRadius * 0.95f * sin(a2)).toFloat()
+                    center.y - (aspectRadius * 0.95f * sin(a2)).toFloat()
                 )
 
                 val color = when (aspect.aspect_type) {
@@ -159,13 +159,13 @@ fun WesternChartWheel(
             val angleRad = Math.toRadians(body.longitude - chart.ascendant + 180.0)
             val dotPos = Offset(
                 center.x + (innerRadius * cos(angleRad)).toFloat(),
-                center.y + (innerRadius * sin(angleRad)).toFloat()
+                center.y - (innerRadius * sin(angleRad)).toFloat()
             )
             drawCircle(color = AccentPrimary, radius = 4f, center = dotPos)
 
             val textRadius = baseRadius + radialOffsets[idx]
             val textX = center.x + (textRadius * cos(angleRad)).toFloat()
-            val textY = center.y + (textRadius * sin(angleRad)).toFloat() + 10f
+            val textY = center.y - (textRadius * sin(angleRad)).toFloat() + 10f
 
             drawContext.canvas.nativeCanvas.drawText(body.symbol, textX, textY, symbolPaint)
             if (body.isRetrograde) {
