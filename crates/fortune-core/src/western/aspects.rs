@@ -63,9 +63,10 @@ pub fn calculate_traditional_aspects(
 
                     let rel_speed = f_speed - s_speed;
 
-                    // Compute future angle distance in 1 day to see if gap to target_angle is closing
-                    let future_f_lon = (f_lon + f_speed).rem_euclid(360.0);
-                    let future_s_lon = (s_lon + s_speed).rem_euclid(360.0);
+                    // Compute future angle distance in small time step (0.01 day) to evaluate instantaneous approach
+                    let dt = 0.01;
+                    let future_f_lon = (f_lon + f_speed * dt).rem_euclid(360.0);
+                    let future_s_lon = (s_lon + s_speed * dt).rem_euclid(360.0);
                     let future_diff = (future_f_lon - future_s_lon).abs();
                     let future_shortest = if future_diff > 180.0 { 360.0 - future_diff } else { future_diff };
                     let future_orb = (future_shortest - target_angle).abs();
