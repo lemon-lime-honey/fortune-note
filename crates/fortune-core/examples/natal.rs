@@ -164,6 +164,7 @@ fn main() {
         latitude,
         longitude,
         gender,
+        western_house_system: None,
     };
 
     let output = match calculate_fortune(input) {

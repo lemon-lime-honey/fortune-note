@@ -21,7 +21,10 @@ pub use vedic::{
     calculate_varga_sign, calculate_varga_sign_and_degree, calculate_vedic, DashaPeriodInfo,
     VargaChart, VargaDivision, VargaPlacement, VedicChart, VedicPlanet,
 };
-pub use western::{calculate_western, WesternAspect, WesternChart, WesternHouseSystem, WesternNode, WesternPlanet};
+pub use western::{
+    calculate_western, WesternAspect, WesternChart, WesternHouseSystem, WesternNode, WesternPlanet,
+    WesternTraditionalData,
+};
 
 /// Unified input structure for fortune calculation.
 ///
@@ -37,6 +40,8 @@ pub struct FortuneCalculationInput {
     pub latitude: f64,
     pub longitude: f64,
     pub gender: Gender,
+    #[serde(default)]
+    pub western_house_system: Option<WesternHouseSystem>,
 }
 
 /// Unified output structure containing decoupled domain results and resolved timezone metadata.
@@ -86,7 +91,8 @@ pub fn calculate_fortune(
     )
     .map_err(|e| format!("Ephemeris error: {}", e))?;
 
-    let western = calculate_western(&ephem, input.latitude, WesternHouseSystem::Placidus);
+    let house_sys = input.western_house_system.unwrap_or(WesternHouseSystem::Placidus);
+    let western = calculate_western(&ephem, input.latitude, house_sys);
     let vedic = calculate_vedic(&ephem, input.latitude);
     let saju = calculate_saju(&ephem, input.year, input.longitude, input.gender)
         .map_err(|e| format!("Saju error: {}", e))?;
@@ -127,6 +133,7 @@ mod tests {
             latitude: 37.5665,
             longitude: 126.9780,
             gender: Gender::Male,
+            western_house_system: None,
         };
 
         let output = calculate_fortune(input).expect("calculation should succeed");
