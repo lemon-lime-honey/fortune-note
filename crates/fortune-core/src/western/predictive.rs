@@ -332,8 +332,41 @@ pub fn calculate_secondary_progressions(
 }
 
 // ---------------------------------------------------------------------------
-// 4. Solar Return (Exact Newton-Raphson solver at natal coordinates)
+// 4. Solar & Planetary Returns (Exact Solver at Natal Coordinates)
 // ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReturnAspectContact {
+    pub return_point: String,
+    pub return_longitude: f64,
+    pub natal_point: String,
+    pub natal_longitude: f64,
+    pub aspect_type: String,
+    pub orb: f64,
+}
+
+pub fn compute_return_natal_aspects(
+    return_points: &[(&str, f64)],
+    natal_points: &[(&str, f64)],
+    max_orb: f64,
+) -> Vec<ReturnAspectContact> {
+    let mut contacts = Vec::new();
+    for &(ret_name, ret_lon) in return_points {
+        for &(nat_name, nat_lon) in natal_points {
+            if let Some((asp, orb)) = find_aspect(ret_lon, nat_lon, max_orb) {
+                contacts.push(ReturnAspectContact {
+                    return_point: ret_name.to_string(),
+                    return_longitude: ret_lon,
+                    natal_point: nat_name.to_string(),
+                    natal_longitude: nat_lon,
+                    aspect_type: asp.to_string(),
+                    orb,
+                });
+            }
+        }
+    }
+    contacts
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SolarReturnResult {
@@ -345,10 +378,29 @@ pub struct SolarReturnResult {
     pub midheaven: f64,
     pub house_cusps: [f64; 12],
     pub planets: Vec<ProgressedBody>,
+    #[serde(default)]
+    pub natal_aspects: Vec<ReturnAspectContact>,
 }
 
-/// Core solar return calculation when natal Sun longitude is already known.
-pub fn calculate_solar_return_with_natal_sun(
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlanetaryReturnResult {
+    pub target_year: i32,
+    pub return_body: String,
+    pub return_date_utc: String,
+    pub exact_jd_ut1: f64,
+    pub body_longitude: f64,
+    pub is_retrograde: bool,
+    pub speed: f64,
+    pub ascendant: f64,
+    pub midheaven: f64,
+    pub house_cusps: [f64; 12],
+    pub return_planets: Vec<ProgressedBody>,
+    pub natal_aspects: Vec<ReturnAspectContact>,
+    pub return_internal_aspects: Vec<PredictiveAspect>,
+}
+
+/// Core solar return calculation with optional natal aspects computation.
+pub fn calculate_solar_return_with_natal_sun_detailed(
     birth_year: i32,
     birth_month: u32,
     birth_day: u32,
@@ -360,6 +412,7 @@ pub fn calculate_solar_return_with_natal_sun(
     target_year: i32,
     target_sun_lon: f64,
     house_system: Option<vedaksha::astro::houses::HouseSystem>,
+    natal_points: Option<&[(&str, f64)]>,
 ) -> Result<SolarReturnResult, String> {
     // 1. Resolve exact natal UTC timestamp
     let tz_res = resolve_local_to_utc(
@@ -391,7 +444,7 @@ pub fn calculate_solar_return_with_natal_sun(
         h_sys,
     );
 
-    let planets = final_ephem.bodies.iter().map(|b| {
+    let planets: Vec<ProgressedBody> = final_ephem.bodies.iter().map(|b| {
         let lon = b.tropical_longitude;
         let sign_index = (lon / 30.0).floor() as u8 % 12;
         let sign_degree = lon - (sign_index as f64 * 30.0);
@@ -404,6 +457,17 @@ pub fn calculate_solar_return_with_natal_sun(
         }
     }).collect();
 
+    let mut natal_aspects = Vec::new();
+    if let Some(nat_pts) = natal_points {
+        let mut ret_points = Vec::with_capacity(planets.len() + 2);
+        ret_points.push(("ASC", house_result.asc));
+        ret_points.push(("MC", house_result.mc));
+        for p in &planets {
+            ret_points.push((p.name.as_str(), p.progressed_longitude));
+        }
+        natal_aspects = compute_return_natal_aspects(&ret_points, nat_pts, 2.0);
+    }
+
     Ok(SolarReturnResult {
         return_year: target_year,
         return_date_utc: format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02} UTC", ry, rm, rd, rh, rmin, rs.round() as u32 % 60),
@@ -413,7 +477,27 @@ pub fn calculate_solar_return_with_natal_sun(
         midheaven: house_result.mc,
         house_cusps: house_result.cusps,
         planets,
+        natal_aspects,
     })
+}
+
+pub fn calculate_solar_return_with_natal_sun(
+    birth_year: i32,
+    birth_month: u32,
+    birth_day: u32,
+    birth_hour: u32,
+    birth_minute: u32,
+    birth_second: f64,
+    latitude: f64,
+    longitude: f64,
+    target_year: i32,
+    target_sun_lon: f64,
+    house_system: Option<vedaksha::astro::houses::HouseSystem>,
+) -> Result<SolarReturnResult, String> {
+    calculate_solar_return_with_natal_sun_detailed(
+        birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_second,
+        latitude, longitude, target_year, target_sun_lon, house_system, None,
+    )
 }
 
 pub fn calculate_solar_return(
@@ -457,6 +541,220 @@ pub fn calculate_solar_return(
         house_system,
     )
 }
+
+/// Calculate planetary returns for any celestial body in a target year.
+/// Computes exact return moment(s), return chart placements, and aspects to natal points (including ASC and MC).
+pub fn calculate_planetary_return(
+    birth_year: i32,
+    birth_month: u32,
+    birth_day: u32,
+    birth_hour: u32,
+    birth_minute: u32,
+    birth_second: f64,
+    latitude: f64,
+    longitude: f64,
+    target_year: i32,
+    return_body_name: &str,
+    house_system: Option<vedaksha::astro::houses::HouseSystem>,
+    aspect_max_orb: Option<f64>,
+) -> Result<Vec<PlanetaryReturnResult>, String> {
+    let tz_res = resolve_local_to_utc(
+        birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_second,
+        latitude, longitude,
+    ).map_err(|e| format!("Timezone resolution failed: {}", e))?;
+
+    let birth_time_frac = (tz_res.utc_hour as f64 + (tz_res.utc_minute as f64 + tz_res.utc_second / 60.0) / 60.0) / 24.0;
+    let birth_utc_jd = calendar_to_jd(tz_res.utc_year, tz_res.utc_month, tz_res.utc_day as f64 + birth_time_frac);
+
+    let natal_ephem = compute_ephemeris(
+        tz_res.utc_year, tz_res.utc_month, tz_res.utc_day,
+        tz_res.utc_hour, tz_res.utc_minute, tz_res.utc_second,
+        latitude, longitude,
+    ).map_err(|e| format!("Natal ephemeris error: {}", e))?;
+
+    let h_sys = house_system.unwrap_or(vedaksha::astro::houses::HouseSystem::Regiomontanus);
+    let natal_house = vedaksha::astro::houses::compute_houses(
+        natal_ephem.ramc,
+        latitude,
+        natal_ephem.true_obliquity_deg,
+        h_sys,
+    );
+
+    let vbody = body_from_name(return_body_name)
+        .ok_or_else(|| format!("Unknown return celestial body: {}", return_body_name))?;
+
+    let natal_target_body = natal_ephem.bodies.iter().find(|b| {
+        b.name.eq_ignore_ascii_case(return_body_name)
+            || (return_body_name.eq_ignore_ascii_case("Rahu") && b.name == "Rahu")
+            || (return_body_name.eq_ignore_ascii_case("Ketu") && b.name == "Ketu")
+            || (return_body_name.eq_ignore_ascii_case("North Node") && b.name == "Rahu")
+            || (return_body_name.eq_ignore_ascii_case("South Node") && b.name == "Ketu")
+    }).ok_or_else(|| format!("Body {} not found in natal chart", return_body_name))?;
+    let natal_target_lon = natal_target_body.tropical_longitude;
+
+    let mut all_natal_points = Vec::with_capacity(natal_ephem.bodies.len() + 2);
+    all_natal_points.push(("ASC".to_string(), natal_house.asc));
+    all_natal_points.push(("MC".to_string(), natal_house.mc));
+    for b in &natal_ephem.bodies {
+        all_natal_points.push((b.name.clone(), b.tropical_longitude));
+    }
+
+    let mut exact_jds = Vec::new();
+
+    if return_body_name.eq_ignore_ascii_case("Sun") {
+        let approx_jd = birth_utc_jd + (target_year - birth_year) as f64 * 365.242_198_78;
+        let exact_jd = find_solar_longitude_moment(approx_jd, natal_target_lon)
+            .map_err(|e| format!("Solar return solver failed: {}", e))?;
+        exact_jds.push(exact_jd);
+    } else {
+        let start_jd = calendar_to_jd(target_year, 1, 1.0);
+        let end_jd = calendar_to_jd(target_year, 12, 31.9999);
+
+        let step_days = if return_body_name.eq_ignore_ascii_case("Moon") {
+            0.5
+        } else if return_body_name.eq_ignore_ascii_case("Mercury") || return_body_name.eq_ignore_ascii_case("Venus") {
+            1.0
+        } else {
+            2.0
+        };
+
+        let mut cur_t = start_jd;
+        let mut prev_lon = get_body_tropical_lon(vbody, cur_t)?;
+
+        while cur_t < end_jd {
+            let next_t = (cur_t + step_days).min(end_jd);
+            let next_lon = match get_body_tropical_lon(vbody, next_t) {
+                Ok(l) => l,
+                Err(_) => {
+                    cur_t = next_t;
+                    continue;
+                }
+            };
+
+            let e0 = separation_error(prev_lon, natal_target_lon, 0.0);
+            let e1 = separation_error(next_lon, natal_target_lon, 0.0);
+
+            if e0.abs() < 12.0 && e1.abs() < 12.0 && (e0 * e1 <= 0.0) && (e0 != e1) {
+                let mut left_t = cur_t;
+                let mut right_t = next_t;
+                for _ in 0..16 {
+                    let mid_t = (left_t + right_t) * 0.5;
+                    if let Ok(mid_lon) = get_body_tropical_lon(vbody, mid_t) {
+                        let mid_e = separation_error(mid_lon, natal_target_lon, 0.0);
+                        if mid_e.abs() < 1e-5 {
+                            left_t = mid_t;
+                            break;
+                        }
+                        let e_left = separation_error(get_body_tropical_lon(vbody, left_t).unwrap_or(prev_lon), natal_target_lon, 0.0);
+                        if e_left * mid_e <= 0.0 {
+                            right_t = mid_t;
+                        } else {
+                            left_t = mid_t;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                let cand_jd = left_t;
+                if !exact_jds.iter().any(|&u: &f64| (u - cand_jd).abs() < 0.25) {
+                    exact_jds.push(cand_jd);
+                }
+            }
+
+            cur_t = next_t;
+            prev_lon = next_lon;
+        }
+    }
+
+    let orb_limit = aspect_max_orb.unwrap_or(2.0);
+    let mut results = Vec::new();
+
+    for exact_jd in exact_jds {
+        let (ry, rm, rd, rh, rmin, rs) = jd_to_calendar(exact_jd);
+        let return_ephem = compute_ephemeris(ry, rm, rd, rh, rmin, rs, latitude, longitude)
+            .map_err(|e| format!("Return ephemeris calculation failed: {}", e))?;
+
+        let ret_house = vedaksha::astro::houses::compute_houses(
+            return_ephem.ramc,
+            latitude,
+            return_ephem.true_obliquity_deg,
+            h_sys,
+        );
+
+        let mut ret_planets = Vec::new();
+        let mut cur_body_lon = natal_target_lon;
+        let mut cur_body_spd = 0.0;
+        let mut cur_body_rx = false;
+
+        for b in &return_ephem.bodies {
+            let lon = b.tropical_longitude;
+            let sign_index = (lon / 30.0).floor() as u8 % 12;
+            let sign_degree = lon - (sign_index as f64 * 30.0);
+
+            if b.name.eq_ignore_ascii_case(return_body_name)
+                || (return_body_name.eq_ignore_ascii_case("Rahu") && b.name == "Rahu")
+                || (return_body_name.eq_ignore_ascii_case("Ketu") && b.name == "Ketu")
+                || (return_body_name.eq_ignore_ascii_case("North Node") && b.name == "Rahu")
+                || (return_body_name.eq_ignore_ascii_case("South Node") && b.name == "Ketu")
+            {
+                cur_body_lon = lon;
+                cur_body_spd = b.speed;
+                cur_body_rx = b.is_retrograde;
+            }
+
+            ret_planets.push(ProgressedBody {
+                name: b.name.clone(),
+                progressed_longitude: lon,
+                sign_index,
+                sign_degree,
+                is_retrograde: b.is_retrograde,
+            });
+        }
+
+        let mut all_ret_points = Vec::with_capacity(ret_planets.len() + 2);
+        all_ret_points.push(("ASC", ret_house.asc));
+        all_ret_points.push(("MC", ret_house.mc));
+        for p in &ret_planets {
+            all_ret_points.push((p.name.as_str(), p.progressed_longitude));
+        }
+
+        let nat_pts_ref: Vec<(&str, f64)> = all_natal_points.iter().map(|(n, l)| (n.as_str(), *l)).collect();
+        let natal_aspects = compute_return_natal_aspects(&all_ret_points, &nat_pts_ref, orb_limit);
+
+        let mut internal_aspects = Vec::new();
+        for i in 0..ret_planets.len() {
+            for j in (i + 1)..ret_planets.len() {
+                if let Some((asp, orb)) = find_aspect(ret_planets[i].progressed_longitude, ret_planets[j].progressed_longitude, orb_limit) {
+                    internal_aspects.push(PredictiveAspect {
+                        moving_body: ret_planets[i].name.clone(),
+                        natal_body: ret_planets[j].name.clone(),
+                        aspect_type: asp.to_string(),
+                        orb,
+                    });
+                }
+            }
+        }
+
+        results.push(PlanetaryReturnResult {
+            target_year,
+            return_body: natal_target_body.name.clone(),
+            return_date_utc: format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02} UTC", ry, rm, rd, rh, rmin, rs.round() as u32 % 60),
+            exact_jd_ut1: exact_jd,
+            body_longitude: cur_body_lon,
+            is_retrograde: cur_body_rx,
+            speed: cur_body_spd,
+            ascendant: ret_house.asc,
+            midheaven: ret_house.mc,
+            house_cusps: ret_house.cusps,
+            return_planets: ret_planets,
+            natal_aspects,
+            return_internal_aspects: internal_aspects,
+        });
+    }
+
+    Ok(results)
+}
+
 
 // ---------------------------------------------------------------------------
 // 5. Transits
@@ -1128,11 +1426,18 @@ pub fn calculate_predictive_suite(
         natal_planets,
     ).ok();
 
+    let mut all_natal_for_return = Vec::with_capacity(natal_planets.len() + 2);
+    all_natal_for_return.push(("ASC", natal_ascendant));
+    all_natal_for_return.push(("MC", natal_midheaven));
+    for &(name, lon) in natal_planets {
+        all_natal_for_return.push((name, lon));
+    }
+
     let natal_sun_lon = natal_planets.iter().find(|(name, _)| *name == "Sun").map(|(_, lon)| *lon);
     let solar_return = if let Some(sun_lon) = natal_sun_lon {
-        calculate_solar_return_with_natal_sun(
+        calculate_solar_return_with_natal_sun_detailed(
             birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_second,
-            latitude, longitude, target_year, sun_lon, house_system,
+            latitude, longitude, target_year, sun_lon, house_system, Some(&all_natal_for_return),
         ).ok()
     } else {
         calculate_solar_return(
@@ -1321,5 +1626,34 @@ mod tests {
             assert!(!day.snapshot_planets.is_empty());
         }
     }
+
+    #[test]
+    fn test_planetary_return_inter_chart_aspects() {
+        let returns = calculate_planetary_return(
+            1990, 5, 15, 14, 30, 0.0,
+            37.5665, 126.9780,
+            2026, "Sun",
+            None, Some(2.0),
+        ).expect("Solar return calculation should succeed");
+
+        assert_eq!(returns.len(), 1);
+        let sr = &returns[0];
+        assert_eq!(sr.return_body, "Sun");
+        assert_eq!(sr.target_year, 2026);
+        assert!(!sr.return_planets.is_empty());
+        assert!(!sr.natal_aspects.is_empty(), "Inter-chart aspects between Return and Natal must be computed");
+
+        let sun_conjunction = sr.natal_aspects.iter().find(|a| {
+            a.return_point == "Sun" && a.natal_point == "Sun" && a.aspect_type == "Conjunction"
+        });
+        assert!(sun_conjunction.is_some(), "Solar return must contain Return Sun Conjunction Natal Sun");
+        assert!(sun_conjunction.unwrap().orb < 0.01, "Sun conjunction orb must be near zero");
+
+        let has_axis_aspect = sr.natal_aspects.iter().any(|a| {
+            a.return_point == "ASC" || a.return_point == "MC" || a.natal_point == "ASC" || a.natal_point == "MC"
+        });
+        assert!(has_axis_aspect, "Inter-chart aspects must include ASC and MC contacts");
+    }
 }
+
 
