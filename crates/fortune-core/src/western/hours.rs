@@ -39,6 +39,91 @@ const DAY_RULERS: [ClassicalPlanet; 7] = [
     ClassicalPlanet::Saturn,  // Saturday
 ];
 
+/// Compute day ruler and hour ruler using astronomical hour angles and true sunrise/sunset.
+pub fn calculate_astronomical_planetary_hours(
+    jd_ut1: f64,
+    latitude: f64,
+    ramc: f64,
+    sun_longitude: f64,
+    obliquity_deg: f64,
+    asc_longitude: f64,
+    saturn_house: u8,
+    is_moon_voc: bool,
+    is_moon_via_combusta: bool,
+) -> PlanetaryHoursReport {
+    let sun_lon_rad = sun_longitude.to_radians();
+    let eps_rad = obliquity_deg.to_radians();
+    let lat_rad = latitude.to_radians();
+
+    // Equatorial coordinates of Sun
+    let sin_delta = eps_rad.sin() * sun_lon_rad.sin();
+    let cos_delta = (1.0 - sin_delta * sin_delta).max(0.0).sqrt();
+    let alpha_rad = (eps_rad.cos() * sun_lon_rad.sin()).atan2(sun_lon_rad.cos());
+    let alpha_deg = alpha_rad.to_degrees().rem_euclid(360.0);
+
+    // Standard solar altitude at sunrise/sunset: -50 arcminutes (-0.8333333°)
+    let h0_rad = (-0.833_333_3_f64).to_radians();
+    let cos_h0 = if lat_rad.cos() * cos_delta > 1e-7 {
+        (h0_rad.sin() - lat_rad.sin() * sin_delta) / (lat_rad.cos() * cos_delta)
+    } else {
+        0.0
+    };
+
+    let (semi_diurnal_deg, is_polar_day, is_polar_night) = if cos_h0 < -1.0 {
+        (180.0, true, false) // Midnight sun (all day)
+    } else if cos_h0 > 1.0 {
+        (0.0, false, true)  // Polar night (all night)
+    } else {
+        (cos_h0.clamp(-1.0, 1.0).acos().to_degrees(), false, false)
+    };
+
+    // Hour angle H = RAMC - Alpha, normalized to [-180°, +180°]
+    let mut h = (ramc - alpha_deg).rem_euclid(360.0);
+    if h > 180.0 {
+        h -= 360.0;
+    }
+
+    let (is_daytime, fraction, day_shift) = if is_polar_day {
+        let f = (h + 180.0) / 360.0;
+        (true, f.clamp(0.0, 0.999999), 0i64)
+    } else if is_polar_night {
+        let f = (h + 180.0) / 360.0;
+        (false, f.clamp(0.0, 0.999999), 0i64)
+    } else if h >= -semi_diurnal_deg && h <= semi_diurnal_deg {
+        // Daytime: from sunrise (-H0) to sunset (+H0)
+        let f = (h + semi_diurnal_deg) / (2.0 * semi_diurnal_deg);
+        (true, f.clamp(0.0, 0.999999), 0i64)
+    } else {
+        // Nighttime
+        let night_span = (360.0 - 2.0 * semi_diurnal_deg).max(0.1);
+        if h < -semi_diurnal_deg {
+            // Before sunrise (between midnight and sunrise): day ruler belongs to previous calendar day
+            let dist_from_sunset = (180.0 - semi_diurnal_deg) + (180.0 + h);
+            let f = dist_from_sunset / night_span;
+            (false, f.clamp(0.0, 0.999999), -1i64)
+        } else {
+            // After sunset (between sunset and midnight): day ruler belongs to today
+            let dist_from_sunset = h - semi_diurnal_deg;
+            let f = dist_from_sunset / night_span;
+            (false, f.clamp(0.0, 0.999999), 0i64)
+        }
+    };
+
+    // Calendar day of week: JD 0.0 was Monday (1). Sunday = 0, Monday = 1 ... Saturday = 6
+    let base_weekday = ((jd_ut1 + 1.5).floor() as i64).rem_euclid(7);
+    let astrological_weekday = (base_weekday + day_shift).rem_euclid(7) as u32;
+
+    calculate_planetary_hours(
+        astrological_weekday,
+        is_daytime,
+        fraction,
+        asc_longitude,
+        saturn_house,
+        is_moon_voc,
+        is_moon_via_combusta,
+    )
+}
+
 /// Compute day ruler and hour ruler for a given local time, weekday, and day/night fraction.
 pub fn calculate_planetary_hours(
     day_of_week: u32, // 0 = Sunday .. 6 = Saturday (starting at sunrise)

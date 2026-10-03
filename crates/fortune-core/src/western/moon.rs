@@ -44,14 +44,14 @@ pub fn evaluate_moon_condition(
     let is_waxing = elongation < 180.0;
 
     let lunar_phase_name = match elongation {
-        e if e < 45.0 => "New Moon (신월)",
-        e if e < 90.0 => "Waxing Crescent (초승달)",
-        e if e < 135.0 => "First Quarter (상현달)",
-        e if e < 180.0 => "Waxing Gibbous (차오르는 달)",
-        e if e < 225.0 => "Full Moon (보름달 / 만월)",
-        e if e < 270.0 => "Waning Gibbous (기우는 달)",
-        e if e < 315.0 => "Third Quarter (하현달)",
-        _ => "Waning Crescent (그믐달)",
+        e if e >= 337.5 || e < 22.5 => "New Moon",
+        e if e >= 22.5 && e < 67.5 => "Waxing Crescent",
+        e if e >= 67.5 && e < 112.5 => "First Quarter",
+        e if e >= 112.5 && e < 157.5 => "Waxing Gibbous",
+        e if e >= 157.5 && e < 202.5 => "Full Moon",
+        e if e >= 202.5 && e < 247.5 => "Waning Gibbous",
+        e if e >= 247.5 && e < 292.5 => "Third Quarter",
+        _ => "Waning Crescent",
     }.to_string();
 
     // Check for applying major aspects (0°, 60°, 90°, 120°, 180°) before leaving the sign

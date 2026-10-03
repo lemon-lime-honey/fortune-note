@@ -325,6 +325,12 @@ fn main() {
         if let Some(ref next_asp) = trad.moon_condition.next_applying_aspect {
             println!("    Next Applying Aspect: {}", next_asp);
         }
+        if let Some(ref san) = trad.prenatal_syzygy {
+            println!(
+                "  Prenatal Syzygy : {} at {} (UTC: {})",
+                san.syzygy_type, format_deg(san.longitude), san.exact_datetime_utc
+            );
+        }
 
         println!("  Essential Dignities & Lilly Scores:");
         for d in &trad.planet_dignities {

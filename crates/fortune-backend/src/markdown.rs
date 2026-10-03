@@ -129,6 +129,13 @@ fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput) {
         if let Some(ref next_asp) = trad.moon_condition.next_applying_aspect {
             out.push_str(&format!("  * Next Applying Aspect: {}\n", next_asp));
         }
+        if let Some(ref san) = trad.prenatal_syzygy {
+            let sign_name = ZODIAC_SIGNS[san.sign_index as usize % 12];
+            out.push_str(&format!(
+                "- Prenatal Syzygy (SAN): {} at {:.2}° ({}) on {}\n",
+                san.syzygy_type, san.longitude, sign_name, san.exact_datetime_utc
+            ));
+        }
 
         if !trad.planetary_hours.considerations.is_empty() {
             out.push_str("- Considerations Before Judgment:\n");

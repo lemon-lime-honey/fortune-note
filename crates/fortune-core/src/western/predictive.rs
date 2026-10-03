@@ -243,17 +243,15 @@ pub fn calculate_secondary_progressions(
     target_day: u32,
     natal_planets: &[(&str, f64)],
 ) -> Result<SecondaryProgressionResult, String> {
-    let birth_jd = calendar_to_jd(
-        birth_year,
-        birth_month,
-        birth_day as f64 + (birth_hour as f64 + (birth_minute as f64 + birth_second / 60.0) / 60.0) / 24.0,
-    );
+    let birth_time_fraction = (birth_hour as f64 + (birth_minute as f64 + birth_second / 60.0) / 60.0) / 24.0;
+    let birth_jd = calendar_to_jd(birth_year, birth_month, birth_day as f64 + birth_time_fraction);
 
-    let elapsed_years = (target_year - birth_year) as f64
-        + (target_month as f64 - birth_month as f64) / 12.0
-        + (target_day as f64 - birth_day as f64) / 365.2422;
+    let target_jd = calendar_to_jd(target_year, target_month, target_day as f64 + birth_time_fraction);
 
-    // 1 day = 1 tropical year
+    let elapsed_days = (target_jd - birth_jd).max(0.0);
+    // Standard secondary progression: 1 Ephemeris Day = 1 Mean Tropical Year (365.24219878 days)
+    let elapsed_years = elapsed_days / 365.242_198_78;
+
     let progressed_jd = birth_jd + elapsed_years;
     let (py, pm, pd, ph, pmin, ps) = jd_to_calendar(progressed_jd);
 
@@ -284,13 +282,13 @@ pub fn calculate_secondary_progressions(
     let mut elongation = prog_moon_lon - prog_sun_lon;
     if elongation < 0.0 { elongation += 360.0; }
     let progressed_lunar_phase = match elongation {
-        e if e < 45.0 => "Progressed New Moon",
-        e if e < 90.0 => "Progressed Crescent",
-        e if e < 135.0 => "Progressed First Quarter",
-        e if e < 180.0 => "Progressed Gibbous",
-        e if e < 225.0 => "Progressed Full Moon",
-        e if e < 270.0 => "Progressed Disseminating",
-        e if e < 315.0 => "Progressed Last Quarter",
+        e if e >= 337.5 || e < 22.5 => "Progressed New Moon",
+        e if e >= 22.5 && e < 67.5 => "Progressed Crescent",
+        e if e >= 67.5 && e < 112.5 => "Progressed First Quarter",
+        e if e >= 112.5 && e < 157.5 => "Progressed Gibbous",
+        e if e >= 157.5 && e < 202.5 => "Progressed Full Moon",
+        e if e >= 202.5 && e < 247.5 => "Progressed Disseminating",
+        e if e >= 247.5 && e < 292.5 => "Progressed Last Quarter",
         _ => "Progressed Balsamic",
     }.to_string();
 
@@ -329,6 +327,7 @@ pub struct SolarReturnResult {
     pub sun_longitude: f64,
     pub ascendant: f64,
     pub midheaven: f64,
+    pub house_cusps: [f64; 12],
     pub planets: Vec<ProgressedBody>,
 }
 
@@ -413,6 +412,7 @@ pub fn calculate_solar_return(
         sun_longitude: target_sun_lon,
         ascendant: house_result.asc,
         midheaven: house_result.mc,
+        house_cusps: house_result.cusps,
         planets,
     })
 }

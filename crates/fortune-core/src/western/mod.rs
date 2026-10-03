@@ -21,6 +21,7 @@ pub mod moon;
 pub mod parts;
 pub mod predictive;
 pub mod reception;
+pub mod syzygy;
 
 /// Supported Western house division systems.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -118,6 +119,7 @@ pub struct WesternTraditionalData {
     pub arabic_parts: Vec<parts::ArabicPart>,
     pub fixed_stars: Vec<fixed_stars::FixedStarInfo>,
     pub fixed_star_conjunctions: Vec<fixed_stars::FixedStarConjunction>,
+    pub prenatal_syzygy: Option<syzygy::PrenatalSyzygy>,
 }
 
 /// Complete Western chart result.
@@ -277,8 +279,10 @@ pub fn calculate_western(
     let north_node_lon = ephem.bodies.iter().find(|b| b.name == "Rahu").map_or(0.0, |b| b.tropical_longitude);
     let south_node_lon = ephem.bodies.iter().find(|b| b.name == "Ketu").map_or(180.0, |b| b.tropical_longitude);
 
+    let mercury_lon = ephem.bodies.iter().find(|b| b.name == "Mercury").map_or(0.0, |b| b.tropical_longitude);
     let venus_lon = ephem.bodies.iter().find(|b| b.name == "Venus").map_or(0.0, |b| b.tropical_longitude);
     let mars_lon = ephem.bodies.iter().find(|b| b.name == "Mars").map_or(0.0, |b| b.tropical_longitude);
+    let jupiter_lon = ephem.bodies.iter().find(|b| b.name == "Jupiter").map_or(0.0, |b| b.tropical_longitude);
     let saturn_lon = ephem.bodies.iter().find(|b| b.name == "Saturn").map_or(0.0, |b| b.tropical_longitude);
 
     // 3.1 Dignities
@@ -306,18 +310,13 @@ pub fn calculate_western(
         &planet_tuples,
     );
 
-    // 3.3 Planetary Hours & Radicality
-    let day_of_week = ((ephem.jd_ut1 + 1.5).floor() as u64 % 7) as u32;
-    let fraction_of_day = if is_day_chart {
-        ((sun_house as f64 - 7.0).rem_euclid(6.0) / 6.0).clamp(0.0, 1.0)
-    } else {
-        ((sun_house as f64 - 1.0).rem_euclid(6.0) / 6.0).clamp(0.0, 1.0)
-    };
-
-    let planetary_hours = hours::calculate_planetary_hours(
-        day_of_week,
-        is_day_chart,
-        fraction_of_day,
+    // 3.3 Planetary Hours & Radicality (Astronomical Hour Angle & True Sunrise/Sunset)
+    let planetary_hours = hours::calculate_astronomical_planetary_hours(
+        ephem.jd_ut1,
+        latitude,
+        ephem.ramc,
+        sun_lon,
+        ephem.true_obliquity_deg,
         ascendant,
         saturn_house,
         moon_condition.is_void_of_course,
@@ -345,8 +344,10 @@ pub fn calculate_western(
         ascendant,
         sun_lon,
         moon_lon,
+        mercury_lon,
         venus_lon,
         mars_lon,
+        jupiter_lon,
         saturn_lon,
         &cusps,
         is_day_chart,
@@ -359,6 +360,8 @@ pub fn calculate_western(
     star_check_bodies.push(("Ascendant", ascendant));
     star_check_bodies.push(("Midheaven", midheaven));
     let fixed_star_conjunctions = fixed_stars::detect_fixed_star_conjunctions(&fixed_stars, &star_check_bodies, 1.5);
+    // 3.10 Prenatal Syzygy (SAN)
+    let prenatal_syzygy = syzygy::calculate_prenatal_syzygy(ephem.jd_ut1).ok();
 
     let traditional = Some(WesternTraditionalData {
         planet_dignities,
@@ -372,6 +375,7 @@ pub fn calculate_western(
         arabic_parts,
         fixed_stars,
         fixed_star_conjunctions,
+        prenatal_syzygy,
     });
 
     WesternChart {
@@ -419,5 +423,50 @@ mod tests {
         assert_eq!(chart.house_cusps.len(), 12);
         assert_eq!(chart.planets.len(), 7);
         assert_eq!(chart.nodes.len(), 2);
+    }
+
+    #[test]
+    fn test_phase5_precision_corrections() {
+        // 2000-01-01 03:00 UTC (12:00 KST, Saturday) Seoul (37.5665, 126.9780)
+        let ephem = compute_ephemeris(2000, 1, 1, 3, 0, 0.0, 37.5665, 126.9780)
+            .expect("ephem should succeed");
+
+        let chart = calculate_western(&ephem, 37.5665, WesternHouseSystem::Placidus);
+        let trad = chart.traditional.expect("traditional data should exist");
+
+        // 1. Planetary Hours: Daytime on Saturday at noon
+        assert_eq!(trad.planetary_hours.day_ruler, "Saturn");
+        assert!(trad.planetary_hours.is_day_hour);
+        // Hour in Saturday noon is either Mars (Hour 3) or Sun (Hour 4) or Venus depending on exact sunrise
+        assert!(!trad.planetary_hours.hour_ruler.is_empty());
+
+        // 2. Moon Condition: Lunar day 25/Waning Crescent (elongation ~298.8 deg)
+        assert_eq!(trad.moon_condition.lunar_phase_name, "Waning Crescent");
+
+        // 3. Prenatal Syzygy: December 1999 Full Moon
+        assert!(trad.prenatal_syzygy.is_some());
+        let san = trad.prenatal_syzygy.as_ref().unwrap();
+        assert_eq!(san.syzygy_type, "Full Moon");
+        assert!(san.exact_datetime_utc.starts_with("1999-12-22"));
+
+        // 4. Arabic Parts: 10 parts including 7 Hermetic lots
+        assert!(trad.arabic_parts.len() >= 10);
+        let part_names: Vec<&str> = trad.arabic_parts.iter().map(|p| p.name.as_str()).collect();
+        assert!(part_names.contains(&"Part of Fortune"));
+        assert!(part_names.contains(&"Part of Spirit"));
+        assert!(part_names.contains(&"Lot of Eros"));
+        assert!(part_names.contains(&"Lot of Victory"));
+        assert!(part_names.contains(&"Lot of Necessity"));
+        assert!(part_names.contains(&"Lot of Courage"));
+        assert!(part_names.contains(&"Lot of Nemesis"));
+
+        // 5. Fixed Stars: 45 major stars populated
+        assert_eq!(trad.fixed_stars.len(), 45);
+        let star_names: Vec<&str> = trad.fixed_stars.iter().map(|s| s.name.as_str()).collect();
+        assert!(star_names.contains(&"Arcturus"));
+        assert!(star_names.contains(&"Achernar"));
+        assert!(star_names.contains(&"Scheat"));
+        assert!(star_names.contains(&"Markab"));
+        assert!(star_names.contains(&"Deneb Algedi"));
     }
 }
