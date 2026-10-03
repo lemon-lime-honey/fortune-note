@@ -81,6 +81,22 @@ fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput) {
         chart.western.midheaven, ZODIAC_SIGNS[mc_sign]
     ));
     out.push_str(&format!("- House System: {}\n", chart.western.house_system.display_name()));
+    out.push_str("- House Cusps (12 Cusps):\n");
+    for (i, cusp) in chart.western.house_cusps.iter().enumerate() {
+        let sign_idx = (cusp / 30.0).floor() as usize % 12;
+        let sign_deg = cusp - (sign_idx as f64 * 30.0);
+        let tag = match i + 1 {
+            1 => " (ASC)",
+            4 => " (IC)",
+            7 => " (DSC)",
+            10 => " (MC)",
+            _ => "",
+        };
+        out.push_str(&format!(
+            "  * House {:02}{}: {:.2}° ({})\n",
+            i + 1, tag, sign_deg, ZODIAC_SIGNS[sign_idx]
+        ));
+    }
     out.push_str("- Planetary Placements:\n");
     for p in &chart.western.planets {
         let sign_name = ZODIAC_SIGNS[p.sign_index as usize % 12];

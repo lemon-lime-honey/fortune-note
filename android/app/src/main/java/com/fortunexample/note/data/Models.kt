@@ -565,3 +565,13 @@ data class BackupPreview(
     val horaryCount: Int,
     val rawJson: String
 )
+
+val WESTERN_ZODIAC_SIGNS = listOf(
+    "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
+    "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"
+)
+
+fun getZodiacSignName(index: Int): String {
+    return WESTERN_ZODIAC_SIGNS.getOrElse(((index % 12) + 12) % 12) { "" }
+}
+

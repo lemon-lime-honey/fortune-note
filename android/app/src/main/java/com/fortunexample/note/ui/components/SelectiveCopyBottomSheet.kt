@@ -324,6 +324,23 @@ private fun generateSelectiveMarkdown(
                     sb.append("- Ascendant: ${String.format("%.2f°", w.ascendant)} ($ascSign)\n")
                     sb.append("- Midheaven (MC): ${String.format("%.2f°", w.midheaven)} ($mcSign)\n")
                     w.house_system?.let { sb.append("- House System: $it\n") }
+                    if (w.house_cusps.isNotEmpty()) {
+                        sb.append("- House Cusps (12 Cusps):\n")
+                        w.house_cusps.forEachIndexed { idx, cusp ->
+                            val hNum = idx + 1
+                            val signIdx = ((cusp / 30.0).toInt() % 12 + 12) % 12
+                            val signName = ZODIAC_NAMES.getOrElse(signIdx) { "" }
+                            val signDeg = cusp % 30.0
+                            val tag = when (hNum) {
+                                1 -> " (ASC)"
+                                4 -> " (IC)"
+                                7 -> " (DSC)"
+                                10 -> " (MC)"
+                                else -> ""
+                            }
+                            sb.append("  * House ${String.format("%02d", hNum)}$tag: ${String.format("%.2f°", signDeg)} ($signName)\n")
+                        }
+                    }
                     sb.append("- Planetary Placements:\n")
                     w.planets.forEach { p ->
                         val sign = ZODIAC_NAMES.getOrElse(p.sign_index % 12) { "" }

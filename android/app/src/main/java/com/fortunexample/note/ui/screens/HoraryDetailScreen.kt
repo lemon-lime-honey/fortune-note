@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fortunexample.note.data.FortuneChartOutput
 import com.fortunexample.note.data.HoraryDto
+import com.fortunexample.note.data.getZodiacSignName
 import com.fortunexample.note.ui.components.VedicChartDiamond
 import com.fortunexample.note.ui.components.WesternChartWheel
 import com.fortunexample.note.ui.components.WesternTraditionalSection
@@ -167,6 +168,105 @@ fun HoraryDetailScreen(
                     if (selectedTab == 0) {
                         WesternChartWheel(chart = chart.western)
                         Spacer(modifier = Modifier.height(16.dp))
+
+                        // 12 하우스 커스프 카드
+                        if (chart.western.house_cusps.isNotEmpty()) {
+                            Card(
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
+                                border = BorderStroke(1.dp, BorderColor),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    val houseSysName = chart.western.house_system ?: "Regiomontanus"
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "House Cusps ($houseSysName)",
+                                            color = TextPrimary,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp
+                                        )
+                                        IconButton(
+                                            onClick = {
+                                                val sb = StringBuilder()
+                                                sb.appendLine("[Horary Chart - House Cusps ($houseSysName)]")
+                                                chart.western.house_cusps.forEachIndexed { idx, deg ->
+                                                    val hNum = idx + 1
+                                                    val signIdx = ((deg / 30.0).toInt() % 12 + 12) % 12
+                                                    val signName = getZodiacSignName(signIdx)
+                                                    val signDeg = deg % 30.0
+                                                    val angleTag = when (hNum) {
+                                                        1 -> " (ASC)"
+                                                        4 -> " (IC)"
+                                                        7 -> " (DSC)"
+                                                        10 -> " (MC)"
+                                                        else -> ""
+                                                    }
+                                                    sb.appendLine("• House ${String.format("%02d", hNum)}$angleTag: ${String.format("%.2f°", signDeg)} $signName")
+                                                }
+                                                copyToClipboard("House Cusps", sb.toString().trimEnd(), "House Cusps 복사 완료")
+                                            },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.ContentCopy,
+                                                contentDescription = "House Cusps 복사",
+                                                tint = TextSecondary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    val chunks = chart.western.house_cusps.chunked(2)
+                                    chunks.forEachIndexed { rowIdx, pair ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 4.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            val h1 = rowIdx * 2 + 1
+                                            val deg1 = pair[0]
+                                            val sIdx1 = ((deg1 / 30.0).toInt() % 12 + 12) % 12
+                                            val s1 = getZodiacSignName(sIdx1)
+                                            val d1 = deg1 % 30.0
+                                            val tag1 = when (h1) { 1 -> " (ASC)"; 7 -> " (DSC)"; else -> "" }
+                                            Text(
+                                                text = "H$h1$tag1: ${String.format("%.1f°", d1)} $s1",
+                                                fontSize = 12.sp,
+                                                color = if (h1 == 1 || h1 == 7) CelestialBlue else TextPrimary,
+                                                fontWeight = if (h1 == 1 || h1 == 7) FontWeight.SemiBold else FontWeight.Normal,
+                                                modifier = Modifier.weight(1f)
+                                            )
+
+                                            if (pair.size > 1) {
+                                                val h2 = rowIdx * 2 + 2
+                                                val deg2 = pair[1]
+                                                val sIdx2 = ((deg2 / 30.0).toInt() % 12 + 12) % 12
+                                                val s2 = getZodiacSignName(sIdx2)
+                                                val d2 = deg2 % 30.0
+                                                val tag2 = when (h2) { 4 -> " (IC)"; 10 -> " (MC)"; else -> "" }
+                                                Text(
+                                                    text = "H$h2$tag2: ${String.format("%.1f°", d2)} $s2",
+                                                    fontSize = 12.sp,
+                                                    color = if (h2 == 4 || h2 == 10) CelestialBlue else TextPrimary,
+                                                    fontWeight = if (h2 == 4 || h2 == 10) FontWeight.SemiBold else FontWeight.Normal,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                            }
+                                        }
+                                        if (rowIdx < chunks.size - 1) {
+                                            HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
+                                        }
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(14.dp))
+                        }
 
                         Card(
                             shape = RoundedCornerShape(12.dp),
