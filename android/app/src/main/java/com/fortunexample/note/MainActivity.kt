@@ -140,24 +140,15 @@ class MainActivity : ComponentActivity() {
                         val id = backStackEntry.arguments?.getString("id") ?: return@composable
                         val profile = profiles.find { it.id == id }
                         var chart by remember { mutableStateOf<FortuneChartOutput?>(null) }
-                        var sajuMarkdown by remember { mutableStateOf<String?>(null) }
-                        var westernMarkdown by remember { mutableStateOf<String?>(null) }
-                        var vedicMarkdown by remember { mutableStateOf<String?>(null) }
 
                         LaunchedEffect(id) {
                             FortuneApp.repository.calculateProfileChart(id).onSuccess { chart = it }
-                            FortuneApp.repository.exportProfileSajuMarkdown(id).onSuccess { sajuMarkdown = it }
-                            FortuneApp.repository.exportProfileWesternMarkdown(id).onSuccess { westernMarkdown = it }
-                            FortuneApp.repository.exportProfileVedicMarkdown(id).onSuccess { vedicMarkdown = it }
                         }
 
                         if (profile != null) {
                             ProfileDetailScreen(
                                 profile = profile,
                                 chart = chart,
-                                sajuMarkdown = sajuMarkdown,
-                                westernMarkdown = westernMarkdown,
-                                vedicMarkdown = vedicMarkdown,
                                 onBack = { navController.popBackStack() },
                                 onEdit = { navController.navigate("profile_edit?id=$id") },
                                 onDelete = {

@@ -347,7 +347,8 @@ pub struct SolarReturnResult {
     pub planets: Vec<ProgressedBody>,
 }
 
-pub fn calculate_solar_return(
+/// Core solar return calculation when natal Sun longitude is already known.
+pub fn calculate_solar_return_with_natal_sun(
     birth_year: i32,
     birth_month: u32,
     birth_day: u32,
@@ -357,22 +358,13 @@ pub fn calculate_solar_return(
     latitude: f64,
     longitude: f64,
     target_year: i32,
+    target_sun_lon: f64,
 ) -> Result<SolarReturnResult, String> {
     // 1. Resolve exact natal UTC timestamp
     let tz_res = resolve_local_to_utc(
         birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_second,
         latitude, longitude,
     ).map_err(|e| format!("Timezone resolution failed: {}", e))?;
-
-    let natal_ephem = compute_ephemeris(
-        tz_res.utc_year, tz_res.utc_month, tz_res.utc_day,
-        tz_res.utc_hour, tz_res.utc_minute, tz_res.utc_second,
-        latitude, longitude,
-    ).map_err(|e| format!("Natal ephemeris error: {}", e))?;
-
-    let natal_sun = natal_ephem.get_body("Sun")
-        .ok_or_else(|| "Sun not found in natal ephemeris".to_string())?;
-    let target_sun_lon = natal_sun.tropical_longitude;
 
     // 2. Initial guess in target_year using exact birth UTC JD
     let birth_time_frac = (tz_res.utc_hour as f64 + (tz_res.utc_minute as f64 + tz_res.utc_second / 60.0) / 60.0) / 24.0;
@@ -420,6 +412,46 @@ pub fn calculate_solar_return(
         house_cusps: house_result.cusps,
         planets,
     })
+}
+
+pub fn calculate_solar_return(
+    birth_year: i32,
+    birth_month: u32,
+    birth_day: u32,
+    birth_hour: u32,
+    birth_minute: u32,
+    birth_second: f64,
+    latitude: f64,
+    longitude: f64,
+    target_year: i32,
+) -> Result<SolarReturnResult, String> {
+    // 1. Resolve exact natal UTC timestamp
+    let tz_res = resolve_local_to_utc(
+        birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_second,
+        latitude, longitude,
+    ).map_err(|e| format!("Timezone resolution failed: {}", e))?;
+
+    let natal_ephem = compute_ephemeris(
+        tz_res.utc_year, tz_res.utc_month, tz_res.utc_day,
+        tz_res.utc_hour, tz_res.utc_minute, tz_res.utc_second,
+        latitude, longitude,
+    ).map_err(|e| format!("Natal ephemeris error: {}", e))?;
+
+    let natal_sun = natal_ephem.get_body("Sun")
+        .ok_or_else(|| "Sun not found in natal ephemeris".to_string())?;
+
+    calculate_solar_return_with_natal_sun(
+        birth_year,
+        birth_month,
+        birth_day,
+        birth_hour,
+        birth_minute,
+        birth_second,
+        latitude,
+        longitude,
+        target_year,
+        natal_sun.tropical_longitude,
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -587,10 +619,18 @@ pub fn calculate_predictive_suite(
         natal_planets,
     ).ok();
 
-    let solar_return = calculate_solar_return(
-        birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_second,
-        latitude, longitude, target_year,
-    ).ok();
+    let natal_sun_lon = natal_planets.iter().find(|(name, _)| *name == "Sun").map(|(_, lon)| *lon);
+    let solar_return = if let Some(sun_lon) = natal_sun_lon {
+        calculate_solar_return_with_natal_sun(
+            birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_second,
+            latitude, longitude, target_year, sun_lon,
+        ).ok()
+    } else {
+        calculate_solar_return(
+            birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_second,
+            latitude, longitude, target_year,
+        ).ok()
+    };
 
     let transits = calculate_transits(
         target_year, target_month, target_day, 12, 0,

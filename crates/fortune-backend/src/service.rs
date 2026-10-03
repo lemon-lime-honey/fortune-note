@@ -10,8 +10,8 @@ use crate::models::{
 use crate::repository::{HoraryRepository, ProfileRepository};
 use chrono::Utc;
 use fortune_core::{
-    calculate_fortune, lookup_timezone_id, FortuneCalculationInput, FortuneCalculationOutput,
-    Gender, WesternHouseSystem,
+    calculate_fortune, compute_ephemeris, lookup_timezone_id, resolve_local_to_utc,
+    FortuneCalculationInput, FortuneCalculationOutput, Gender, WesternHouseSystem,
 };
 use uuid::Uuid;
 
@@ -247,11 +247,43 @@ impl FortuneBackendService {
         let profile = self
             .get_profile(id)?
             .ok_or_else(|| FortuneBackendError::NotFoundError(format!("Profile {} not found", id)))?;
-        let chart = self.calculate_profile_chart(id)?;
+
+        let tz_res = resolve_local_to_utc(
+            profile.birth_year,
+            profile.birth_month,
+            profile.birth_day,
+            profile.birth_hour,
+            profile.birth_minute,
+            0.0,
+            profile.latitude,
+            profile.longitude,
+        )
+        .map_err(|e| FortuneBackendError::CalculationError(format!("Timezone resolution error: {}", e)))?;
+
+        let ephem = compute_ephemeris(
+            tz_res.utc_year,
+            tz_res.utc_month,
+            tz_res.utc_day,
+            tz_res.utc_hour,
+            tz_res.utc_minute,
+            tz_res.utc_second,
+            profile.latitude,
+            profile.longitude,
+        )
+        .map_err(|e| FortuneBackendError::CalculationError(format!("Ephemeris error: {}", e)))?;
+
+        let house_result = fortune_core::western::compute_houses(
+            ephem.ramc,
+            profile.latitude,
+            ephem.true_obliquity_deg,
+            fortune_core::western::HouseSystem::Placidus,
+        );
 
         let mut natal_planets = Vec::new();
-        for p in &chart.western.planets {
-            natal_planets.push((p.name.as_str(), p.longitude));
+        for b in &ephem.bodies {
+            if b.name != "Rahu" && b.name != "Ketu" {
+                natal_planets.push((b.name.as_str(), b.tropical_longitude));
+            }
         }
 
         let suite = fortune_core::western::predictive::calculate_predictive_suite(
@@ -266,8 +298,8 @@ impl FortuneBackendService {
             target_year,
             target_month,
             target_day,
-            chart.western.ascendant,
-            chart.western.midheaven,
+            house_result.asc,
+            house_result.mc,
             &natal_planets,
         );
 

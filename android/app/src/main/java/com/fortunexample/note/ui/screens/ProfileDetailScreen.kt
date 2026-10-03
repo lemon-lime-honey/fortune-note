@@ -41,9 +41,6 @@ import com.fortunexample.note.ui.theme.*
 fun ProfileDetailScreen(
     profile: ProfileDto,
     chart: FortuneChartOutput?,
-    sajuMarkdown: String?,
-    westernMarkdown: String?,
-    vedicMarkdown: String?,
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -108,8 +105,15 @@ fun ProfileDetailScreen(
                     IconButton(onClick = onEdit) {
                         Icon(Icons.Default.Edit, contentDescription = "수정", tint = TextPrimary)
                     }
-                    IconButton(onClick = { showSelectiveCopySheet = true }) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = "데이터 선택 복사", tint = TextPrimary)
+                    IconButton(
+                        onClick = { showSelectiveCopySheet = true },
+                        enabled = chart != null
+                    ) {
+                        Icon(
+                            Icons.Default.ContentCopy,
+                            contentDescription = "데이터 선택 복사",
+                            tint = if (chart != null) TextPrimary else TextSecondary.copy(alpha = 0.35f)
+                        )
                     }
                     IconButton(onClick = onDelete) {
                         Icon(Icons.Default.Delete, contentDescription = "삭제", tint = AstrologicalRed)

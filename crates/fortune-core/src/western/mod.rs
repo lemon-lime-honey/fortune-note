@@ -7,7 +7,7 @@
 //! - William Lilly's Christian Astrology traditional domain engine
 
 use serde::{Deserialize, Serialize};
-use vedaksha::astro::houses::{compute_houses, HouseSystem};
+pub use vedaksha::astro::houses::{compute_houses, HouseSystem};
 
 use crate::ephemeris::EphemerisSnapshot;
 
