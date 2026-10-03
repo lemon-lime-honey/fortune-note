@@ -11,7 +11,7 @@ use crate::repository::{HoraryRepository, ProfileRepository};
 use chrono::Utc;
 use fortune_core::{
     calculate_fortune, lookup_timezone_id, FortuneCalculationInput, FortuneCalculationOutput,
-    Gender,
+    Gender, WesternHouseSystem,
 };
 use uuid::Uuid;
 
@@ -177,6 +177,14 @@ impl FortuneBackendService {
         &self,
         id: &str,
     ) -> Result<FortuneCalculationOutput, FortuneBackendError> {
+        self.calculate_profile_chart_with_house(id, None)
+    }
+
+    pub fn calculate_profile_chart_with_house(
+        &self,
+        id: &str,
+        house_system_name: Option<&str>,
+    ) -> Result<FortuneCalculationOutput, FortuneBackendError> {
         let profile = self
             .get_profile(id)?
             .ok_or_else(|| FortuneBackendError::NotFoundError(format!("Profile {} not found", id)))?;
@@ -186,6 +194,8 @@ impl FortuneBackendService {
         } else {
             Gender::Female
         };
+
+        let western_house_system = house_system_name.and_then(WesternHouseSystem::from_str_name);
 
         let input = FortuneCalculationInput {
             year: profile.birth_year,
@@ -197,6 +207,7 @@ impl FortuneBackendService {
             latitude: profile.latitude,
             longitude: profile.longitude,
             gender,
+            western_house_system,
         };
 
         calculate_fortune(input).map_err(FortuneBackendError::CalculationError)
@@ -224,6 +235,43 @@ impl FortuneBackendService {
             .ok_or_else(|| FortuneBackendError::NotFoundError(format!("Profile {} not found", id)))?;
         let chart = self.calculate_profile_chart(id)?;
         Ok(format_profile_vedic_markdown(&profile, &chart))
+    }
+
+    pub fn calculate_profile_predictive_suite(
+        &self,
+        id: &str,
+        target_year: i32,
+        target_month: u32,
+        target_day: u32,
+    ) -> Result<fortune_core::western::predictive::PredictiveSuite, FortuneBackendError> {
+        let profile = self
+            .get_profile(id)?
+            .ok_or_else(|| FortuneBackendError::NotFoundError(format!("Profile {} not found", id)))?;
+        let chart = self.calculate_profile_chart(id)?;
+
+        let mut natal_planets = Vec::new();
+        for p in &chart.western.planets {
+            natal_planets.push((p.name.as_str(), p.longitude));
+        }
+
+        let suite = fortune_core::western::predictive::calculate_predictive_suite(
+            profile.birth_year,
+            profile.birth_month,
+            profile.birth_day,
+            profile.birth_hour,
+            profile.birth_minute,
+            0.0,
+            profile.latitude,
+            profile.longitude,
+            target_year,
+            target_month,
+            target_day,
+            chart.western.ascendant,
+            chart.western.midheaven,
+            &natal_planets,
+        );
+
+        Ok(suite)
     }
 
     pub fn create_horary(
@@ -356,9 +404,21 @@ impl FortuneBackendService {
         &self,
         id: &str,
     ) -> Result<FortuneCalculationOutput, FortuneBackendError> {
+        self.calculate_horary_chart_with_house(id, Some("Regiomontanus"))
+    }
+
+    pub fn calculate_horary_chart_with_house(
+        &self,
+        id: &str,
+        house_system_name: Option<&str>,
+    ) -> Result<FortuneCalculationOutput, FortuneBackendError> {
         let item = self
             .get_horary(id)?
             .ok_or_else(|| FortuneBackendError::NotFoundError(format!("Horary {} not found", id)))?;
+
+        let western_house_system = house_system_name
+            .and_then(WesternHouseSystem::from_str_name)
+            .or(Some(WesternHouseSystem::Regiomontanus));
 
         let input = FortuneCalculationInput {
             year: item.query_year,
@@ -370,6 +430,7 @@ impl FortuneBackendService {
             latitude: item.latitude,
             longitude: item.longitude,
             gender: Gender::Male, // 호라리는 차트 자체의 하우스와 행성 배치 분석
+            western_house_system,
         };
 
         calculate_fortune(input).map_err(FortuneBackendError::CalculationError)
@@ -419,6 +480,7 @@ impl FortuneBackendService {
             latitude,
             longitude,
             gender,
+            western_house_system: None,
         };
         calculate_fortune(input).map_err(FortuneBackendError::CalculationError)
     }
@@ -651,7 +713,7 @@ mod tests {
             })
             .expect("profile1 failed");
 
-        let h1 = service1
+        let _h1 = service1
             .create_horary(CreateHoraryParams {
                 title: "이직 성공 여부".to_string(),
                 category: "career".to_string(),

@@ -112,6 +112,19 @@ impl FortuneClient {
         })
     }
 
+    pub fn calculate_profile_chart_with_house(
+        &self,
+        id: String,
+        house_system: Option<String>,
+    ) -> Result<String, FortuneBackendFfiError> {
+        let chart = self.service.calculate_profile_chart_with_house(&id, house_system.as_deref())?;
+        serde_json::to_string(&chart).map_err(|e| {
+            FortuneBackendFfiError::SerializationError {
+                detail: format!("Failed to serialize chart: {}", e),
+            }
+        })
+    }
+
     pub fn export_profile_saju_markdown(&self, id: String) -> Result<String, FortuneBackendFfiError> {
         Ok(self.service.export_profile_saju_markdown(&id)?)
     }
@@ -195,6 +208,98 @@ impl FortuneClient {
         serde_json::to_string(&chart).map_err(|e| {
             FortuneBackendFfiError::SerializationError {
                 detail: format!("Failed to serialize chart: {}", e),
+            }
+        })
+    }
+
+    pub fn calculate_horary_chart_with_house(
+        &self,
+        id: String,
+        house_system: Option<String>,
+    ) -> Result<String, FortuneBackendFfiError> {
+        let chart = self.service.calculate_horary_chart_with_house(&id, house_system.as_deref())?;
+        serde_json::to_string(&chart).map_err(|e| {
+            FortuneBackendFfiError::SerializationError {
+                detail: format!("Failed to serialize chart: {}", e),
+            }
+        })
+    }
+
+    pub fn calculate_annual_profection(
+        &self,
+        birth_year: i32,
+        target_year: i32,
+        natal_ascendant: f64,
+        natal_planets_json: String,
+    ) -> Result<String, FortuneBackendFfiError> {
+        let planets: Vec<(String, f64)> = serde_json::from_str(&natal_planets_json).map_err(|e| {
+            FortuneBackendFfiError::SerializationError {
+                detail: format!("Invalid planets JSON: {}", e),
+            }
+        })?;
+        let planet_tuples: Vec<(&str, f64)> = planets.iter().map(|(n, l)| (n.as_str(), *l)).collect();
+        let res = fortune_core::western::predictive::calculate_annual_profection(
+            birth_year,
+            target_year,
+            natal_ascendant,
+            &planet_tuples,
+        );
+        serde_json::to_string(&res).map_err(|e| {
+            FortuneBackendFfiError::SerializationError {
+                detail: format!("Failed to serialize profection: {}", e),
+            }
+        })
+    }
+
+    pub fn calculate_solar_arc(
+        &self,
+        birth_year: i32,
+        birth_month: u32,
+        birth_day: u32,
+        target_year: i32,
+        target_month: u32,
+        target_day: u32,
+        natal_planets_json: String,
+    ) -> Result<String, FortuneBackendFfiError> {
+        let planets: Vec<(String, f64)> = serde_json::from_str(&natal_planets_json).map_err(|e| {
+            FortuneBackendFfiError::SerializationError {
+                detail: format!("Invalid planets JSON: {}", e),
+            }
+        })?;
+        let planet_tuples: Vec<(&str, f64)> = planets.iter().map(|(n, l)| (n.as_str(), *l)).collect();
+        let (arc, directed) = fortune_core::western::predictive::calculate_solar_arc(
+            birth_year,
+            birth_month,
+            birth_day,
+            target_year,
+            target_month,
+            target_day,
+            &planet_tuples,
+        );
+        let res = serde_json::json!({
+            "solar_arc_degrees": arc,
+            "directed_planets": directed
+        });
+        serde_json::to_string(&res).map_err(|e| {
+            FortuneBackendFfiError::SerializationError {
+                detail: format!("Failed to serialize solar arc: {}", e),
+            }
+        })
+    }
+
+    pub fn calculate_profile_predictive_suite(
+        &self,
+        id: String,
+        target_year: i32,
+        target_month: u32,
+        target_day: u32,
+    ) -> Result<String, FortuneBackendFfiError> {
+        let suite = self.service.calculate_profile_predictive_suite(
+            &id, target_year, target_month, target_day,
+        )?;
+        serde_json::to_string(&suite).map_err(|e| {
+            FortuneBackendFfiError::SerializationError {
+                detail: format!("Failed to serialize predictive suite: {}", e),
             }
         })
     }
