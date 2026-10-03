@@ -30,6 +30,12 @@ private val ZODIAC_NAMES = listOf(
     "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"
 )
 
+private fun formatWesternBodyName(rawName: String): String {
+    return rawName
+        .replace("Rahu", "North Node")
+        .replace("Ketu", "South Node")
+}
+
 private fun getZodiacSign(lon: Double): String {
     val idx = ((lon % 360.0 + 360.0) % 360.0 / 30.0).toInt() % 12
     return ZODIAC_NAMES.getOrElse(idx) { "" }
@@ -237,6 +243,8 @@ private fun SectionCopyButton(
 @Composable
 private fun ProfectionCard(data: PredictiveSuiteData) {
     val prof = data.profection
+    val formattedPlanets = prof.active_natal_planets.map { formatWesternBodyName(it) }
+
     Column {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -249,9 +257,9 @@ private fun ProfectionCard(data: PredictiveSuiteData) {
                 sb.appendLine("[Annual Profections - ${data.target_year}년 (${data.age}세)]")
                 sb.appendLine("• Profected House: House ${prof.profected_house}")
                 sb.appendLine("• Profected Sign: ${prof.profected_sign_name}")
-                sb.appendLine("• Lord of the Year: ${prof.lord_of_the_year}")
-                if (prof.active_natal_planets.isNotEmpty()) {
-                    sb.appendLine("• Natal Planets in Sign: ${prof.active_natal_planets.joinToString(", ")}")
+                sb.appendLine("• Lord of the Year: ${formatWesternBodyName(prof.lord_of_the_year)}")
+                if (formattedPlanets.isNotEmpty()) {
+                    sb.appendLine("• Natal Planets in Sign: ${formattedPlanets.joinToString(", ")}")
                 }
                 sb.toString().trimEnd()
             }
@@ -264,13 +272,13 @@ private fun ProfectionCard(data: PredictiveSuiteData) {
         Spacer(modifier = Modifier.height(4.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("Lord of the Year", color = TextSecondary, fontSize = 13.sp)
-            Text(prof.lord_of_the_year, fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 13.sp)
+            Text(formatWesternBodyName(prof.lord_of_the_year), fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 13.sp)
         }
-        if (prof.active_natal_planets.isNotEmpty()) {
+        if (formattedPlanets.isNotEmpty()) {
             Spacer(modifier = Modifier.height(4.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Natal Planets in Sign", color = TextSecondary, fontSize = 13.sp)
-                Text(prof.active_natal_planets.joinToString(", "), fontWeight = FontWeight.Medium, color = VedicGreen, fontSize = 13.sp)
+                Text(formattedPlanets.joinToString(", "), fontWeight = FontWeight.Medium, color = VedicGreen, fontSize = 13.sp)
             }
         }
     }
@@ -295,7 +303,9 @@ private fun SolarArcCard(data: PredictiveSuiteData) {
                     sb.appendLine("  (None)")
                 } else {
                     arc.contacts.forEach { c ->
-                        sb.appendLine("  - ${c.moving_body} · ${c.natal_body} : ${c.aspect_type} (Orb ${String.format("%.2f°", c.orb)})")
+                        val moving = formatWesternBodyName(c.moving_body)
+                        val natal = formatWesternBodyName(c.natal_body)
+                        sb.appendLine("  - $moving · $natal : ${c.aspect_type} (Orb ${String.format("%.2f°", c.orb)})")
                     }
                 }
                 sb.toString().trimEnd()
@@ -310,13 +320,15 @@ private fun SolarArcCard(data: PredictiveSuiteData) {
             Text("Contacts to Natal Chart (Orb ≤ 1°):", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = TextPrimary)
             Spacer(modifier = Modifier.height(4.dp))
             arc.contacts.forEach { c ->
+                val moving = formatWesternBodyName(c.moving_body)
+                val natal = formatWesternBodyName(c.natal_body)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 3.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("${c.moving_body} · ${c.natal_body}", fontSize = 12.sp, color = TextPrimary)
+                    Text("$moving · $natal", fontSize = 12.sp, color = TextPrimary)
                     Text(
                         "${c.aspect_type} (Orb ${String.format("%.2f°", c.orb)})",
                         fontSize = 12.sp,
@@ -354,7 +366,9 @@ private fun SecondaryProgressionCard(data: PredictiveSuiteData) {
                     sb.appendLine("  (None)")
                 } else {
                     sec.contacts.forEach { c ->
-                        sb.appendLine("  - ${c.moving_body} · ${c.natal_body} : ${c.aspect_type} (Orb ${String.format("%.2f°", c.orb)})")
+                        val moving = formatWesternBodyName(c.moving_body)
+                        val natal = formatWesternBodyName(c.natal_body)
+                        sb.appendLine("  - $moving · $natal : ${c.aspect_type} (Orb ${String.format("%.2f°", c.orb)})")
                     }
                 }
                 sb.toString().trimEnd()
@@ -390,13 +404,15 @@ private fun SecondaryProgressionCard(data: PredictiveSuiteData) {
             Text("Contacts to Natal Chart:", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = TextPrimary)
             Spacer(modifier = Modifier.height(4.dp))
             sec.contacts.forEach { c ->
+                val moving = formatWesternBodyName(c.moving_body)
+                val natal = formatWesternBodyName(c.natal_body)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 3.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("${c.moving_body} · ${c.natal_body}", fontSize = 12.sp, color = TextPrimary)
+                    Text("$moving · $natal", fontSize = 12.sp, color = TextPrimary)
                     Text("${c.aspect_type} (Orb ${String.format("%.2f°", c.orb)})", fontSize = 12.sp, color = CelestialBlue, fontWeight = FontWeight.Medium)
                 }
             }
@@ -420,6 +436,9 @@ private fun PlanetaryReturnsCard(data: PredictiveSuiteData) {
     val mcSign = getZodiacSign(sr.midheaven)
     val mcDeg = getSignDegree(sr.midheaven)
 
+    val classicalPlanets = sr.planets.filter { it.name != "Rahu" && it.name != "Ketu" }
+    val lunarNodes = sr.planets.filter { it.name == "Rahu" || it.name == "Ketu" }
+
     Column {
         // 1행: 카드 제목과 복사 버튼
         Row(
@@ -442,13 +461,22 @@ private fun PlanetaryReturnsCard(data: PredictiveSuiteData) {
                         sb.appendLine("  - H${idx + 1}: ${String.format("%.2f°", d)} $s")
                     }
                 }
-                if (sr.planets.isNotEmpty()) {
-                    sb.appendLine("• Return Planets Placements:")
-                    sr.planets.forEach { p ->
+                if (classicalPlanets.isNotEmpty()) {
+                    sb.appendLine("• Return Planetary Placements:")
+                    classicalPlanets.forEach { p ->
                         val rx = if (p.is_retrograde) " [Rx]" else ""
                         val s = getZodiacSign(p.progressed_longitude)
                         val h = if (sr.house_cusps.isNotEmpty()) "House ${findHouseNumber(p.progressed_longitude, sr.house_cusps)}" else ""
                         sb.appendLine("  - ${p.name}$rx: ${String.format("%.2f°", p.sign_degree)} $s · $h")
+                    }
+                }
+                if (lunarNodes.isNotEmpty()) {
+                    sb.appendLine("• Return Lunar Nodes:")
+                    lunarNodes.forEach { n ->
+                        val displayName = formatWesternBodyName(n.name)
+                        val s = getZodiacSign(n.progressed_longitude)
+                        val h = if (sr.house_cusps.isNotEmpty()) "House ${findHouseNumber(n.progressed_longitude, sr.house_cusps)}" else ""
+                        sb.appendLine("  - $displayName: ${String.format("%.2f°", n.sign_degree)} $s · $h")
                     }
                 }
                 sb.toString().trimEnd()
@@ -551,12 +579,12 @@ private fun PlanetaryReturnsCard(data: PredictiveSuiteData) {
             }
         }
 
-        // Return Chart Full Planets Placements
-        if (sr.planets.isNotEmpty()) {
+        // 7대 고전 행성 배치 표
+        if (classicalPlanets.isNotEmpty()) {
             Spacer(modifier = Modifier.height(10.dp))
-            Text("Return Planets Placements", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = TextPrimary)
+            Text("Return Planetary Placements", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = TextPrimary)
             Spacer(modifier = Modifier.height(4.dp))
-            sr.planets.forEach { p ->
+            classicalPlanets.forEach { p ->
                 val rx = if (p.is_retrograde) " [Rx]" else ""
                 val signName = getZodiacSign(p.progressed_longitude)
                 val houseNum = if (sr.house_cusps.isNotEmpty()) findHouseNumber(p.progressed_longitude, sr.house_cusps) else null
@@ -571,6 +599,34 @@ private fun PlanetaryReturnsCard(data: PredictiveSuiteData) {
                     Text("${p.name}$rx", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = TextPrimary)
                     Text(
                         text = "${String.format("%.2f°", p.sign_degree)} $signName" + (if (houseNum != null) " · H$houseNum" else ""),
+                        fontSize = 12.sp,
+                        color = CelestialBlue
+                    )
+                }
+                HorizontalDivider(color = BorderColor.copy(alpha = 0.4f))
+            }
+        }
+
+        // 달의 교점 (North Node & South Node) 분리 표
+        if (lunarNodes.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Text("Return Lunar Nodes", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = TextPrimary)
+            Spacer(modifier = Modifier.height(4.dp))
+            lunarNodes.forEach { n ->
+                val displayName = formatWesternBodyName(n.name)
+                val signName = getZodiacSign(n.progressed_longitude)
+                val houseNum = if (sr.house_cusps.isNotEmpty()) findHouseNumber(n.progressed_longitude, sr.house_cusps) else null
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 3.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(displayName, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = TextPrimary)
+                    Text(
+                        text = "${String.format("%.2f°", n.sign_degree)} $signName" + (if (houseNum != null) " · H$houseNum" else ""),
                         fontSize = 12.sp,
                         color = CelestialBlue
                     )
@@ -605,7 +661,9 @@ private fun TransitsCard(data: PredictiveSuiteData) {
                     sb.appendLine("  (No major aspects within 2° orb)")
                 } else {
                     data.transits.forEach { t ->
-                        sb.appendLine("• Tr ${t.transiting_planet} · Nat ${t.natal_planet}: ${t.aspect_type} (Orb ${String.format("%.2f°", t.orb)})")
+                        val trPlanet = formatWesternBodyName(t.transiting_planet)
+                        val natPlanet = formatWesternBodyName(t.natal_planet)
+                        sb.appendLine("• Tr $trPlanet · Nat $natPlanet: ${t.aspect_type} (Orb ${String.format("%.2f°", t.orb)})")
                     }
                 }
                 sb.toString().trimEnd()
@@ -617,13 +675,15 @@ private fun TransitsCard(data: PredictiveSuiteData) {
             Text("No major transiting aspects within 2° orb.", color = TextSecondary, fontSize = 12.sp)
         } else {
             data.transits.take(10).forEach { t ->
+                val trPlanet = formatWesternBodyName(t.transiting_planet)
+                val natPlanet = formatWesternBodyName(t.natal_planet)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 3.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Tr ${t.transiting_planet} · Nat ${t.natal_planet}", fontSize = 12.sp, color = TextPrimary)
+                    Text("Tr $trPlanet · Nat $natPlanet", fontSize = 12.sp, color = TextPrimary)
                     Text("${t.aspect_type} (Orb ${String.format("%.2f°", t.orb)})", fontSize = 12.sp, color = CelestialBlue, fontWeight = FontWeight.Medium)
                 }
             }
@@ -647,7 +707,9 @@ private fun PrimaryDirectionsCard(data: PredictiveSuiteData) {
                     sb.appendLine("  (None calculated)")
                 } else {
                     data.primary_directions.forEach { pd ->
-                        sb.appendLine("• ${pd.promittor} → ${pd.significator} ${pd.aspect_type} | Realization: ~${String.format("%.1f", pd.realization_age)} yrs (Arc: ${String.format("%.2f°", pd.direction_arc_deg)})")
+                        val prom = formatWesternBodyName(pd.promittor)
+                        val sig = formatWesternBodyName(pd.significator)
+                        sb.appendLine("• $prom → $sig ${pd.aspect_type} | Realization: ~${String.format("%.1f", pd.realization_age)} yrs (Arc: ${String.format("%.2f°", pd.direction_arc_deg)})")
                     }
                 }
                 sb.toString().trimEnd()
@@ -659,6 +721,8 @@ private fun PrimaryDirectionsCard(data: PredictiveSuiteData) {
             Text("No primary directions calculated.", color = TextSecondary, fontSize = 12.sp)
         } else {
             data.primary_directions.take(8).forEach { pd ->
+                val prom = formatWesternBodyName(pd.promittor)
+                val sig = formatWesternBodyName(pd.significator)
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -670,7 +734,7 @@ private fun PrimaryDirectionsCard(data: PredictiveSuiteData) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "${pd.promittor} → ${pd.significator}",
+                            text = "$prom → $sig",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = TextPrimary
