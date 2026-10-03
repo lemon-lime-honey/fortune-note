@@ -515,6 +515,262 @@ pub fn calculate_transits(
     Ok(contacts)
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransitPlanetSnapshot {
+    pub name: String,
+    pub tropical_longitude: f64,
+    pub speed: f64,
+    pub is_retrograde: bool,
+    pub sign_index: u32,
+    pub sign_degree: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransitEventHit {
+    pub event_jd: f64,
+    pub utc_date_time: String,
+    pub moving_body: String,
+    pub moving_longitude: f64,
+    pub moving_speed: f64,
+    pub is_retrograde: bool,
+    pub natal_point: String,
+    pub natal_longitude: f64,
+    pub aspect_type: String,
+    pub orb_deg: f64,
+    pub snapshot_planets: Vec<TransitPlanetSnapshot>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransitSearchQuery {
+    pub start_year: i32,
+    pub start_month: u32,
+    pub start_day: u32,
+    pub end_year: i32,
+    pub end_month: u32,
+    pub end_day: u32,
+    pub moving_bodies: Option<Vec<String>>,
+    pub natal_targets: Option<Vec<String>>,
+    pub aspect_types: Option<Vec<String>>,
+}
+
+fn body_from_name(name: &str) -> Option<vedaksha::ephem::bodies::Body> {
+    match name {
+        "Sun" => Some(vedaksha::ephem::bodies::Body::Sun),
+        "Moon" => Some(vedaksha::ephem::bodies::Body::Moon),
+        "Mercury" => Some(vedaksha::ephem::bodies::Body::Mercury),
+        "Venus" => Some(vedaksha::ephem::bodies::Body::Venus),
+        "Mars" => Some(vedaksha::ephem::bodies::Body::Mars),
+        "Jupiter" => Some(vedaksha::ephem::bodies::Body::Jupiter),
+        "Saturn" => Some(vedaksha::ephem::bodies::Body::Saturn),
+        "North Node" | "Rahu" => Some(vedaksha::ephem::bodies::Body::TrueNode),
+        "South Node" | "Ketu" => Some(vedaksha::ephem::bodies::Body::TrueSouthNode),
+        _ => None,
+    }
+}
+
+fn get_body_tropical_lon(body: vedaksha::ephem::bodies::Body, jd: f64) -> Result<f64, String> {
+    let provider = vedaksha::ephem::analytical::AnalyticalProvider;
+    let pos = vedaksha::ephem::coordinates::apparent_position(&provider, body, jd)
+        .map_err(|e| format!("Body position failed: {:?}", e))?;
+    Ok(vedaksha::math::angle::normalize_degrees(pos.ecliptic.longitude.to_degrees()))
+}
+
+fn separation_error(lon_tr: f64, lon_nat: f64, target_sep: f64) -> f64 {
+    let sep = (lon_tr - lon_nat).rem_euclid(360.0);
+    (sep - target_sep + 540.0).rem_euclid(360.0) - 180.0
+}
+
+/// Search exact transit aspect hits within a bounded time interval.
+pub fn find_transit_events(
+    query: &TransitSearchQuery,
+    natal_points: &[(&str, f64)],
+) -> Result<Vec<TransitEventHit>, String> {
+    let start_jd = calendar_to_jd(query.start_year, query.start_month, query.start_day as f64);
+    let end_jd = calendar_to_jd(query.end_year, query.end_month, (query.end_day as f64) + 0.9999);
+
+    if end_jd <= start_jd {
+        return Err("End date must be after start date".to_string());
+    }
+
+    let default_moving = vec![
+        "Saturn".to_string(),
+        "Jupiter".to_string(),
+        "Mars".to_string(),
+        "Sun".to_string(),
+        "Venus".to_string(),
+        "Mercury".to_string(),
+    ];
+    let moving_list = query.moving_bodies.as_ref().unwrap_or(&default_moving);
+
+    let has_moon = moving_list.iter().any(|b| b == "Moon");
+    let step_days = if has_moon { 0.25 } else { 0.5 };
+
+    let aspect_defs: &[(&str, &[f64])] = &[
+        ("Conjunction", &[0.0]),
+        ("Sextile", &[60.0, 300.0]),
+        ("Square", &[90.0, 270.0]),
+        ("Trine", &[120.0, 240.0]),
+        ("Opposition", &[180.0]),
+    ];
+
+    let mut filtered_natal = Vec::new();
+    for &(name, lon) in natal_points {
+        if let Some(ref targets) = query.natal_targets {
+            if targets.iter().any(|t| t.eq_ignore_ascii_case(name)) {
+                filtered_natal.push((name, lon));
+            }
+        } else {
+            filtered_natal.push((name, lon));
+        }
+    }
+
+    let mut active_aspects = Vec::new();
+    for &(asp_name, targets) in aspect_defs {
+        if let Some(ref selected_asps) = query.aspect_types {
+            if selected_asps.iter().any(|s| s.eq_ignore_ascii_case(asp_name)) {
+                active_aspects.push((asp_name, targets));
+            }
+        } else {
+            active_aspects.push((asp_name, targets));
+        }
+    }
+
+    let mut raw_hits = Vec::new();
+
+    for moving_name in moving_list {
+        let vbody = match body_from_name(moving_name) {
+            Some(b) => b,
+            None => continue,
+        };
+
+        let mut cur_t = start_jd;
+        let mut prev_lon = match get_body_tropical_lon(vbody, cur_t) {
+            Ok(l) => l,
+            Err(_) => continue,
+        };
+
+        while cur_t < end_jd {
+            let next_t = (cur_t + step_days).min(end_jd);
+            let next_lon = match get_body_tropical_lon(vbody, next_t) {
+                Ok(l) => l,
+                Err(_) => {
+                    cur_t = next_t;
+                    continue;
+                }
+            };
+
+            for &(nat_name, nat_lon) in &filtered_natal {
+                for &(asp_name, targets) in &active_aspects {
+                    for &target_sep in targets {
+                        let e0 = separation_error(prev_lon, nat_lon, target_sep);
+                        let e1 = separation_error(next_lon, nat_lon, target_sep);
+
+                        if e0.abs() < 12.0 && e1.abs() < 12.0 && (e0 * e1 <= 0.0) && (e0 != e1) {
+                            // Bisection refinement
+                            let mut left_t = cur_t;
+                            let mut right_t = next_t;
+                            let mut left_e = e0;
+
+                            for _ in 0..12 {
+                                let mid_t = (left_t + right_t) * 0.5;
+                                if let Ok(mid_lon) = get_body_tropical_lon(vbody, mid_t) {
+                                    let mid_e = separation_error(mid_lon, nat_lon, target_sep);
+                                    if mid_e.abs() < 1e-4 {
+                                        left_t = mid_t;
+                                        break;
+                                    }
+                                    if left_e * mid_e <= 0.0 {
+                                        right_t = mid_t;
+                                    } else {
+                                        left_t = mid_t;
+                                        left_e = mid_e;
+                                    }
+                                } else {
+                                    break;
+                                }
+                            }
+
+                            let hit_jd = (left_t + right_t) * 0.5;
+                            raw_hits.push((hit_jd, moving_name.clone(), nat_name.to_string(), nat_lon, asp_name.to_string(), target_sep));
+                        }
+                    }
+                }
+            }
+
+            cur_t = next_t;
+            prev_lon = next_lon;
+        }
+    }
+
+    // Sort by JD
+    raw_hits.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    // Deduplicate within 0.15 day (~3.6 hours) for the same planet-target-aspect
+    let mut unique_hits = Vec::new();
+    for hit in raw_hits {
+        let is_dup = unique_hits.iter().any(|u: &(f64, String, String, f64, String, f64)| {
+            u.1 == hit.1 && u.2 == hit.2 && u.4 == hit.4 && (u.0 - hit.0).abs() < 0.15
+        });
+        if !is_dup {
+            unique_hits.push(hit);
+        }
+    }
+
+    // Generate full snapshots for each hit
+    let mut hits = Vec::with_capacity(unique_hits.len());
+    for (hit_jd, moving_name, nat_name, nat_lon, asp_name, target_sep) in unique_hits {
+        let (hy, hm, hd, hhour, hmin, hsec) = jd_to_calendar(hit_jd);
+        let date_str = format!(
+            "{:04}-{:02}-{:02} {:02}:{:02}:{:02} UTC",
+            hy, hm, hd, hhour, hmin, hsec.floor() as u32
+        );
+
+        if let Ok(ephem) = compute_ephemeris(hy, hm, hd, hhour, hmin, hsec, 0.0, 0.0) {
+            let mut snapshots = Vec::new();
+            let mut moving_lon = 0.0;
+            let mut moving_spd = 0.0;
+            let mut moving_rx = false;
+
+            for b in &ephem.bodies {
+                let sign_idx = ((b.tropical_longitude / 30.0).floor() as u32) % 12;
+                let sign_deg = b.tropical_longitude - (sign_idx as f64 * 30.0);
+                if b.name == moving_name {
+                    moving_lon = b.tropical_longitude;
+                    moving_spd = b.speed;
+                    moving_rx = b.is_retrograde;
+                }
+                snapshots.push(TransitPlanetSnapshot {
+                    name: b.name.clone(),
+                    tropical_longitude: b.tropical_longitude,
+                    speed: b.speed,
+                    is_retrograde: b.is_retrograde,
+                    sign_index: sign_idx,
+                    sign_degree: sign_deg,
+                });
+            }
+
+            let orb_deg = separation_error(moving_lon, nat_lon, target_sep).abs();
+
+            hits.push(TransitEventHit {
+                event_jd: hit_jd,
+                utc_date_time: date_str,
+                moving_body: moving_name,
+                moving_longitude: moving_lon,
+                moving_speed: moving_spd,
+                is_retrograde: moving_rx,
+                natal_point: nat_name,
+                natal_longitude: nat_lon,
+                aspect_type: asp_name,
+                orb_deg,
+                snapshot_planets: snapshots,
+            });
+        }
+    }
+
+    Ok(hits)
+}
+
+
 // ---------------------------------------------------------------------------
 // 6. Primary Directions (Ptolemaic / Placidean Equatorial Arc & Naibod Key)
 // ---------------------------------------------------------------------------
@@ -852,5 +1108,36 @@ mod tests {
         // At Seoul (lat = 37.5665), Dec = +23.44 gives positive AD
         let ad_seoul = ascensional_difference(23.439, 37.5665);
         assert!(ad_seoul > 15.0 && ad_seoul < 25.0);
+    }
+
+    #[test]
+    fn test_find_transit_events_bounded() {
+        let query = TransitSearchQuery {
+            start_year: 2026,
+            start_month: 1,
+            start_day: 1,
+            end_year: 2026,
+            end_month: 6,
+            end_day: 30,
+            moving_bodies: Some(vec!["Jupiter".to_string(), "Mars".to_string()]),
+            natal_targets: Some(vec!["Sun".to_string(), "MC".to_string()]),
+            aspect_types: Some(vec!["Conjunction".to_string(), "Trine".to_string(), "Square".to_string()]),
+        };
+
+        let natal_points = [
+            ("Sun", 45.0),
+            ("MC", 120.0),
+            ("Moon", 210.0),
+        ];
+
+        let hits = find_transit_events(&query, &natal_points).expect("Search should succeed");
+        assert!(!hits.is_empty(), "Expected at least 1 transit hit in 6 months for Mars/Jupiter");
+
+        for hit in &hits {
+            assert!(hit.orb_deg < 0.1, "Exact hit orb should be very close to zero: {}", hit.orb_deg);
+            assert!(hit.moving_body == "Jupiter" || hit.moving_body == "Mars");
+            assert!(hit.natal_point == "Sun" || hit.natal_point == "MC");
+            assert!(!hit.snapshot_planets.is_empty(), "Snapshot planets must be present");
+        }
     }
 }
