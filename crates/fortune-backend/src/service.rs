@@ -565,6 +565,20 @@ impl FortuneBackendService {
             .and_then(WesternHouseSystem::from_str_name)
             .or(Some(WesternHouseSystem::Regiomontanus));
 
+        let gender = if let Some(ref qid) = item.querent_profile_id {
+            if let Ok(Some(profile)) = self.get_profile(qid) {
+                if profile.gender.to_lowercase() == "female" {
+                    Gender::Female
+                } else {
+                    Gender::Male
+                }
+            } else {
+                Gender::Male
+            }
+        } else {
+            Gender::Male
+        };
+
         let input = FortuneCalculationInput {
             year: item.query_year,
             month: item.query_month,
@@ -574,7 +588,7 @@ impl FortuneBackendService {
             second: item.query_second,
             latitude: item.latitude,
             longitude: item.longitude,
-            gender: Gender::Male, // 호라리는 차트 자체의 하우스와 행성 배치 분석
+            gender,
             western_house_system,
             timezone_id: Some(item.timezone_id.clone()),
         };
@@ -1020,5 +1034,78 @@ mod tests {
         assert_eq!(default_out.western.house_cusps, regio_out.western.house_cusps);
         // 중간 하우스 커스프(예: 11번 커스프)는 Placidus와 달라야 함
         assert_ne!(regio_out.western.house_cusps[10], placidus_out.western.house_cusps[10]);
+    }
+
+    #[test]
+    fn test_horary_querent_gender_resolution() {
+        let service = FortuneBackendService::new(":memory:").expect("service init failed");
+
+        let female_profile = service
+            .create_profile(CreateProfileParams {
+                name: "여성 의뢰인".to_string(),
+                gender: "female".to_string(),
+                birth_year: 1992,
+                birth_month: 8,
+                birth_day: 15,
+                birth_hour: 10,
+                birth_minute: 0,
+                latitude: 37.5665,
+                longitude: 126.9780,
+                timezone_id: Some("Asia/Seoul".to_string()),
+                notes: None,
+            })
+            .expect("female profile creation failed");
+
+        let horary_female = service
+            .create_horary(CreateHoraryParams {
+                title: "결혼 시기 질문".to_string(),
+                category: "Relationship".to_string(),
+                question_text: "언제쯤 결혼할 수 있을까요?".to_string(),
+                query_year: 2024,
+                query_month: 5,
+                query_day: 20,
+                query_hour: 15,
+                query_minute: 30,
+                query_second: 0.0,
+                latitude: 37.5665,
+                longitude: 126.9780,
+                timezone_id: Some("Asia/Seoul".to_string()),
+                querent_profile_id: Some(female_profile.id.clone()),
+                result_notes: None,
+            })
+            .expect("horary creation failed");
+
+        let horary_default = service
+            .create_horary(CreateHoraryParams {
+                title: "결혼 시기 질문 (의뢰인 없음)".to_string(),
+                category: "Relationship".to_string(),
+                question_text: "언제쯤 결혼할 수 있을까요?".to_string(),
+                query_year: 2024,
+                query_month: 5,
+                query_day: 20,
+                query_hour: 15,
+                query_minute: 30,
+                query_second: 0.0,
+                latitude: 37.5665,
+                longitude: 126.9780,
+                timezone_id: Some("Asia/Seoul".to_string()),
+                querent_profile_id: None,
+                result_notes: None,
+            })
+            .expect("horary creation failed");
+
+        let out_female = service.calculate_horary_chart(&horary_female.id).expect("calc failed");
+        let out_default = service.calculate_horary_chart(&horary_default.id).expect("calc failed");
+
+        let parts_female = &out_female.western.traditional.unwrap().arabic_parts;
+        let parts_default = &out_default.western.traditional.unwrap().arabic_parts;
+
+        let marriage_female = parts_female.iter().find(|p| p.name == "Part of Marriage").unwrap();
+        let marriage_default = parts_default.iter().find(|p| p.name == "Part of Marriage").unwrap();
+
+        assert_ne!(
+            marriage_female.longitude, marriage_default.longitude,
+            "Horary Part of Marriage must differ when querent is female vs default male"
+        );
     }
 }

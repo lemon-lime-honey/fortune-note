@@ -160,6 +160,18 @@ pub fn determine_house(lon: f64, cusps: &[f64; 12]) -> u8 {
     1 // Fallback
 }
 
+/// Default conjunction orb for traditional fixed stars (degrees).
+pub const DEFAULT_FIXED_STAR_MAX_ORB: f64 = 1.5;
+
+/// Classical aspect definitions: (Aspect Name, Target Angle, Default Modern Orb)
+pub const DEFAULT_MAJOR_ASPECTS: [(&str, f64, f64); 5] = [
+    ("Conjunction", 0.0, 8.0),
+    ("Sextile", 60.0, 6.0),
+    ("Square", 90.0, 7.0),
+    ("Trine", 120.0, 8.0),
+    ("Opposition", 180.0, 8.0),
+];
+
 /// Calculate Western astrology chart from an ephemeris snapshot and observer latitude.
 pub fn calculate_western(
     ephem: &EphemerisSnapshot,
@@ -226,13 +238,7 @@ pub fn calculate_western(
 
     // 2. Compute major aspects exclusively among the 7 classical planets
     let mut aspects = Vec::new();
-    let aspect_defs = [
-        ("Conjunction", 0.0, 8.0),
-        ("Sextile", 60.0, 6.0),
-        ("Square", 90.0, 7.0),
-        ("Trine", 120.0, 8.0),
-        ("Opposition", 180.0, 8.0),
-    ];
+    let aspect_defs = DEFAULT_MAJOR_ASPECTS;
 
     for i in 0..planets.len() {
         for j in (i + 1)..planets.len() {
@@ -374,7 +380,7 @@ pub fn calculate_western(
     let mut star_check_bodies = planet_pos_tuples.clone();
     star_check_bodies.push(("Ascendant", ascendant));
     star_check_bodies.push(("Midheaven", midheaven));
-    let fixed_star_conjunctions = fixed_stars::detect_fixed_star_conjunctions(&fixed_stars, &star_check_bodies, 1.5);
+    let fixed_star_conjunctions = fixed_stars::detect_fixed_star_conjunctions(&fixed_stars, &star_check_bodies, DEFAULT_FIXED_STAR_MAX_ORB);
     // 3.10 Prenatal Syzygy (SAN)
     let prenatal_syzygy = syzygy::calculate_prenatal_syzygy_with_coords(ephem.jd_ut1, sun_lon, moon_lon).ok();
 
