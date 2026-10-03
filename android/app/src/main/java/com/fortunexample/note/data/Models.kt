@@ -438,6 +438,8 @@ data class PredictiveSuiteData(
     val target_year: Int,
     val target_month: Int,
     val target_day: Int,
+    val target_hour: Int = 0,
+    val target_minute: Int = 0,
     val age: Int,
     val profection: AnnualProfectionData,
     val solar_arc: SolarArcResultData,

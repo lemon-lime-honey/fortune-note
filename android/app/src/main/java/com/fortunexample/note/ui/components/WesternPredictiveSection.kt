@@ -67,7 +67,8 @@ fun WesternPredictiveSection(
     predictiveData: PredictiveSuiteData?,
     targetYear: Int,
     isLoading: Boolean,
-    onYearChange: (Int) -> Unit
+    onYearChange: (Int) -> Unit,
+    onTimeChange: ((Int?, Int?) -> Unit)? = null
 ) {
     var selectedTechTab by remember { mutableStateOf(0) }
     val techTabs = listOf(
@@ -192,7 +193,7 @@ fun WesternPredictiveSection(
                     1 -> SolarArcCard(predictiveData)
                     2 -> SecondaryProgressionCard(predictiveData)
                     3 -> PlanetaryReturnsCard(predictiveData)
-                    4 -> TransitsCard(predictiveData)
+                    4 -> TransitsCard(predictiveData, onTimeChange)
                     5 -> PrimaryDirectionsCard(predictiveData)
                 }
             } else if (isLoading) {
@@ -523,6 +524,22 @@ private fun PlanetaryReturnsCard(data: PredictiveSuiteData) {
             }
         }
 
+        if (selectedPlanetIdx != 0) {
+            Surface(
+                color = SurfaceLight,
+                shape = RoundedCornerShape(6.dp),
+                border = BorderStroke(1.dp, BorderColor),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+            ) {
+                Text(
+                    text = "${planetOptions[selectedPlanetIdx]} Return is currently in development. Solar Return chart is displayed.",
+                    color = TextSecondary,
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(6.dp))
 
         // 중복 Return Year 라벨 제거하고 정확한 회귀 시각만 표시
@@ -642,7 +659,10 @@ private fun PlanetaryReturnsCard(data: PredictiveSuiteData) {
 }
 
 @Composable
-private fun TransitsCard(data: PredictiveSuiteData) {
+private fun TransitsCard(
+    data: PredictiveSuiteData,
+    onTimeChange: ((Int?, Int?) -> Unit)? = null
+) {
     Column {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -651,16 +671,16 @@ private fun TransitsCard(data: PredictiveSuiteData) {
         ) {
             Column {
                 Text("Transits (${data.target_year})", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
-                // 트랜짓 계산 기준 시점 명시 (생일 12:00 정오 스냅샷)
+                // 트랜짓 계산 기준 시점 명시 (출생 시각 및 분 기준)
                 Text(
-                    text = "${data.target_year}-${String.format("%02d", data.target_month)}-${String.format("%02d", data.target_day)} 12:00 Local (Birthday)",
+                    text = "${data.target_year}-${String.format("%02d", data.target_month)}-${String.format("%02d", data.target_day)} ${String.format("%02d:%02d", data.target_hour, data.target_minute)} Local",
                     color = TextSecondary,
                     fontSize = 11.sp
                 )
             }
             SectionCopyButton(title = "Transits") {
                 val sb = StringBuilder()
-                sb.appendLine("[Transits - ${data.target_year}년 (${data.target_year}-${String.format("%02d", data.target_month)}-${String.format("%02d", data.target_day)} 12:00 Local)]")
+                sb.appendLine("[Transits - ${data.target_year}년 (${data.target_year}-${String.format("%02d", data.target_month)}-${String.format("%02d", data.target_day)} ${String.format("%02d:%02d", data.target_hour, data.target_minute)} Local)]")
                 if (data.transits.isEmpty()) {
                     sb.appendLine("  (No major aspects within 2° orb)")
                 } else {
@@ -673,6 +693,45 @@ private fun TransitsCard(data: PredictiveSuiteData) {
                 sb.toString().trimEnd()
             }
         }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // 트랜짓 시간 조정 빠른 칩
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            FilterChip(
+                selected = false,
+                onClick = { onTimeChange?.invoke(null, null) },
+                label = { Text("출생시각", fontSize = 11.sp) }
+            )
+            FilterChip(
+                selected = data.target_hour == 12 && data.target_minute == 0,
+                onClick = { onTimeChange?.invoke(12, 0) },
+                label = { Text("12:00 정오", fontSize = 11.sp) }
+            )
+            FilterChip(
+                selected = false,
+                onClick = {
+                    val prev = (data.target_hour + 23) % 24
+                    onTimeChange?.invoke(prev, data.target_minute)
+                },
+                label = { Text("-1시간", fontSize = 11.sp) }
+            )
+            FilterChip(
+                selected = false,
+                onClick = {
+                    val next = (data.target_hour + 1) % 24
+                    onTimeChange?.invoke(next, data.target_minute)
+                },
+                label = { Text("+1시간", fontSize = 11.sp) }
+            )
+        }
+
         Spacer(modifier = Modifier.height(8.dp))
 
         if (data.transits.isEmpty()) {

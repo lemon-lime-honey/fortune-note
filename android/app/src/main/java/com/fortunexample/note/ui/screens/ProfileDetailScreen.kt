@@ -73,6 +73,8 @@ fun ProfileDetailScreen(
     var vedicError by remember { mutableStateOf<String?>(null) }
 
     var predictiveTargetYear by remember { mutableIntStateOf(2026) }
+    var predictiveTargetHour by remember { mutableStateOf<Int?>(null) }
+    var predictiveTargetMinute by remember { mutableStateOf<Int?>(null) }
     var predictiveData by remember { mutableStateOf<PredictiveSuiteData?>(null) }
     var isPredictiveLoading by remember { mutableStateOf(false) }
 
@@ -127,15 +129,18 @@ fun ProfileDetailScreen(
         }
     }
 
-    // 4. Lazy-load predictive suite only when user enters Western tab (tab index 1)
-    LaunchedEffect(profile.id, predictiveTargetYear, selectedDomainTab) {
-        if (selectedDomainTab == 1 && (predictiveData == null || predictiveData?.target_year != predictiveTargetYear)) {
+    // 4. Lazy-load predictive suite when user enters Western tab (tab index 1) or changes target year/time/house
+    LaunchedEffect(profile.id, predictiveTargetYear, predictiveTargetHour, predictiveTargetMinute, selectedHouse, selectedDomainTab) {
+        if (selectedDomainTab == 1) {
             isPredictiveLoading = true
             FortuneApp.repository.calculateProfilePredictiveSuite(
-                profile.id,
-                predictiveTargetYear,
-                profile.birth_month,
-                profile.birth_day
+                id = profile.id,
+                targetYear = predictiveTargetYear,
+                targetMonth = profile.birth_month,
+                targetDay = profile.birth_day,
+                targetHour = predictiveTargetHour,
+                targetMinute = predictiveTargetMinute,
+                houseSystem = selectedHouse
             ).onSuccess {
                 predictiveData = it
                 isPredictiveLoading = false
@@ -481,6 +486,10 @@ fun ProfileDetailScreen(
                                 isLoading = isPredictiveLoading,
                                 onYearChange = {
                                     predictiveTargetYear = it
+                                },
+                                onTimeChange = { h, m ->
+                                    predictiveTargetHour = h
+                                    predictiveTargetMinute = m
                                 }
                             )
                             }

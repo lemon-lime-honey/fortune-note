@@ -96,14 +96,20 @@ class FortuneRepository(
         id: String,
         targetYear: Int,
         targetMonth: Int,
-        targetDay: Int
+        targetDay: Int,
+        targetHour: Int? = null,
+        targetMinute: Int? = null,
+        houseSystem: String? = null
     ): Result<PredictiveSuiteData> = withContext(Dispatchers.IO) {
         runCatching {
             val resJson = client.calculateProfilePredictiveSuite(
                 id,
                 targetYear,
                 targetMonth.toUInt(),
-                targetDay.toUInt()
+                targetDay.toUInt(),
+                targetHour?.toUInt(),
+                targetMinute?.toUInt(),
+                houseSystem
             )
             json.decodeFromString(PredictiveSuiteData.serializer(), resJson)
         }
@@ -115,9 +121,9 @@ class FortuneRepository(
         }
     }
 
-    suspend fun exportProfileWesternMarkdown(id: String): Result<String> = withContext(Dispatchers.IO) {
+    suspend fun exportProfileWesternMarkdown(id: String, houseSystem: String? = null): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
-            client.exportProfileWesternMarkdown(id)
+            client.exportProfileWesternMarkdown(id, houseSystem)
         }
     }
 
