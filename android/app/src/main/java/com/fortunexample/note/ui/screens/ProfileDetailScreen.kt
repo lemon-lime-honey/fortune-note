@@ -57,16 +57,19 @@ fun ProfileDetailScreen(
     var predictiveData by remember { mutableStateOf<PredictiveSuiteData?>(null) }
     var isPredictiveLoading by remember { mutableStateOf(false) }
 
-    LaunchedEffect(profile.id, predictiveTargetYear) {
-        isPredictiveLoading = true
-        FortuneApp.repository.calculateProfilePredictiveSuite(
-            profile.id,
-            predictiveTargetYear,
-            profile.birth_month,
-            profile.birth_day
-        ).onSuccess { predictiveData = it }
-            .onFailure { predictiveData = null }
-        isPredictiveLoading = false
+    // Lazy-load predictive suite only when user enters Western tab (tab index 1)
+    LaunchedEffect(profile.id, predictiveTargetYear, selectedDomainTab) {
+        if (selectedDomainTab == 1 && predictiveData == null) {
+            isPredictiveLoading = true
+            FortuneApp.repository.calculateProfilePredictiveSuite(
+                profile.id,
+                predictiveTargetYear,
+                profile.birth_month,
+                profile.birth_day
+            ).onSuccess { predictiveData = it }
+                .onFailure { predictiveData = null }
+            isPredictiveLoading = false
+        }
     }
 
     val vargaList = listOf(
@@ -104,16 +107,6 @@ fun ProfileDetailScreen(
                 actions = {
                     IconButton(onClick = onEdit) {
                         Icon(Icons.Default.Edit, contentDescription = "수정", tint = TextPrimary)
-                    }
-                    IconButton(
-                        onClick = { showSelectiveCopySheet = true },
-                        enabled = chart != null
-                    ) {
-                        Icon(
-                            Icons.Default.ContentCopy,
-                            contentDescription = "데이터 선택 복사",
-                            tint = if (chart != null) TextPrimary else TextSecondary.copy(alpha = 0.35f)
-                        )
                     }
                     IconButton(onClick = onDelete) {
                         Icon(Icons.Default.Delete, contentDescription = "삭제", tint = AstrologicalRed)
@@ -154,6 +147,41 @@ fun ProfileDetailScreen(
                         .verticalScroll(rememberScrollState())
                         .padding(16.dp)
                 ) {
+                    // 차트 상단 헤더 및 데이터 선택 복사 버튼
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = when (selectedDomainTab) {
+                                0 -> "사주명리 분석 차트"
+                                1 -> "Western Tropical Chart"
+                                else -> "Vedic Sidereal Chart"
+                            },
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = TextPrimary
+                        )
+                        OutlinedButton(
+                            onClick = { showSelectiveCopySheet = true },
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, BorderColor)
+                        ) {
+                            Icon(
+                                Icons.Default.ContentCopy,
+                                contentDescription = "데이터 선택 복사",
+                                modifier = Modifier.size(15.dp),
+                                tint = TextPrimary
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("데이터 복사", fontSize = 12.sp, color = TextPrimary, fontWeight = FontWeight.Medium)
+                        }
+                    }
+
                     when (selectedDomainTab) {
                         0 -> SajuChartTable(chart = chart.saju)
                         1 -> {
@@ -289,7 +317,10 @@ fun ProfileDetailScreen(
                                 predictiveData = predictiveData,
                                 targetYear = predictiveTargetYear,
                                 isLoading = isPredictiveLoading,
-                                onYearChange = { predictiveTargetYear = it }
+                                onYearChange = {
+                                    predictiveTargetYear = it
+                                    predictiveData = null
+                                }
                             )
                         }
                         2 -> {
