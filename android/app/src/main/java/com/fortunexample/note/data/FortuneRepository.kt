@@ -57,6 +57,37 @@ class FortuneRepository(
         }
     }
 
+    suspend fun calculateProfileChartWithHouse(id: String, houseSystem: String?): Result<FortuneChartOutput> = withContext(Dispatchers.IO) {
+        runCatching {
+            val resJson = client.calculateProfileChartWithHouse(id, houseSystem)
+            json.decodeFromString(FortuneChartOutput.serializer(), resJson)
+        }
+    }
+
+    suspend fun calculateHoraryChartWithHouse(id: String, houseSystem: String?): Result<FortuneChartOutput> = withContext(Dispatchers.IO) {
+        runCatching {
+            val resJson = client.calculateHoraryChartWithHouse(id, houseSystem)
+            json.decodeFromString(FortuneChartOutput.serializer(), resJson)
+        }
+    }
+
+    suspend fun calculateProfilePredictiveSuite(
+        id: String,
+        targetYear: Int,
+        targetMonth: Int,
+        targetDay: Int
+    ): Result<PredictiveSuiteData> = withContext(Dispatchers.IO) {
+        runCatching {
+            val resJson = client.calculateProfilePredictiveSuite(
+                id,
+                targetYear,
+                targetMonth.toUInt(),
+                targetDay.toUInt()
+            )
+            json.decodeFromString(PredictiveSuiteData.serializer(), resJson)
+        }
+    }
+
     suspend fun exportProfileSajuMarkdown(id: String): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
             client.exportProfileSajuMarkdown(id)

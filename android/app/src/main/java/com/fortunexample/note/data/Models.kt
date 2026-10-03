@@ -173,13 +173,236 @@ data class WesternAspectData(
 )
 
 @Serializable
+data class PlanetDignityData(
+    val planet: String,
+    val longitude: Double,
+    val house_number: Int,
+    val sign_index: Int,
+    val is_in_domicile: Boolean,
+    val is_in_exaltation: Boolean,
+    val is_in_triplicity: Boolean,
+    val is_in_term: Boolean,
+    val is_in_face: Boolean,
+    val is_in_detriment: Boolean,
+    val is_in_fall: Boolean,
+    val is_peregrine: Boolean,
+    val essential_score: Int,
+    val accidental_score: Int,
+    val accidental_reasons: List<String> = emptyList(),
+    val total_lilly_score: Int
+)
+
+@Serializable
+data class MoonConditionData(
+    val is_void_of_course: Boolean,
+    val is_via_combusta: Boolean,
+    val is_in_tincture_exception: Boolean,
+    val lunar_phase_name: String,
+    val is_waxing: Boolean,
+    val elongation_deg: Double,
+    val next_applying_aspect: String? = null
+)
+
+@Serializable
+data class PlanetaryHoursData(
+    val day_ruler: String,
+    val hour_ruler: String,
+    val hour_number: Int,
+    val is_day_hour: Boolean,
+    val is_radical: Boolean,
+    val radicality_reason: String,
+    val considerations: List<String> = emptyList()
+)
+
+@Serializable
+data class TraditionalAspectData(
+    val planet1: String,
+    val planet2: String,
+    val aspect_type: String,
+    val orb: Double,
+    val max_allowed_orb: Double,
+    val is_applying: Boolean,
+    val is_partile: Boolean
+)
+
+@Serializable
+data class MutualReceptionData(
+    val planet1: String,
+    val planet2: String,
+    val reception_type: String,
+    val description: String
+)
+
+@Serializable
+data class PerfectionReportData(
+    val translation_of_light: List<String> = emptyList(),
+    val collection_of_light: List<String> = emptyList(),
+    val besiegement: List<String> = emptyList()
+)
+
+@Serializable
+data class AntisciaPointData(
+    val planet_name: String,
+    val longitude: Double,
+    val antiscia_longitude: Double,
+    val contra_antiscia_longitude: Double,
+    val antiscia_sign: String
+)
+
+@Serializable
+data class HouseAlmutenData(
+    val house_number: Int,
+    val cusp_longitude: Double,
+    val almuten_planet: String,
+    val score: Int,
+    val domicile_ruler: String,
+    val exaltation_ruler: String? = null,
+    val triplicity_ruler: String
+)
+
+@Serializable
+data class ArabicPartData(
+    val name: String,
+    val longitude: Double,
+    val sign_index: Int,
+    val sign_degree: Double,
+    val house_number: Int,
+    val formula: String
+)
+
+@Serializable
+data class FixedStarConjunctionData(
+    val star_name: String,
+    val star_longitude: Double,
+    val planet_name: String,
+    val planet_longitude: Double,
+    val orb: Double,
+    val nature: String,
+    val magnitude: Double,
+    val description: String
+)
+
+@Serializable
+data class WesternTraditionalData(
+    val planet_dignities: List<PlanetDignityData> = emptyList(),
+    val moon_condition: MoonConditionData,
+    val planetary_hours: PlanetaryHoursData,
+    val traditional_aspects: List<TraditionalAspectData> = emptyList(),
+    val mutual_receptions: List<MutualReceptionData> = emptyList(),
+    val perfection_report: PerfectionReportData = PerfectionReportData(),
+    val antiscia: List<AntisciaPointData> = emptyList(),
+    val house_almutens: List<HouseAlmutenData> = emptyList(),
+    val arabic_parts: List<ArabicPartData> = emptyList(),
+    val fixed_star_conjunctions: List<FixedStarConjunctionData> = emptyList()
+)
+
+@Serializable
 data class WesternChartData(
     val ascendant: Double,
     val midheaven: Double,
     val house_cusps: List<Double>,
     val planets: List<WesternPlanetData>,
     val nodes: List<WesternNodeData>,
-    val aspects: List<WesternAspectData>
+    val aspects: List<WesternAspectData>,
+    val house_system: String? = null,
+    val traditional: WesternTraditionalData? = null
+)
+
+@Serializable
+data class AnnualProfectionData(
+    val target_age: Int,
+    val target_year: Int,
+    val profected_house: Int,
+    val profected_sign_index: Int,
+    val profected_sign_name: String,
+    val lord_of_the_year: String,
+    val active_natal_planets: List<String> = emptyList()
+)
+
+@Serializable
+data class SolarArcBodyData(
+    val name: String,
+    val natal_longitude: Double,
+    val directed_longitude: Double,
+    val sign_index: Int,
+    val sign_degree: Double
+)
+
+@Serializable
+data class PredictiveAspectData(
+    val moving_body: String,
+    val natal_body: String,
+    val aspect_type: String,
+    val orb: Double
+)
+
+@Serializable
+data class SolarArcResultData(
+    val arc_degrees: Double,
+    val directed_planets: List<SolarArcBodyData> = emptyList(),
+    val contacts: List<PredictiveAspectData> = emptyList()
+)
+
+@Serializable
+data class ProgressedBodyData(
+    val name: String,
+    val progressed_longitude: Double,
+    val sign_index: Int,
+    val sign_degree: Double,
+    val is_retrograde: Boolean
+)
+
+@Serializable
+data class SecondaryProgressionData(
+    val progressed_date_utc: String,
+    val elapsed_tropical_years: Double,
+    val planets: List<ProgressedBodyData> = emptyList(),
+    val progressed_lunar_phase: String,
+    val contacts: List<PredictiveAspectData> = emptyList()
+)
+
+@Serializable
+data class SolarReturnData(
+    val return_year: Int,
+    val return_date_utc: String,
+    val exact_jd_ut1: Double,
+    val sun_longitude: Double,
+    val ascendant: Double,
+    val midheaven: Double,
+    val planets: List<ProgressedBodyData> = emptyList()
+)
+
+@Serializable
+data class TransitContactData(
+    val transiting_planet: String,
+    val transiting_longitude: Double,
+    val natal_planet: String,
+    val natal_longitude: Double,
+    val aspect_type: String,
+    val orb: Double
+)
+
+@Serializable
+data class PrimaryDirectionContactData(
+    val promittor: String,
+    val significator: String,
+    val aspect_type: String,
+    val direction_arc_deg: Double,
+    val realization_age: Double
+)
+
+@Serializable
+data class PredictiveSuiteData(
+    val target_year: Int,
+    val target_month: Int,
+    val target_day: Int,
+    val age: Int,
+    val profection: AnnualProfectionData,
+    val solar_arc: SolarArcResultData,
+    val secondary_progression: SecondaryProgressionData? = null,
+    val solar_return: SolarReturnData? = null,
+    val transits: List<TransitContactData> = emptyList(),
+    val primary_directions: List<PrimaryDirectionContactData> = emptyList()
 )
 
 @Serializable

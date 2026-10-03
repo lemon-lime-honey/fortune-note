@@ -28,6 +28,7 @@ import com.fortunexample.note.data.FortuneChartOutput
 import com.fortunexample.note.data.HoraryDto
 import com.fortunexample.note.ui.components.VedicChartDiamond
 import com.fortunexample.note.ui.components.WesternChartWheel
+import com.fortunexample.note.ui.components.WesternTraditionalSection
 import com.fortunexample.note.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,9 +69,9 @@ fun HoraryDetailScreen(
                     }
                     IconButton(onClick = {
                         if (selectedTab == 0) {
-                            copyToClipboard("Western Horary Prompt", westernMarkdown, "호라리(서양) LLM 프롬프트가 복사되었습니다.")
+                            copyToClipboard("Western Horary Data", westernMarkdown, "호라리(서양) 분석 데이터가 복사되었습니다.")
                         } else {
-                            copyToClipboard("Vedic Prashna Prompt", prashnaMarkdown, "프라슈나(베다) LLM 프롬프트가 복사되었습니다.")
+                            copyToClipboard("Vedic Prashna Data", prashnaMarkdown, "프라슈나(베다) 분석 데이터가 복사되었습니다.")
                         }
                     }) {
                         Icon(Icons.Default.ContentCopy, contentDescription = "현재 탭 복사", tint = TextPrimary)
@@ -84,17 +85,17 @@ fun HoraryDetailScreen(
                         modifier = Modifier.background(BackgroundWhite)
                     ) {
                         DropdownMenuItem(
-                            text = { Text("호라리 (서양) 프롬프트 복사", color = TextPrimary, fontSize = 14.sp) },
+                            text = { Text("호라리 (서양) 데이터 복사", color = TextPrimary, fontSize = 14.sp) },
                             onClick = {
                                 showMenu = false
-                                copyToClipboard("Western Horary Prompt", westernMarkdown, "호라리(서양) LLM 프롬프트가 복사되었습니다.")
+                                copyToClipboard("Western Horary Data", westernMarkdown, "호라리(서양) 분석 데이터가 복사되었습니다.")
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("프라슈나 (베다) 프롬프트 복사", color = TextPrimary, fontSize = 14.sp) },
+                            text = { Text("프라슈나 (베다) 데이터 복사", color = TextPrimary, fontSize = 14.sp) },
                             onClick = {
                                 showMenu = false
-                                copyToClipboard("Vedic Prashna Prompt", prashnaMarkdown, "프라슈나(베다) LLM 프롬프트가 복사되었습니다.")
+                                copyToClipboard("Vedic Prashna Data", prashnaMarkdown, "프라슈나(베다) 분석 데이터가 복사되었습니다.")
                             }
                         )
                         HorizontalDivider(color = BorderColor)
@@ -192,6 +193,9 @@ fun HoraryDetailScreen(
                                 }
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+                        WesternTraditionalSection(traditional = chart.western.traditional)
                     } else {
                         VedicChartDiamond(chart = chart.vedic)
                         Spacer(modifier = Modifier.height(16.dp))

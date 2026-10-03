@@ -167,6 +167,11 @@ class MainActivity : ComponentActivity() {
                                             navController.popBackStack()
                                         }
                                     }
+                                },
+                                onHouseSystemChange = { hSys ->
+                                    scope.launch {
+                                        FortuneApp.repository.calculateProfileChartWithHouse(id, hSys).onSuccess { chart = it }
+                                    }
                                 }
                             )
                         }

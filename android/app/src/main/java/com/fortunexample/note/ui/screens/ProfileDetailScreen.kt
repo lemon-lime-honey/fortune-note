@@ -29,11 +29,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fortunexample.note.FortuneApp
 import com.fortunexample.note.data.FortuneChartOutput
+import com.fortunexample.note.data.PredictiveSuiteData
 import com.fortunexample.note.data.ProfileDto
-import com.fortunexample.note.ui.components.SajuChartTable
-import com.fortunexample.note.ui.components.VedicChartDiamond
-import com.fortunexample.note.ui.components.WesternChartWheel
+import com.fortunexample.note.ui.components.*
 import com.fortunexample.note.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -46,12 +46,31 @@ fun ProfileDetailScreen(
     vedicMarkdown: String?,
     onBack: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onHouseSystemChange: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     var selectedDomainTab by remember { mutableStateOf(0) }
     var selectedVarga by remember { mutableStateOf("D1") }
     var expandedDashaLord by remember { mutableStateOf<String?>(null) }
+
+    var showSelectiveCopySheet by remember { mutableStateOf(false) }
+
+    var predictiveTargetYear by remember { mutableIntStateOf(2026) }
+    var predictiveData by remember { mutableStateOf<PredictiveSuiteData?>(null) }
+    var isPredictiveLoading by remember { mutableStateOf(false) }
+
+    LaunchedEffect(profile.id, predictiveTargetYear) {
+        isPredictiveLoading = true
+        FortuneApp.repository.calculateProfilePredictiveSuite(
+            profile.id,
+            predictiveTargetYear,
+            profile.birth_month,
+            profile.birth_day
+        ).onSuccess { predictiveData = it }
+            .onFailure { predictiveData = null }
+        isPredictiveLoading = false
+    }
 
     val vargaList = listOf(
         "D1" to "Rasi (D1)",
@@ -89,26 +108,8 @@ fun ProfileDetailScreen(
                     IconButton(onClick = onEdit) {
                         Icon(Icons.Default.Edit, contentDescription = "수정", tint = TextPrimary)
                     }
-                    IconButton(onClick = {
-                        val targetMarkdown = when (selectedDomainTab) {
-                            0 -> sajuMarkdown
-                            1 -> westernMarkdown
-                            2 -> vedicMarkdown
-                            else -> null
-                        }
-                        val domainName = when (selectedDomainTab) {
-                            0 -> "사주명리"
-                            1 -> "Western 점성학"
-                            2 -> "Vedic 점성학"
-                            else -> ""
-                        }
-                        if (!targetMarkdown.isNullOrEmpty()) {
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            clipboard.setPrimaryClip(ClipData.newPlainText("Fortune Note $domainName", targetMarkdown))
-                            Toast.makeText(context, "$domainName 전용 LLM 프롬프트가 복사되었습니다.", Toast.LENGTH_SHORT).show()
-                        }
-                    }) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = "LLM 마크다운 복사", tint = TextPrimary)
+                    IconButton(onClick = { showSelectiveCopySheet = true }) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = "데이터 선택 복사", tint = TextPrimary)
                     }
                     IconButton(onClick = onDelete) {
                         Icon(Icons.Default.Delete, contentDescription = "삭제", tint = AstrologicalRed)
@@ -152,6 +153,48 @@ fun ProfileDetailScreen(
                     when (selectedDomainTab) {
                         0 -> SajuChartTable(chart = chart.saju)
                         1 -> {
+                            val houseSystems = listOf("Placidus", "Regiomontanus", "WholeSign", "Equal", "Koch", "Campanus")
+                            var selectedHouse by remember { mutableStateOf(chart.western.house_system ?: "Placidus") }
+
+                            Text(
+                                text = "하우스 시스템 (House System)",
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                houseSystems.forEach { hSys ->
+                                    val isSelected = selectedHouse.equals(hSys, ignoreCase = true)
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = {
+                                            selectedHouse = hSys
+                                            onHouseSystemChange(hSys)
+                                        },
+                                        label = { Text(hSys, fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = AccentPrimary,
+                                            selectedLabelColor = BackgroundWhite,
+                                            containerColor = SurfaceLight,
+                                            labelColor = TextSecondary
+                                        ),
+                                        border = FilterChipDefaults.filterChipBorder(
+                                            enabled = true,
+                                            selected = isSelected,
+                                            borderColor = BorderColor,
+                                            selectedBorderColor = AccentPrimary
+                                        )
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
                             WesternChartWheel(chart = chart.western)
                             Spacer(modifier = Modifier.height(20.dp))
 
@@ -228,7 +271,22 @@ fun ProfileDetailScreen(
                                         }
                                     }
                                 }
+                                Spacer(modifier = Modifier.height(14.dp))
                             }
+
+                            // 윌리엄 릴리 전통 점성술 분석 섹션
+                            WesternTraditionalSection(traditional = chart.western.traditional)
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // 6대 서양 예측 기법 보조 메뉴 섹션
+                            WesternPredictiveSection(
+                                profile = profile,
+                                predictiveData = predictiveData,
+                                targetYear = predictiveTargetYear,
+                                isLoading = isPredictiveLoading,
+                                onYearChange = { predictiveTargetYear = it }
+                            )
                         }
                         2 -> {
                             // 11종 바르가 분점도 선택 칩 바
@@ -468,6 +526,14 @@ fun ProfileDetailScreen(
                 }
             }
         }
+
+        SelectiveCopyBottomSheet(
+            isOpen = showSelectiveCopySheet,
+            onDismiss = { showSelectiveCopySheet = false },
+            profile = profile,
+            chart = chart,
+            selectedDomainTab = selectedDomainTab
+        )
     }
 }
 
