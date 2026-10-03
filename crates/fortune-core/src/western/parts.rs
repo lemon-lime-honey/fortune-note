@@ -91,11 +91,20 @@ pub fn calculate_arabic_parts(
     };
     parts.push(create_part("Lot of Nemesis", nemesis_lon, cusps));
 
-    // 8. Part of Substance / Wealth (2nd House cusp ruler derivative)
+    // 8. Part of Substance / Wealth (2nd House cusp ruler derivative: ASC + Cusp2 - Ruler(Cusp2))
     let cusp2 = cusps[1];
     let cusp2_sign = (cusp2 / 30.0).floor() as usize % 12;
     let ruler_cusp2_planet = DOMICILE_RULERS[cusp2_sign];
-    let substance_lon = (ascendant + cusp2 - (ruler_cusp2_planet as usize as f64 * 30.0 + 15.0)).rem_euclid(360.0);
+    let ruler_cusp2_lon = match ruler_cusp2_planet {
+        super::dignity::ClassicalPlanet::Sun => sun_lon,
+        super::dignity::ClassicalPlanet::Moon => moon_lon,
+        super::dignity::ClassicalPlanet::Mercury => mercury_lon,
+        super::dignity::ClassicalPlanet::Venus => venus_lon,
+        super::dignity::ClassicalPlanet::Mars => mars_lon,
+        super::dignity::ClassicalPlanet::Jupiter => jupiter_lon,
+        super::dignity::ClassicalPlanet::Saturn => saturn_lon,
+    };
+    let substance_lon = (ascendant + cusp2 - ruler_cusp2_lon).rem_euclid(360.0);
     parts.push(create_part("Part of Substance", substance_lon, cusps));
 
     // 9. Part of Marriage
@@ -106,8 +115,12 @@ pub fn calculate_arabic_parts(
     };
     parts.push(create_part("Part of Marriage", marriage_lon, cusps));
 
-    // 10. Part of Sickness
-    let sickness_lon = (ascendant + mars_lon - saturn_lon).rem_euclid(360.0);
+    // 10. Part of Sickness (Day: ASC + Mars - Saturn, Night: ASC + Saturn - Mars)
+    let sickness_lon = if is_day_chart {
+        (ascendant + mars_lon - saturn_lon).rem_euclid(360.0)
+    } else {
+        (ascendant + saturn_lon - mars_lon).rem_euclid(360.0)
+    };
     parts.push(create_part("Part of Sickness", sickness_lon, cusps));
 
     parts
@@ -141,5 +154,48 @@ fn create_part(name: &str, lon: f64, cusps: &[f64; 12]) -> ArabicPart {
         sign_degree,
         house_number,
         ruler,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_part_of_substance_and_sickness() {
+        let cusps = [
+            0.0, 30.0, 60.0, 90.0, 120.0, 150.0,
+            180.0, 210.0, 240.0, 270.0, 300.0, 330.0,
+        ];
+        // Cusp 2 is 30.0 (Taurus 0°), Domicile ruler of Taurus is Venus
+        let ascendant = 10.0;
+        let sun_lon = 50.0;
+        let moon_lon = 100.0;
+        let mercury_lon = 60.0;
+        let venus_lon = 45.0; // Ruler of Cusp 2
+        let mars_lon = 80.0;
+        let jupiter_lon = 120.0;
+        let saturn_lon = 200.0;
+
+        let parts_day = calculate_arabic_parts(
+            ascendant, sun_lon, moon_lon, mercury_lon, venus_lon, mars_lon, jupiter_lon, saturn_lon,
+            &cusps, true, true,
+        );
+        let parts_night = calculate_arabic_parts(
+            ascendant, sun_lon, moon_lon, mercury_lon, venus_lon, mars_lon, jupiter_lon, saturn_lon,
+            &cusps, false, true,
+        );
+
+        let substance = parts_day.iter().find(|p| p.name == "Part of Substance").unwrap();
+        // Substance: ASC (10) + Cusp2 (30) - Venus (45) = -5 -> 355
+        assert_eq!((substance.longitude - 355.0).abs() < 1e-6, true);
+
+        let sickness_day = parts_day.iter().find(|p| p.name == "Part of Sickness").unwrap();
+        let sickness_night = parts_night.iter().find(|p| p.name == "Part of Sickness").unwrap();
+        // Day sickness: ASC (10) + Mars (80) - Saturn (200) = -110 -> 250
+        // Night sickness: ASC (10) + Saturn (200) - Mars (80) = 130
+        assert_eq!((sickness_day.longitude - 250.0).abs() < 1e-6, true);
+        assert_eq!((sickness_night.longitude - 130.0).abs() < 1e-6, true);
+        assert_ne!(sickness_day.longitude, sickness_night.longitude);
     }
 }
