@@ -160,8 +160,8 @@ impl FortuneClient {
         Ok(self.service.export_profile_saju_markdown(&id)?)
     }
 
-    pub fn export_profile_western_markdown(&self, id: String) -> Result<String, FortuneBackendFfiError> {
-        Ok(self.service.export_profile_western_markdown(&id)?)
+    pub fn export_profile_western_markdown(&self, id: String, house_system: Option<String>) -> Result<String, FortuneBackendFfiError> {
+        Ok(self.service.export_profile_western_markdown(&id, house_system.as_deref())?)
     }
 
     pub fn export_profile_vedic_markdown(&self, id: String) -> Result<String, FortuneBackendFfiError> {
@@ -324,9 +324,12 @@ impl FortuneClient {
         target_year: i32,
         target_month: u32,
         target_day: u32,
+        target_hour: Option<u32>,
+        target_minute: Option<u32>,
+        house_system: Option<String>,
     ) -> Result<String, FortuneBackendFfiError> {
         let suite = self.service.calculate_profile_predictive_suite(
-            &id, target_year, target_month, target_day,
+            &id, target_year, target_month, target_day, target_hour, target_minute, house_system.as_deref(),
         )?;
         serde_json::to_string(&suite).map_err(|e| {
             FortuneBackendFfiError::SerializationError {
@@ -455,7 +458,7 @@ mod tests {
         assert!(saju_md.contains("사주팔자"));
 
         let western_md = client
-            .export_profile_western_markdown(profile_id.clone())
+            .export_profile_western_markdown(profile_id.clone(), None)
             .expect("export profile western md failed");
         assert!(western_md.contains("Western Tropical Natal Chart"));
 

@@ -359,6 +359,7 @@ pub fn calculate_solar_return_with_natal_sun(
     longitude: f64,
     target_year: i32,
     target_sun_lon: f64,
+    house_system: Option<vedaksha::astro::houses::HouseSystem>,
 ) -> Result<SolarReturnResult, String> {
     // 1. Resolve exact natal UTC timestamp
     let tz_res = resolve_local_to_utc(
@@ -382,11 +383,12 @@ pub fn calculate_solar_return_with_natal_sun(
     let final_ephem = compute_ephemeris(ry, rm, rd, rh, rmin, rs, latitude, longitude)
         .map_err(|e| format!("Solar return ephemeris calculation failed: {}", e))?;
 
+    let h_sys = house_system.unwrap_or(vedaksha::astro::houses::HouseSystem::Placidus);
     let house_result = vedaksha::astro::houses::compute_houses(
         final_ephem.ramc,
         latitude,
         final_ephem.true_obliquity_deg,
-        vedaksha::astro::houses::HouseSystem::Placidus,
+        h_sys,
     );
 
     let planets = final_ephem.bodies.iter().map(|b| {
@@ -424,6 +426,7 @@ pub fn calculate_solar_return(
     latitude: f64,
     longitude: f64,
     target_year: i32,
+    house_system: Option<vedaksha::astro::houses::HouseSystem>,
 ) -> Result<SolarReturnResult, String> {
     // 1. Resolve exact natal UTC timestamp
     let tz_res = resolve_local_to_utc(
@@ -451,6 +454,7 @@ pub fn calculate_solar_return(
         longitude,
         target_year,
         natal_sun.tropical_longitude,
+        house_system,
     )
 }
 
@@ -567,17 +571,18 @@ pub fn calculate_primary_directions(
     natal_ascendant: f64,
     natal_midheaven: f64,
     latitude: f64,
+    obliquity_deg: f64,
     target_age: f64,
     max_age: f64,
 ) -> Vec<PrimaryDirectionContact> {
-    const MEAN_OBLIQUITY: f64 = 23.4392911; // J2000 standard mean obliquity
+    let obliquity = if obliquity_deg > 0.0 { obliquity_deg } else { 23.4392911 };
     let naibod_key = 59.0 / 60.0 + 8.0 / 3600.0; // 0.985647 deg per tropical year
     let max_arc = max_age * naibod_key;
 
     // 1. Compute equatorial coordinates for primary significators
-    let (ramc, _) = ecliptic_to_equatorial(natal_midheaven, MEAN_OBLIQUITY);
+    let (ramc, _) = ecliptic_to_equatorial(natal_midheaven, obliquity);
     // In celestial mechanics, OA of Ascendant = RA - AD of natal Ascendant
-    let (ra_asc, dec_asc) = ecliptic_to_equatorial(natal_ascendant, MEAN_OBLIQUITY);
+    let (ra_asc, dec_asc) = ecliptic_to_equatorial(natal_ascendant, obliquity);
     let ad_asc = ascensional_difference(dec_asc, latitude);
     let oa_asc = oblique_ascension(ra_asc, ad_asc);
 
@@ -604,7 +609,7 @@ pub fn calculate_primary_directions(
 
             for ray_offset in ray_offsets {
                 let asp_ecliptic_lon = (prom_lon + ray_offset).rem_euclid(360.0);
-                let (ra_asp, dec_asp) = ecliptic_to_equatorial(asp_ecliptic_lon, MEAN_OBLIQUITY);
+                let (ra_asp, dec_asp) = ecliptic_to_equatorial(asp_ecliptic_lon, obliquity);
                 let ad_asp = ascensional_difference(dec_asp, latitude);
                 let oa_asp = oblique_ascension(ra_asp, ad_asp);
 
@@ -675,6 +680,8 @@ pub struct PredictiveSuite {
     pub target_year: i32,
     pub target_month: u32,
     pub target_day: u32,
+    pub target_hour: u32,
+    pub target_minute: u32,
     pub age: u32,
     pub profection: AnnualProfectionResult,
     pub solar_arc: SolarArcResult,
@@ -696,9 +703,13 @@ pub fn calculate_predictive_suite(
     target_year: i32,
     target_month: u32,
     target_day: u32,
+    target_hour: Option<u32>,
+    target_minute: Option<u32>,
     natal_ascendant: f64,
     natal_midheaven: f64,
     natal_planets: &[(&str, f64)],
+    house_system: Option<vedaksha::astro::houses::HouseSystem>,
+    true_obliquity_deg: Option<f64>,
 ) -> PredictiveSuite {
     let profection = calculate_annual_profection(birth_year, target_year, natal_ascendant, natal_planets);
     let solar_arc = calculate_solar_arc_detailed(
@@ -717,30 +728,36 @@ pub fn calculate_predictive_suite(
     let solar_return = if let Some(sun_lon) = natal_sun_lon {
         calculate_solar_return_with_natal_sun(
             birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_second,
-            latitude, longitude, target_year, sun_lon,
+            latitude, longitude, target_year, sun_lon, house_system,
         ).ok()
     } else {
         calculate_solar_return(
             birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_second,
-            latitude, longitude, target_year,
+            latitude, longitude, target_year, house_system,
         ).ok()
     };
 
+    let actual_target_hour = target_hour.unwrap_or(birth_hour);
+    let actual_target_minute = target_minute.unwrap_or(birth_minute);
+
     let transits = calculate_transits(
-        target_year, target_month, target_day, 12, 0,
+        target_year, target_month, target_day, actual_target_hour, actual_target_minute,
         latitude, longitude, natal_planets,
     ).unwrap_or_default();
 
     let age = if target_year >= birth_year { (target_year - birth_year) as u32 } else { 0 };
 
+    let eps = true_obliquity_deg.unwrap_or(23.4392911);
     let primary = calculate_primary_directions(
-        natal_planets, natal_ascendant, natal_midheaven, latitude, age as f64, 100.0,
+        natal_planets, natal_ascendant, natal_midheaven, latitude, eps, age as f64, 100.0,
     );
 
     PredictiveSuite {
         target_year,
         target_month,
         target_day,
+        target_hour: actual_target_hour,
+        target_minute: actual_target_minute,
         age,
         profection,
         solar_arc,
@@ -772,11 +789,16 @@ mod tests {
             1990, 5, 15, 14, 30, 0.0,
             37.5665, 126.9780,
             2026, 5, 15,
+            Some(14), Some(30),
             180.0, 90.0,
             &natal_planets,
+            Some(vedaksha::astro::houses::HouseSystem::Regiomontanus),
+            Some(23.44),
         );
 
         assert_eq!(suite.age, 36);
+        assert_eq!(suite.target_hour, 14);
+        assert_eq!(suite.target_minute, 30);
         assert_eq!(suite.profection.profected_house, 1);
         assert!(suite.solar_arc.arc_degrees > 30.0);
         assert!(suite.solar_return.is_some());

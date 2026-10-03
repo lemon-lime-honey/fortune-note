@@ -320,11 +320,15 @@ impl FortuneBackendService {
         Ok(format_profile_saju_markdown(&profile, &chart))
     }
 
-    pub fn export_profile_western_markdown(&self, id: &str) -> Result<String, FortuneBackendError> {
+    pub fn export_profile_western_markdown(
+        &self,
+        id: &str,
+        house_system_name: Option<&str>,
+    ) -> Result<String, FortuneBackendError> {
         let profile = self
             .get_profile(id)?
             .ok_or_else(|| FortuneBackendError::NotFoundError(format!("Profile {} not found", id)))?;
-        let chart = self.calculate_profile_chart(id)?;
+        let chart = self.calculate_profile_chart_with_house(id, house_system_name)?;
         Ok(format_profile_western_markdown(&profile, &chart))
     }
 
@@ -342,6 +346,9 @@ impl FortuneBackendService {
         target_year: i32,
         target_month: u32,
         target_day: u32,
+        target_hour: Option<u32>,
+        target_minute: Option<u32>,
+        house_system_name: Option<&str>,
     ) -> Result<fortune_core::western::predictive::PredictiveSuite, FortuneBackendError> {
         let profile = self
             .get_profile(id)?
@@ -370,11 +377,15 @@ impl FortuneBackendService {
         )
         .map_err(|e| FortuneBackendError::CalculationError(format!("Ephemeris error: {}", e)))?;
 
+        let western_house_sys = house_system_name
+            .and_then(WesternHouseSystem::from_str_name)
+            .unwrap_or(WesternHouseSystem::Placidus);
+
         let house_result = fortune_core::western::compute_houses(
             ephem.ramc,
             profile.latitude,
             ephem.true_obliquity_deg,
-            fortune_core::western::HouseSystem::Placidus,
+            western_house_sys.to_vedaksha_system(),
         );
 
         let mut natal_planets = Vec::new();
@@ -396,9 +407,13 @@ impl FortuneBackendService {
             target_year,
             target_month,
             target_day,
+            target_hour,
+            target_minute,
             house_result.asc,
             house_result.mc,
             &natal_planets,
+            Some(western_house_sys.to_vedaksha_system()),
+            Some(ephem.true_obliquity_deg),
         );
 
         Ok(suite)
@@ -782,7 +797,7 @@ mod tests {
         assert!(!saju_md.contains("Vedic Sidereal"));
 
         let western_md = service
-            .export_profile_western_markdown(&profile.id)
+            .export_profile_western_markdown(&profile.id, None)
             .expect("western markdown export failed");
         assert!(western_md.contains("Western Tropical Natal Chart"));
         assert!(western_md.contains("Major Aspects"));

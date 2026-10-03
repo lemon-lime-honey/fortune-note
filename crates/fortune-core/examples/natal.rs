@@ -394,9 +394,13 @@ fn main() {
         today.year(),
         today.month(),
         today.day(),
+        Some(hour),
+        Some(minute),
         output.western.ascendant,
         output.western.midheaven,
         &natal_planet_tuples,
+        Some(vedaksha::astro::houses::HouseSystem::Placidus),
+        Some(output.ephemeris.true_obliquity_deg),
     );
 
     println!("[3-C. Western Predictive Suite (Target: {})]", today);
