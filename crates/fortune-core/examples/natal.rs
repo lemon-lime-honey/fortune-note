@@ -416,14 +416,14 @@ fn main() {
     }
     if let Some(ref sec) = pred_suite.secondary_progression {
         println!(
-            "  Secondary Progression : Progressed Date {} UTC, Lunar Phase [{}]",
+            "  Secondary Progression : Progressed Date {}, Lunar Phase [{}]",
             sec.progressed_date_utc,
             sec.progressed_lunar_phase
         );
     }
     if let Some(ref sr) = pred_suite.solar_return {
         println!(
-            "  Solar Return (Current): Moment {} UTC (Return ASC: {}, Return MC: {})",
+            "  Solar Return (Current): Moment {} (Return ASC: {}, Return MC: {})",
             sr.return_date_utc,
             format_deg(sr.ascendant),
             format_deg(sr.midheaven)

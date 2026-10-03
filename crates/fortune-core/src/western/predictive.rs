@@ -9,7 +9,8 @@
 
 use serde::{Deserialize, Serialize};
 use super::dignity::DOMICILE_RULERS;
-use crate::ephemeris::compute_ephemeris;
+use crate::ephemeris::{compute_ephemeris, find_solar_longitude_moment};
+use crate::timezone::resolve_local_to_utc;
 use vedaksha::ephem::julian::calendar_to_jd;
 
 const ZODIAC_SIGNS: [&str; 12] = [
@@ -243,16 +244,31 @@ pub fn calculate_secondary_progressions(
     target_day: u32,
     natal_planets: &[(&str, f64)],
 ) -> Result<SecondaryProgressionResult, String> {
-    let birth_time_fraction = (birth_hour as f64 + (birth_minute as f64 + birth_second / 60.0) / 60.0) / 24.0;
-    let birth_jd = calendar_to_jd(birth_year, birth_month, birth_day as f64 + birth_time_fraction);
+    let tz_res = resolve_local_to_utc(
+        birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_second,
+        latitude, longitude,
+    ).map_err(|e| format!("Timezone resolution failed: {}", e))?;
 
-    let target_jd = calendar_to_jd(target_year, target_month, target_day as f64 + birth_time_fraction);
+    let birth_time_fraction = (tz_res.utc_hour as f64 + (tz_res.utc_minute as f64 + tz_res.utc_second / 60.0) / 60.0) / 24.0;
+    let birth_utc_jd = calendar_to_jd(tz_res.utc_year, tz_res.utc_month, tz_res.utc_day as f64 + birth_time_fraction);
 
-    let elapsed_days = (target_jd - birth_jd).max(0.0);
-    // Standard secondary progression: 1 Ephemeris Day = 1 Mean Tropical Year (365.24219878 days)
-    let elapsed_years = elapsed_days / 365.242_198_78;
+    // Standard secondary progression: 1 Ephemeris Day = 1 Tropical/Solar Year
+    // Day-for-a-Year milestone mapping aligned to completed birthday years + intra-year fraction
+    let (last_bday_year, next_bday_year, completed_years) = if (target_month, target_day) >= (birth_month, birth_day) {
+        (target_year, target_year + 1, (target_year - birth_year).max(0) as f64)
+    } else {
+        (target_year - 1, target_year, (target_year - birth_year - 1).max(0) as f64)
+    };
 
-    let progressed_jd = birth_jd + elapsed_years;
+    let last_bday_jd = calendar_to_jd(last_bday_year, birth_month, birth_day as f64);
+    let next_bday_jd = calendar_to_jd(next_bday_year, birth_month, birth_day as f64);
+    let target_day_jd = calendar_to_jd(target_year, target_month, target_day as f64);
+
+    let year_span = (next_bday_jd - last_bday_jd).max(1.0);
+    let year_fraction = ((target_day_jd - last_bday_jd) / year_span).clamp(0.0, 1.0);
+
+    let elapsed_years = completed_years + year_fraction;
+    let progressed_jd = birth_utc_jd + elapsed_years;
     let (py, pm, pd, ph, pmin, ps) = jd_to_calendar(progressed_jd);
 
     let ephem = compute_ephemeris(py, pm, pd, ph, pmin, ps, latitude, longitude)
@@ -307,7 +323,7 @@ pub fn calculate_secondary_progressions(
     }
 
     Ok(SecondaryProgressionResult {
-        progressed_date_utc: format!("{:04}-{:02}-{:02} {:02}:{:02}", py, pm, pd, ph, pmin),
+        progressed_date_utc: format!("{:04}-{:02}-{:02} {:02}:{:02} UTC", py, pm, pd, ph, pmin),
         elapsed_tropical_years: elapsed_years,
         planets,
         progressed_lunar_phase,
@@ -316,7 +332,7 @@ pub fn calculate_secondary_progressions(
 }
 
 // ---------------------------------------------------------------------------
-// 4. Solar Return (Newton-Raphson solver)
+// 4. Solar Return (Exact Newton-Raphson solver at natal coordinates)
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -342,9 +358,15 @@ pub fn calculate_solar_return(
     longitude: f64,
     target_year: i32,
 ) -> Result<SolarReturnResult, String> {
-    // 1. Calculate natal Sun longitude
-    let natal_ephem = compute_ephemeris(
+    // 1. Resolve exact natal UTC timestamp
+    let tz_res = resolve_local_to_utc(
         birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_second,
+        latitude, longitude,
+    ).map_err(|e| format!("Timezone resolution failed: {}", e))?;
+
+    let natal_ephem = compute_ephemeris(
+        tz_res.utc_year, tz_res.utc_month, tz_res.utc_day,
+        tz_res.utc_hour, tz_res.utc_minute, tz_res.utc_second,
         latitude, longitude,
     ).map_err(|e| format!("Natal ephemeris error: {}", e))?;
 
@@ -352,39 +374,22 @@ pub fn calculate_solar_return(
         .ok_or_else(|| "Sun not found in natal ephemeris".to_string())?;
     let target_sun_lon = natal_sun.tropical_longitude;
 
-    // 2. Initial guess: same calendar date in target_year
-    let mut cur_jd = calendar_to_jd(
-        target_year,
-        birth_month,
-        birth_day as f64 + (birth_hour as f64 + birth_minute as f64 / 60.0) / 24.0,
-    );
+    // 2. Initial guess in target_year using exact birth UTC JD
+    let birth_time_frac = (tz_res.utc_hour as f64 + (tz_res.utc_minute as f64 + tz_res.utc_second / 60.0) / 60.0) / 24.0;
+    let birth_utc_jd = calendar_to_jd(tz_res.utc_year, tz_res.utc_month, tz_res.utc_day as f64 + birth_time_frac);
+    let year_diff = (target_year - birth_year) as f64;
+    let approx_jd = birth_utc_jd + year_diff * 365.242_198_78;
 
-    // 3. Newton-Raphson iteration
-    let mut return_ephem = None;
-    for _ in 0..10 {
-        let (y, m, d, h, min, s) = jd_to_calendar(cur_jd);
-        let ephem = compute_ephemeris(y, m, d, h, min, s, latitude, longitude)
-            .map_err(|e| format!("Solar return iteration error: {}", e))?;
-        let sun = ephem.get_body("Sun")
-            .ok_or_else(|| "Sun not found during return search".to_string())?;
+    // 3. Newton-Raphson exact solar return solver (1e-7 deg precision)
+    let exact_jd = find_solar_longitude_moment(approx_jd, target_sun_lon)
+        .map_err(|e| format!("Solar return solver failed: {}", e))?;
 
-        let mut diff = sun.tropical_longitude - target_sun_lon;
-        if diff > 180.0 { diff -= 360.0; }
-        if diff < -180.0 { diff += 360.0; }
+    let (ry, rm, rd, rh, rmin, rs) = jd_to_calendar(exact_jd);
 
-        if diff.abs() < 1e-5 {
-            return_ephem = Some(ephem);
-            break;
-        }
+    // 4. Return chart observation at natal coordinates
+    let final_ephem = compute_ephemeris(ry, rm, rd, rh, rmin, rs, latitude, longitude)
+        .map_err(|e| format!("Solar return ephemeris calculation failed: {}", e))?;
 
-        let speed = if sun.speed.abs() > 0.5 { sun.speed } else { 0.9856 };
-        cur_jd -= diff / speed;
-    }
-
-    let final_ephem = return_ephem.ok_or_else(|| "Solar return solver failed to converge".to_string())?;
-    let (ry, rm, rd, rh, rmin, rs) = jd_to_calendar(cur_jd);
-
-    // House calculation for return chart
     let house_result = vedaksha::astro::houses::compute_houses(
         final_ephem.ramc,
         latitude,
@@ -407,8 +412,8 @@ pub fn calculate_solar_return(
 
     Ok(SolarReturnResult {
         return_year: target_year,
-        return_date_utc: format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02} UTC", ry, rm, rd, rh, rmin, rs as u32),
-        exact_jd_ut1: cur_jd,
+        return_date_utc: format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02} UTC", ry, rm, rd, rh, rmin, rs.round() as u32 % 60),
+        exact_jd_ut1: exact_jd,
         sun_longitude: target_sun_lon,
         ascendant: house_result.asc,
         midheaven: house_result.mc,
@@ -441,8 +446,17 @@ pub fn calculate_transits(
     longitude: f64,
     natal_planets: &[(&str, f64)],
 ) -> Result<Vec<TransitContact>, String> {
-    let ephem = compute_ephemeris(
+    let tz_res = resolve_local_to_utc(
         target_year, target_month, target_day, target_hour, target_minute, 0.0,
+        latitude, longitude,
+    );
+    let (ty, tm, td, th, tmin, ts) = match tz_res {
+        Ok(ref res) => (res.utc_year, res.utc_month, res.utc_day, res.utc_hour, res.utc_minute, res.utc_second),
+        Err(_) => (target_year, target_month, target_day, target_hour, target_minute, 0.0),
+    };
+
+    let ephem = compute_ephemeris(
+        ty, tm, td, th, tmin, ts,
         latitude, longitude,
     ).map_err(|e| format!("Transit ephemeris failed: {}", e))?;
 
