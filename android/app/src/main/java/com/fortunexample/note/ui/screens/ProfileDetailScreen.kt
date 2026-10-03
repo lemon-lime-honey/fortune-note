@@ -72,7 +72,10 @@ fun ProfileDetailScreen(
     var isVedicLoading by remember { mutableStateOf(false) }
     var vedicError by remember { mutableStateOf<String?>(null) }
 
-    var predictiveTargetYear by remember { mutableIntStateOf(2026) }
+    val todayCal = remember { java.util.Calendar.getInstance() }
+    var predictiveTargetYear by remember { mutableIntStateOf(todayCal.get(java.util.Calendar.YEAR)) }
+    var predictiveTargetMonth by remember { mutableIntStateOf(todayCal.get(java.util.Calendar.MONTH) + 1) }
+    var predictiveTargetDay by remember { mutableIntStateOf(todayCal.get(java.util.Calendar.DAY_OF_MONTH)) }
     var predictiveTargetHour by remember { mutableStateOf<Int?>(null) }
     var predictiveTargetMinute by remember { mutableStateOf<Int?>(null) }
     var predictiveData by remember { mutableStateOf<PredictiveSuiteData?>(null) }
@@ -129,15 +132,15 @@ fun ProfileDetailScreen(
         }
     }
 
-    // 4. Lazy-load predictive suite when user enters Western tab (tab index 1) or changes target year/time/house
-    LaunchedEffect(profile.id, predictiveTargetYear, predictiveTargetHour, predictiveTargetMinute, selectedHouse, selectedDomainTab) {
+    // 4. Lazy-load predictive suite when user enters Western tab (tab index 1) or changes target date/time/house
+    LaunchedEffect(profile.id, predictiveTargetYear, predictiveTargetMonth, predictiveTargetDay, predictiveTargetHour, predictiveTargetMinute, selectedHouse, selectedDomainTab) {
         if (selectedDomainTab == 1) {
             isPredictiveLoading = true
             FortuneApp.repository.calculateProfilePredictiveSuite(
                 id = profile.id,
                 targetYear = predictiveTargetYear,
-                targetMonth = profile.birth_month,
-                targetDay = profile.birth_day,
+                targetMonth = predictiveTargetMonth,
+                targetDay = predictiveTargetDay,
                 targetHour = predictiveTargetHour,
                 targetMinute = predictiveTargetMinute,
                 houseSystem = selectedHouse
@@ -605,9 +608,16 @@ fun ProfileDetailScreen(
                                 profile = profile,
                                 predictiveData = predictiveData,
                                 targetYear = predictiveTargetYear,
+                                targetMonth = predictiveTargetMonth,
+                                targetDay = predictiveTargetDay,
                                 isLoading = isPredictiveLoading,
                                 onYearChange = {
                                     predictiveTargetYear = it
+                                },
+                                onDateChange = { y, m, d ->
+                                    predictiveTargetYear = y
+                                    predictiveTargetMonth = m
+                                    predictiveTargetDay = d
                                 },
                                 onTimeChange = { h, m ->
                                     predictiveTargetHour = h

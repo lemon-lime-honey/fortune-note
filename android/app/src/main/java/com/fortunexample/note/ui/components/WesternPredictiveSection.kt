@@ -66,8 +66,11 @@ fun WesternPredictiveSection(
     profile: ProfileDto,
     predictiveData: PredictiveSuiteData?,
     targetYear: Int,
+    targetMonth: Int = profile.birth_month.toInt(),
+    targetDay: Int = profile.birth_day.toInt(),
     isLoading: Boolean,
     onYearChange: (Int) -> Unit,
+    onDateChange: ((Int, Int, Int) -> Unit)? = null,
     onTimeChange: ((Int?, Int?) -> Unit)? = null
 ) {
     var selectedTechTab by remember { mutableStateOf(0) }
@@ -193,7 +196,7 @@ fun WesternPredictiveSection(
                     1 -> SolarArcCard(predictiveData)
                     2 -> SecondaryProgressionCard(predictiveData)
                     3 -> PlanetaryReturnsCard(predictiveData)
-                    4 -> TransitsCard(predictiveData, onTimeChange)
+                    4 -> TransitsCard(predictiveData, profile, onDateChange, onTimeChange)
                     5 -> PrimaryDirectionsCard(predictiveData)
                 }
             } else if (isLoading) {
@@ -661,8 +664,53 @@ private fun PlanetaryReturnsCard(data: PredictiveSuiteData) {
 @Composable
 private fun TransitsCard(
     data: PredictiveSuiteData,
+    profile: ProfileDto,
+    onDateChange: ((Int, Int, Int) -> Unit)? = null,
     onTimeChange: ((Int?, Int?) -> Unit)? = null
 ) {
+    val context = LocalContext.current
+
+    val openDatePicker = {
+        val dpd = android.app.DatePickerDialog(
+            context,
+            { _, year, monthOfYear, dayOfMonth ->
+                onDateChange?.invoke(year, monthOfYear + 1, dayOfMonth)
+            },
+            data.target_year,
+            (data.target_month.toInt() - 1).coerceIn(0, 11),
+            data.target_day.toInt()
+        )
+        dpd.show()
+    }
+
+    val shiftDays = { days: Int ->
+        val cal = java.util.Calendar.getInstance()
+        cal.set(data.target_year, (data.target_month.toInt() - 1).coerceIn(0, 11), data.target_day.toInt())
+        cal.add(java.util.Calendar.DAY_OF_MONTH, days)
+        onDateChange?.invoke(
+            cal.get(java.util.Calendar.YEAR),
+            cal.get(java.util.Calendar.MONTH) + 1,
+            cal.get(java.util.Calendar.DAY_OF_MONTH)
+        )
+    }
+
+    val setToToday = {
+        val now = java.util.Calendar.getInstance()
+        onDateChange?.invoke(
+            now.get(java.util.Calendar.YEAR),
+            now.get(java.util.Calendar.MONTH) + 1,
+            now.get(java.util.Calendar.DAY_OF_MONTH)
+        )
+    }
+
+    val setToBirthDay = {
+        onDateChange?.invoke(
+            data.target_year,
+            profile.birth_month.toInt(),
+            profile.birth_day.toInt()
+        )
+    }
+
     Column {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -674,8 +722,10 @@ private fun TransitsCard(
                 // 트랜짓 계산 기준 시점 명시 (출생 시각 및 분 기준)
                 Text(
                     text = "${data.target_year}-${String.format("%02d", data.target_month)}-${String.format("%02d", data.target_day)} ${String.format("%02d:%02d", data.target_hour, data.target_minute)} Local",
-                    color = TextSecondary,
-                    fontSize = 11.sp
+                    color = CelestialBlue,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 2.dp)
                 )
             }
             SectionCopyButton(title = "Transits") {
@@ -694,9 +744,60 @@ private fun TransitsCard(
             }
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // 트랜짓 날짜 조정 빠른 칩 (오늘, 날짜 선택, 출생일, -1일, +1일)
+        Text(
+            text = "날짜 (Date)",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            color = TextSecondary
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            FilterChip(
+                selected = false,
+                onClick = { setToToday() },
+                label = { Text("오늘", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
+            )
+            FilterChip(
+                selected = false,
+                onClick = { openDatePicker() },
+                label = { Text("날짜 선택...", fontSize = 11.sp) }
+            )
+            FilterChip(
+                selected = data.target_month.toInt() == profile.birth_month.toInt() && data.target_day.toInt() == profile.birth_day.toInt(),
+                onClick = { setToBirthDay() },
+                label = { Text("출생일", fontSize = 11.sp) }
+            )
+            FilterChip(
+                selected = false,
+                onClick = { shiftDays(-1) },
+                label = { Text("-1일", fontSize = 11.sp) }
+            )
+            FilterChip(
+                selected = false,
+                onClick = { shiftDays(1) },
+                label = { Text("+1일", fontSize = 11.sp) }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         // 트랜짓 시간 조정 빠른 칩
+        Text(
+            text = "시각 (Time)",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            color = TextSecondary
+        )
+        Spacer(modifier = Modifier.height(4.dp))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -732,7 +833,7 @@ private fun TransitsCard(
             )
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         if (data.transits.isEmpty()) {
             Text("No major transiting aspects within 2° orb.", color = TextSecondary, fontSize = 12.sp)
