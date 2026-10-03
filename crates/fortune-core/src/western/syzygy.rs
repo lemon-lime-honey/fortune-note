@@ -28,18 +28,13 @@ pub struct PrenatalSyzygy {
     pub moon_longitude: f64,
 }
 
-/// Calculate the exact prenatal syzygy immediately prior to the given birth JD.
-pub fn calculate_prenatal_syzygy(birth_jd: f64) -> Result<PrenatalSyzygy, String> {
+/// Calculate the exact prenatal syzygy when birth Sun and Moon longitudes are already known.
+pub fn calculate_prenatal_syzygy_with_coords(
+    birth_jd: f64,
+    birth_sun_lon: f64,
+    birth_moon_lon: f64,
+) -> Result<PrenatalSyzygy, String> {
     let provider = AnalyticalProvider;
-
-    // 1. Calculate Sun and Moon at birth
-    let sun_pos = apparent_position(&provider, Body::Sun, birth_jd)
-        .map_err(|e| format!("Sun position calculation failed at birth JD: {:?}", e))?;
-    let moon_pos = apparent_position(&provider, Body::Moon, birth_jd)
-        .map_err(|e| format!("Moon position calculation failed at birth JD: {:?}", e))?;
-
-    let birth_sun_lon = normalize_degrees(sun_pos.ecliptic.longitude.to_degrees());
-    let birth_moon_lon = normalize_degrees(moon_pos.ecliptic.longitude.to_degrees());
 
     let mut elongation = birth_moon_lon - birth_sun_lon;
     if elongation < 0.0 {
@@ -111,4 +106,18 @@ pub fn calculate_prenatal_syzygy(birth_jd: f64) -> Result<PrenatalSyzygy, String
     }
 
     Err("Prenatal syzygy solver failed to converge within 15 iterations".to_string())
+}
+
+/// Calculate the exact prenatal syzygy immediately prior to the given birth JD.
+pub fn calculate_prenatal_syzygy(birth_jd: f64) -> Result<PrenatalSyzygy, String> {
+    let provider = AnalyticalProvider;
+    let sun_pos = apparent_position(&provider, Body::Sun, birth_jd)
+        .map_err(|e| format!("Sun position calculation failed at birth JD: {:?}", e))?;
+    let moon_pos = apparent_position(&provider, Body::Moon, birth_jd)
+        .map_err(|e| format!("Moon position calculation failed at birth JD: {:?}", e))?;
+
+    let birth_sun_lon = normalize_degrees(sun_pos.ecliptic.longitude.to_degrees());
+    let birth_moon_lon = normalize_degrees(moon_pos.ecliptic.longitude.to_degrees());
+
+    calculate_prenatal_syzygy_with_coords(birth_jd, birth_sun_lon, birth_moon_lon)
 }

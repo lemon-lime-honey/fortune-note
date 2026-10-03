@@ -361,7 +361,7 @@ pub fn calculate_western(
     star_check_bodies.push(("Midheaven", midheaven));
     let fixed_star_conjunctions = fixed_stars::detect_fixed_star_conjunctions(&fixed_stars, &star_check_bodies, 1.5);
     // 3.10 Prenatal Syzygy (SAN)
-    let prenatal_syzygy = syzygy::calculate_prenatal_syzygy(ephem.jd_ut1).ok();
+    let prenatal_syzygy = syzygy::calculate_prenatal_syzygy_with_coords(ephem.jd_ut1, sun_lon, moon_lon).ok();
 
     let traditional = Some(WesternTraditionalData {
         planet_dignities,
