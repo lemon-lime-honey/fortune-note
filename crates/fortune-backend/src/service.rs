@@ -10,8 +10,10 @@ use crate::models::{
 use crate::repository::{HoraryRepository, ProfileRepository};
 use chrono::Utc;
 use fortune_core::{
-    calculate_fortune, compute_ephemeris, lookup_timezone_id, resolve_local_to_utc,
-    FortuneCalculationInput, FortuneCalculationOutput, Gender, WesternHouseSystem,
+    calculate_fortune, calculate_fortune_saju, calculate_fortune_vedic, calculate_fortune_western,
+    compute_ephemeris, lookup_timezone_id, resolve_with_timezone,
+    FortuneCalculationInput, FortuneCalculationOutput, Gender, SajuCalculationOutput,
+    VedicCalculationOutput, WesternCalculationOutput, WesternHouseSystem,
 };
 use uuid::Uuid;
 
@@ -208,9 +210,106 @@ impl FortuneBackendService {
             longitude: profile.longitude,
             gender,
             western_house_system,
+            timezone_id: Some(profile.timezone_id.clone()),
         };
 
         calculate_fortune(input).map_err(FortuneBackendError::CalculationError)
+    }
+
+    pub fn calculate_profile_saju(
+        &self,
+        id: &str,
+    ) -> Result<SajuCalculationOutput, FortuneBackendError> {
+        let profile = self
+            .get_profile(id)?
+            .ok_or_else(|| FortuneBackendError::NotFoundError(format!("Profile {} not found", id)))?;
+
+        let gender = if profile.gender == "male" {
+            Gender::Male
+        } else {
+            Gender::Female
+        };
+
+        let input = FortuneCalculationInput {
+            year: profile.birth_year,
+            month: profile.birth_month,
+            day: profile.birth_day,
+            hour: profile.birth_hour,
+            minute: profile.birth_minute,
+            second: 0.0,
+            latitude: profile.latitude,
+            longitude: profile.longitude,
+            gender,
+            western_house_system: None,
+            timezone_id: Some(profile.timezone_id.clone()),
+        };
+
+        calculate_fortune_saju(input).map_err(FortuneBackendError::CalculationError)
+    }
+
+    pub fn calculate_profile_western(
+        &self,
+        id: &str,
+        house_system_name: Option<&str>,
+    ) -> Result<WesternCalculationOutput, FortuneBackendError> {
+        let profile = self
+            .get_profile(id)?
+            .ok_or_else(|| FortuneBackendError::NotFoundError(format!("Profile {} not found", id)))?;
+
+        let gender = if profile.gender == "male" {
+            Gender::Male
+        } else {
+            Gender::Female
+        };
+
+        let western_house_system = house_system_name.and_then(WesternHouseSystem::from_str_name);
+
+        let input = FortuneCalculationInput {
+            year: profile.birth_year,
+            month: profile.birth_month,
+            day: profile.birth_day,
+            hour: profile.birth_hour,
+            minute: profile.birth_minute,
+            second: 0.0,
+            latitude: profile.latitude,
+            longitude: profile.longitude,
+            gender,
+            western_house_system,
+            timezone_id: Some(profile.timezone_id.clone()),
+        };
+
+        calculate_fortune_western(input).map_err(FortuneBackendError::CalculationError)
+    }
+
+    pub fn calculate_profile_vedic(
+        &self,
+        id: &str,
+    ) -> Result<VedicCalculationOutput, FortuneBackendError> {
+        let profile = self
+            .get_profile(id)?
+            .ok_or_else(|| FortuneBackendError::NotFoundError(format!("Profile {} not found", id)))?;
+
+        let gender = if profile.gender == "male" {
+            Gender::Male
+        } else {
+            Gender::Female
+        };
+
+        let input = FortuneCalculationInput {
+            year: profile.birth_year,
+            month: profile.birth_month,
+            day: profile.birth_day,
+            hour: profile.birth_hour,
+            minute: profile.birth_minute,
+            second: 0.0,
+            latitude: profile.latitude,
+            longitude: profile.longitude,
+            gender,
+            western_house_system: None,
+            timezone_id: Some(profile.timezone_id.clone()),
+        };
+
+        calculate_fortune_vedic(input).map_err(FortuneBackendError::CalculationError)
     }
 
     pub fn export_profile_saju_markdown(&self, id: &str) -> Result<String, FortuneBackendError> {
@@ -248,15 +347,14 @@ impl FortuneBackendService {
             .get_profile(id)?
             .ok_or_else(|| FortuneBackendError::NotFoundError(format!("Profile {} not found", id)))?;
 
-        let tz_res = resolve_local_to_utc(
+        let tz_res = resolve_with_timezone(
             profile.birth_year,
             profile.birth_month,
             profile.birth_day,
             profile.birth_hour,
             profile.birth_minute,
             0.0,
-            profile.latitude,
-            profile.longitude,
+            &profile.timezone_id,
         )
         .map_err(|e| FortuneBackendError::CalculationError(format!("Timezone resolution error: {}", e)))?;
 
@@ -463,6 +561,7 @@ impl FortuneBackendService {
             longitude: item.longitude,
             gender: Gender::Male, // 호라리는 차트 자체의 하우스와 행성 배치 분석
             western_house_system,
+            timezone_id: Some(item.timezone_id.clone()),
         };
 
         calculate_fortune(input).map_err(FortuneBackendError::CalculationError)
@@ -513,6 +612,7 @@ impl FortuneBackendService {
             longitude,
             gender,
             western_house_system: None,
+            timezone_id: None,
         };
         calculate_fortune(input).map_err(FortuneBackendError::CalculationError)
     }
@@ -656,6 +756,22 @@ mod tests {
             .calculate_profile_chart(&profile.id)
             .expect("chart calculation failed");
         assert_eq!(chart.saju.daeun_periods.len(), 10);
+
+        // Verify decoupled domain calculations
+        let saju_out = service
+            .calculate_profile_saju(&profile.id)
+            .expect("decoupled saju failed");
+        assert_eq!(saju_out.saju.daeun_periods.len(), 10);
+
+        let western_out = service
+            .calculate_profile_western(&profile.id, None)
+            .expect("decoupled western failed");
+        assert_eq!(western_out.western.planets.len(), 7);
+
+        let vedic_out = service
+            .calculate_profile_vedic(&profile.id)
+            .expect("decoupled vedic failed");
+        assert_eq!(vedic_out.vedic.vargas.len(), 11);
 
         let saju_md = service
             .export_profile_saju_markdown(&profile.id)

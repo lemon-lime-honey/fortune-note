@@ -125,6 +125,37 @@ impl FortuneClient {
         })
     }
 
+    pub fn calculate_profile_saju(&self, id: String) -> Result<String, FortuneBackendFfiError> {
+        let saju = self.service.calculate_profile_saju(&id)?;
+        serde_json::to_string(&saju).map_err(|e| {
+            FortuneBackendFfiError::SerializationError {
+                detail: format!("Failed to serialize saju output: {}", e),
+            }
+        })
+    }
+
+    pub fn calculate_profile_western(
+        &self,
+        id: String,
+        house_system: Option<String>,
+    ) -> Result<String, FortuneBackendFfiError> {
+        let western = self.service.calculate_profile_western(&id, house_system.as_deref())?;
+        serde_json::to_string(&western).map_err(|e| {
+            FortuneBackendFfiError::SerializationError {
+                detail: format!("Failed to serialize western output: {}", e),
+            }
+        })
+    }
+
+    pub fn calculate_profile_vedic(&self, id: String) -> Result<String, FortuneBackendFfiError> {
+        let vedic = self.service.calculate_profile_vedic(&id)?;
+        serde_json::to_string(&vedic).map_err(|e| {
+            FortuneBackendFfiError::SerializationError {
+                detail: format!("Failed to serialize vedic output: {}", e),
+            }
+        })
+    }
+
     pub fn export_profile_saju_markdown(&self, id: String) -> Result<String, FortuneBackendFfiError> {
         Ok(self.service.export_profile_saju_markdown(&id)?)
     }

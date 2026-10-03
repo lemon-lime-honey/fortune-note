@@ -689,6 +689,12 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_fortune_backend_checksum_method_fortuneclient_calculate_profile_predictive_suite(
     ): Int
+    external fun uniffi_fortune_backend_checksum_method_fortuneclient_calculate_profile_saju(
+    ): Int
+    external fun uniffi_fortune_backend_checksum_method_fortuneclient_calculate_profile_vedic(
+    ): Int
+    external fun uniffi_fortune_backend_checksum_method_fortuneclient_calculate_profile_western(
+    ): Int
     external fun uniffi_fortune_backend_checksum_method_fortuneclient_calculate_solar_arc(
     ): Int
     external fun uniffi_fortune_backend_checksum_method_fortuneclient_create_horary(
@@ -764,6 +770,12 @@ internal object UniffiLib {
     external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_profile_chart_with_house(`ptr`: Long,`id`: RustBuffer.ByValue,`houseSystem`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_profile_predictive_suite(`ptr`: Long,`id`: RustBuffer.ByValue,`targetYear`: Int,`targetMonth`: Int,`targetDay`: Int,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_profile_saju(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_profile_vedic(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_profile_western(`ptr`: Long,`id`: RustBuffer.ByValue,`houseSystem`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_solar_arc(`ptr`: Long,`birthYear`: Int,`birthMonth`: Int,`birthDay`: Int,`targetYear`: Int,`targetMonth`: Int,`targetDay`: Int,`natalPlanetsJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -944,6 +956,15 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_calculate_profile_predictive_suite() and 0xFFFF) != 6196) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_calculate_profile_saju() and 0xFFFF) != 46256) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_calculate_profile_vedic() and 0xFFFF) != 23388) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_calculate_profile_western() and 0xFFFF) != 6880) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_calculate_solar_arc() and 0xFFFF) != 1870) {
@@ -1421,6 +1442,12 @@ public interface FortuneClientInterface {
     
     fun `calculateProfilePredictiveSuite`(`id`: kotlin.String, `targetYear`: kotlin.Int, `targetMonth`: kotlin.UInt, `targetDay`: kotlin.UInt): kotlin.String
     
+    fun `calculateProfileSaju`(`id`: kotlin.String): kotlin.String
+    
+    fun `calculateProfileVedic`(`id`: kotlin.String): kotlin.String
+    
+    fun `calculateProfileWestern`(`id`: kotlin.String, `houseSystem`: kotlin.String?): kotlin.String
+    
     fun `calculateSolarArc`(`birthYear`: kotlin.Int, `birthMonth`: kotlin.UInt, `birthDay`: kotlin.UInt, `targetYear`: kotlin.Int, `targetMonth`: kotlin.UInt, `targetDay`: kotlin.UInt, `natalPlanetsJson`: kotlin.String): kotlin.String
     
     fun `createHorary`(`paramsJson`: kotlin.String): kotlin.String
@@ -1685,6 +1712,52 @@ open class FortuneClient: Disposable, AutoCloseable, FortuneClientInterface
         FfiConverterInt.lower(`targetYear`),
         FfiConverterUInt.lower(`targetMonth`),
         FfiConverterUInt.lower(`targetDay`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(FortuneBackendFfiException::class)override fun `calculateProfileSaju`(`id`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
+    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_calculate_profile_saju(
+        it,
+        
+        FfiConverterString.lower(`id`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(FortuneBackendFfiException::class)override fun `calculateProfileVedic`(`id`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
+    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_calculate_profile_vedic(
+        it,
+        
+        FfiConverterString.lower(`id`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(FortuneBackendFfiException::class)override fun `calculateProfileWestern`(`id`: kotlin.String, `houseSystem`: kotlin.String?): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
+    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_calculate_profile_western(
+        it,
+        
+        FfiConverterString.lower(`id`),
+        FfiConverterOptionalString.lower(`houseSystem`),_status)
 }
     }
     )

@@ -166,6 +166,7 @@ fn main() {
         longitude,
         gender,
         western_house_system: None,
+        timezone_id: None,
     };
 
     let output = match calculate_fortune(input) {
