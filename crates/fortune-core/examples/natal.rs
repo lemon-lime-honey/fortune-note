@@ -4,6 +4,7 @@
 //! All 8 arguments (year, month, day, hour, minute, latitude, longitude, gender)
 //! are strictly required with no arbitrary defaults.
 
+use chrono::Datelike;
 use fortune_core::{FortuneCalculationInput, Gender, VargaDivision, calculate_fortune};
 use std::env;
 
@@ -303,6 +304,124 @@ fn main() {
                 asp.planet1, asp.aspect_type, asp.planet2, asp.actual_angle, asp.orb
             );
         }
+    }
+    println!();
+
+    if let Some(ref trad) = output.western.traditional {
+        println!("[3-B. William Lilly Traditional Analysis]");
+        println!(
+            "  Planetary Hours : Day of {}, Hour of {} (Radicality: {} - {})",
+            trad.planetary_hours.day_ruler,
+            trad.planetary_hours.hour_ruler,
+            if trad.planetary_hours.is_radical { "Radical" } else { "Non-radical" },
+            trad.planetary_hours.radicality_reason
+        );
+        println!(
+            "  Moon Condition  : Phase [{}], VOC [{}], Via Combusta [{}]",
+            trad.moon_condition.lunar_phase_name,
+            if trad.moon_condition.is_void_of_course { "Void of Course" } else { "None" },
+            if trad.moon_condition.is_via_combusta { "Via Combusta" } else { "None" }
+        );
+        if let Some(ref next_asp) = trad.moon_condition.next_applying_aspect {
+            println!("    Next Applying Aspect: {}", next_asp);
+        }
+
+        println!("  Essential Dignities & Lilly Scores:");
+        for d in &trad.planet_dignities {
+            let mut status = Vec::new();
+            if d.is_in_domicile { status.push("Domicile"); }
+            if d.is_in_exaltation { status.push("Exaltation"); }
+            if d.is_in_triplicity { status.push("Triplicity"); }
+            if d.is_in_term { status.push("Term"); }
+            if d.is_in_face { status.push("Face"); }
+            if d.is_in_detriment { status.push("Detriment"); }
+            if d.is_in_fall { status.push("Fall"); }
+            if d.is_peregrine { status.push("Peregrine"); }
+            let status_str = if status.is_empty() { "None".to_string() } else { status.join(", ") };
+
+            println!(
+                "    {:<8} : {:<22} | Score: {:+2} Ess, {:+2} Acc = {:+2} Total",
+                d.planet.name(), status_str, d.essential_score, d.accidental_score, d.total_lilly_score
+            );
+        }
+
+        if !trad.arabic_parts.is_empty() {
+            println!("  Arabic Parts:");
+            for part in &trad.arabic_parts {
+                println!(
+                    "    {:<18} : {} (House {:02}, Ruler: {})",
+                    part.name, format_deg(part.longitude), part.house_number, part.ruler
+                );
+            }
+        }
+
+        if !trad.fixed_star_conjunctions.is_empty() {
+            println!("  Fixed Star Conjunctions (Orb <= 1.5°):");
+            for sc in &trad.fixed_star_conjunctions {
+                println!(
+                    "    {} ☌ {} (Orb: {:.2}°, Nature: {}): {}",
+                    sc.star_name, sc.body_name, sc.orb, sc.nature, sc.meaning
+                );
+            }
+        }
+        println!();
+    }
+
+    // Predictive Suite for current moment
+    let today = chrono::Utc::now().naive_utc().date();
+    let natal_planet_tuples: Vec<(&str, f64)> = output
+        .western
+        .planets
+        .iter()
+        .map(|p| (p.name.as_str(), p.longitude))
+        .collect();
+    let pred_suite = fortune_core::western::predictive::calculate_predictive_suite(
+        year,
+        month,
+        day,
+        hour,
+        minute,
+        second,
+        latitude,
+        longitude,
+        today.year(),
+        today.month(),
+        today.day(),
+        output.western.ascendant,
+        output.western.midheaven,
+        &natal_planet_tuples,
+    );
+
+    println!("[3-C. Western Predictive Suite (Target: {})]", today);
+    println!(
+        "  Annual Profection     : Age {}, Active House {:02} ({}), Lord: {}",
+        pred_suite.profection.target_age,
+        pred_suite.profection.profected_house,
+        pred_suite.profection.profected_sign_name,
+        pred_suite.profection.lord_of_the_year
+    );
+    println!(
+        "  Solar Arc Directions  : Arc {:.4}° (Contacts: {})",
+        pred_suite.solar_arc.arc_degrees,
+        pred_suite.solar_arc.contacts.len()
+    );
+    for c in pred_suite.solar_arc.contacts.iter().take(3) {
+        println!("    -> {} {} {} (Orb: {:.2}°)", c.moving_body, c.aspect_type, c.natal_body, c.orb);
+    }
+    if let Some(ref sec) = pred_suite.secondary_progression {
+        println!(
+            "  Secondary Progression : Progressed Date {} UTC, Lunar Phase [{}]",
+            sec.progressed_date_utc,
+            sec.progressed_lunar_phase
+        );
+    }
+    if let Some(ref sr) = pred_suite.solar_return {
+        println!(
+            "  Solar Return (Current): Moment {} UTC (Return ASC: {}, Return MC: {})",
+            sr.return_date_utc,
+            format_deg(sr.ascendant),
+            format_deg(sr.midheaven)
+        );
     }
     println!();
 
