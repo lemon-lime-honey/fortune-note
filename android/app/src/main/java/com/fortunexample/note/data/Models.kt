@@ -149,7 +149,9 @@ data class WesternPlanetData(
     val sign_index: Int,
     val sign_degree: Double,
     val house_number: Int,
-    val is_retrograde: Boolean
+    val is_retrograde: Boolean,
+    val speed: Double = 0.0,
+    val latitude: Double = 0.0
 )
 
 @Serializable
@@ -176,8 +178,9 @@ data class WesternAspectData(
 data class PlanetDignityData(
     val planet: String,
     val longitude: Double,
-    val house_number: Int,
     val sign_index: Int,
+    val sign_degree: Double = 0.0,
+    val house_number: Int,
     val is_in_domicile: Boolean,
     val is_in_exaltation: Boolean,
     val is_in_triplicity: Boolean,
@@ -188,8 +191,9 @@ data class PlanetDignityData(
     val is_peregrine: Boolean,
     val essential_score: Int,
     val accidental_score: Int,
-    val accidental_reasons: List<String> = emptyList(),
-    val total_lilly_score: Int
+    val total_lilly_score: Int,
+    val accidental_factors: List<String> = emptyList(),
+    val accidental_reasons: List<String> = emptyList()
 )
 
 @Serializable
@@ -219,10 +223,13 @@ data class TraditionalAspectData(
     val planet1: String,
     val planet2: String,
     val aspect_type: String,
+    val exact_angle: Double = 0.0,
+    val actual_angle: Double = 0.0,
     val orb: Double,
     val max_allowed_orb: Double,
     val is_applying: Boolean,
-    val is_partile: Boolean
+    val is_partile: Boolean,
+    val degrees_to_perfection: Double = 0.0
 )
 
 @Serializable
@@ -242,22 +249,27 @@ data class PerfectionReportData(
 
 @Serializable
 data class AntisciaPointData(
-    val planet_name: String,
-    val longitude: Double,
-    val antiscia_longitude: Double,
-    val contra_antiscia_longitude: Double,
-    val antiscia_sign: String
+    val body_name: String,
+    val true_longitude: Double,
+    val antiscion_longitude: Double,
+    val antiscion_sign_index: Int,
+    val antiscion_degree: Double,
+    val contra_antiscion_longitude: Double
 )
 
 @Serializable
-data class HouseAlmutenData(
+data class HouseCuspDignityData(
     val house_number: Int,
-    val cusp_longitude: Double,
-    val almuten_planet: String,
-    val score: Int,
-    val domicile_ruler: String,
-    val exaltation_ruler: String? = null,
-    val triplicity_ruler: String
+    val cusp_degree: Double,
+    val sign_index: Int,
+    val sign_degree: Double,
+    val domicile: String,
+    val exaltation: String? = null,
+    val triplicity: String,
+    val term: String,
+    val face: String,
+    val almuten: String,
+    val almuten_score: Int
 )
 
 @Serializable
@@ -267,19 +279,43 @@ data class ArabicPartData(
     val sign_index: Int,
     val sign_degree: Double,
     val house_number: Int,
-    val formula: String
+    val ruler: String,
+    val formula: String = ""
 )
 
 @Serializable
 data class FixedStarConjunctionData(
     val star_name: String,
+    val korean_name: String = "",
+    val body_name: String,
     val star_longitude: Double,
-    val planet_name: String,
-    val planet_longitude: Double,
+    val body_longitude: Double,
     val orb: Double,
     val nature: String,
-    val magnitude: Double,
-    val description: String
+    val meaning: String
+)
+
+@Serializable
+data class FixedStarInfoData(
+    val name: String,
+    val korean_name: String = "",
+    val longitude: Double,
+    val sign_index: Int,
+    val sign_degree: Double,
+    val nature: String,
+    val meaning: String
+)
+
+@Serializable
+data class PrenatalSyzygyData(
+    val syzygy_type: String,
+    val exact_datetime_utc: String,
+    val exact_jd_ut1: Double,
+    val longitude: Double,
+    val sign_index: Int,
+    val sign_degree: Double,
+    val sun_longitude: Double,
+    val moon_longitude: Double
 )
 
 @Serializable
@@ -288,13 +324,18 @@ data class WesternTraditionalData(
     val moon_condition: MoonConditionData,
     val planetary_hours: PlanetaryHoursData,
     val traditional_aspects: List<TraditionalAspectData> = emptyList(),
-    val mutual_receptions: List<MutualReceptionData> = emptyList(),
-    val perfection_report: PerfectionReportData = PerfectionReportData(),
     val antiscia: List<AntisciaPointData> = emptyList(),
-    val house_almutens: List<HouseAlmutenData> = emptyList(),
+    val mutual_receptions: List<MutualReceptionData> = emptyList(),
+    val perfection: PerfectionReportData = PerfectionReportData(),
+    val cusp_dignities: List<HouseCuspDignityData> = emptyList(),
     val arabic_parts: List<ArabicPartData> = emptyList(),
-    val fixed_star_conjunctions: List<FixedStarConjunctionData> = emptyList()
-)
+    val fixed_stars: List<FixedStarInfoData> = emptyList(),
+    val fixed_star_conjunctions: List<FixedStarConjunctionData> = emptyList(),
+    val prenatal_syzygy: PrenatalSyzygyData? = null
+) {
+    val perfection_report: PerfectionReportData get() = perfection
+    val house_almutens: List<HouseCuspDignityData> get() = cusp_dignities
+}
 
 @Serializable
 data class WesternChartData(
@@ -413,7 +454,8 @@ data class VedicPlanetData(
     val sign_degree: Double,
     val nakshatra_name: String,
     val nakshatra_pada: Int,
-    val is_retrograde: Boolean
+    val is_retrograde: Boolean,
+    val latitude: Double = 0.0
 )
 
 @Serializable

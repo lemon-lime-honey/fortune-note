@@ -396,7 +396,7 @@ private fun generateSelectiveMarkdown(
                             sb.append("  * No major fixed star conjunctions within orb\n")
                         } else {
                             trad.fixed_star_conjunctions.forEach { s ->
-                                sb.append("  * ${s.star_name} ☌ ${s.planet_name} (Orb: ${String.format("%.2f°", s.orb)}, Nature: ${s.nature}): ${s.description}\n")
+                                sb.append("  * ${s.star_name} ☌ ${s.body_name} (Orb: ${String.format("%.2f°", s.orb)}, Nature: ${s.nature}): ${s.meaning}\n")
                             }
                         }
                     }

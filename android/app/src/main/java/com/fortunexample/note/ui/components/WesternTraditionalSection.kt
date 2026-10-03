@@ -311,7 +311,7 @@ fun WesternTraditionalSection(
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Text(
-                                            text = "${fs.star_name} ★ · ${fs.planet_name}",
+                                            text = "${fs.star_name} ★ · ${fs.body_name}",
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 13.sp,
                                             color = TextPrimary
@@ -324,7 +324,7 @@ fun WesternTraditionalSection(
                                         )
                                     }
                                     Text(
-                                        text = fs.description,
+                                        text = fs.meaning,
                                         color = TextSecondary,
                                         fontSize = 12.sp
                                     )
@@ -389,7 +389,7 @@ fun WesternTraditionalSection(
                             ) {
                                 Text(text = "House ${ha.house_number} Cusp", color = TextPrimary, fontSize = 12.sp)
                                 Text(
-                                    text = "Almuten: ${ha.almuten_planet} (${ha.score} pts)",
+                                    text = "Almuten: ${ha.almuten} (${ha.almuten_score} pts)",
                                     color = CelestialBlue,
                                     fontWeight = FontWeight.Medium,
                                     fontSize = 12.sp
