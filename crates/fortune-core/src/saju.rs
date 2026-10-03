@@ -154,19 +154,13 @@ pub fn calculate_saju(
     let month_stem = (base_month_stem + branch_offset) % 10;
     let month_pillar = Pillar::new(month_stem, month_branch);
 
-    // 3. Day Pillar: Epoch 2000-01-01 12:00 UT was Wu-Wu (戊午: stem 4, branch 6)
+    // 3. Day Pillar & Local Solar Hours
     let local_jd = jd + (longitude / 15.0 / 24.0);
-    let day_number = (local_jd + 0.5).floor() as i64;
-    let day_diff = day_number - 2451545;
-    let day_stem = (4 + day_diff).rem_euclid(10) as u8;
-    let day_branch = (6 + day_diff).rem_euclid(12) as u8;
-    let day_pillar = Pillar::new(day_stem, day_branch);
+    let (day_pillar, local_solar_hours) = calculate_day_pillar(local_jd);
 
     // 4. Hour Pillar: Five Rats rule (오서둔시법)
-    let local_solar_hours = ((local_jd + 0.5) % 1.0) * 24.0;
-    let hour_branch = (((local_solar_hours + 1.0) / 2.0).floor() as u8) % 12;
-    let base_hour_stem = (day_stem % 5) * 2;
-    let hour_stem = (base_hour_stem + hour_branch) % 10;
+    let hour_branch = calculate_hour_branch(local_solar_hours);
+    let hour_stem = calculate_hour_stem(day_pillar.stem_index, hour_branch);
     let hour_pillar = Pillar::new(hour_stem, hour_branch);
 
     // 5. DaeUn (10-year major luck progression)
@@ -181,11 +175,7 @@ pub fn calculate_saju(
 
     let mut daeun_periods = Vec::with_capacity(10);
     for i in 1..=10u8 {
-        let (s, b) = if is_forward_daeun {
-            ((month_stem + i) % 10, (month_branch + i) % 12)
-        } else {
-            ((month_stem + 10 - (i % 10)) % 10, (month_branch + 12 - (i % 12)) % 12)
-        };
+        let pillar = calculate_daeun_pillar(month_stem, month_branch, i, is_forward_daeun);
         let start_age = daeun_number + ((i - 1) as u32 * 10);
         let start_jd = jd + term_diff_days + ((i - 1) as f64 * 10.0 * 365.25);
 
@@ -193,7 +183,7 @@ pub fn calculate_saju(
             order: i,
             start_age,
             start_jd,
-            pillar: Pillar::new(s, b),
+            pillar,
         });
     }
 
@@ -206,6 +196,55 @@ pub fn calculate_saju(
         is_forward_daeun,
         daeun_periods,
     })
+}
+
+/// Calculate Day Pillar from local Julian Date.
+/// Epoch: 2000-01-01 12:00 UT was Wu-Wu (戊午: stem 4, branch 6).
+pub fn calculate_day_pillar(local_jd: f64) -> (Pillar, f64) {
+    let day_number = (local_jd + 0.5).floor() as i64;
+    let day_diff = day_number - 2451545;
+    let day_stem = (4 + day_diff).rem_euclid(10) as u8;
+    let day_branch = (6 + day_diff).rem_euclid(12) as u8;
+
+    let day_fraction = (local_jd + 0.5).rem_euclid(1.0);
+    let local_solar_hours = day_fraction * 24.0;
+
+    (Pillar::new(day_stem, day_branch), local_solar_hours)
+}
+
+/// Calculate Earthly Branch index (0..11) for local solar hours (0.0..24.0).
+/// Zi hour (자시) spans 23:00 to 01:00.
+pub fn calculate_hour_branch(local_solar_hours: f64) -> u8 {
+    let normalized_hours = local_solar_hours.rem_euclid(24.0);
+    (((normalized_hours + 1.0) / 2.0).floor() as u8) % 12
+}
+
+/// Calculate Hour Heavenly Stem index (0..9) using Five Rats rule (오서둔시법).
+pub fn calculate_hour_stem(day_stem: u8, hour_branch: u8) -> u8 {
+    let base_hour_stem = (day_stem % 5) * 2;
+    (base_hour_stem + hour_branch) % 10
+}
+
+/// Calculate DaeUn pillar at a given progression step (1-indexed).
+/// Uses mathematical Euclidean remainder for guaranteed safe modular arithmetic.
+pub fn calculate_daeun_pillar(
+    month_stem: u8,
+    month_branch: u8,
+    step: u8,
+    is_forward: bool,
+) -> Pillar {
+    let step_i16 = step as i16;
+    let s = if is_forward {
+        (month_stem as i16 + step_i16).rem_euclid(10) as u8
+    } else {
+        (month_stem as i16 - step_i16).rem_euclid(10) as u8
+    };
+    let b = if is_forward {
+        (month_branch as i16 + step_i16).rem_euclid(12) as u8
+    } else {
+        (month_branch as i16 - step_i16).rem_euclid(12) as u8
+    };
+    Pillar::new(s, b)
 }
 
 #[cfg(test)]
@@ -269,6 +308,68 @@ mod tests {
         let m_first = &saju_male.daeun_periods[0].pillar;
         let f_first = &saju_female.daeun_periods[0].pillar;
         assert_ne!(m_first.stem_index, f_first.stem_index);
+    }
+
+    #[test]
+    fn test_hour_branch_zi_boundary() {
+        // Hai hour (해시: 21:00 ~ 23:00, index 11)
+        assert_eq!(calculate_hour_branch(22.9), 11);
+
+        // Zi hour (자시: 23:00 ~ 01:00, index 0)
+        assert_eq!(calculate_hour_branch(23.0), 0);
+        assert_eq!(calculate_hour_branch(23.5), 0);
+        assert_eq!(calculate_hour_branch(0.0), 0);
+        assert_eq!(calculate_hour_branch(0.5), 0);
+        assert_eq!(calculate_hour_branch(0.99), 0);
+
+        // Chou hour (축시: 01:00 ~ 03:00, index 1)
+        assert_eq!(calculate_hour_branch(1.0), 1);
+        assert_eq!(calculate_hour_branch(1.5), 1);
+
+        // Wrap around safety
+        assert_eq!(calculate_hour_branch(24.0), 0);
+        assert_eq!(calculate_hour_branch(24.5), 0);
+    }
+
+    #[test]
+    fn test_hour_stem_five_rats() {
+        // Gap (0) or Gi (5) day -> Zi hour is Gap-Zi (0)
+        assert_eq!(calculate_hour_stem(0, 0), 0);
+        assert_eq!(calculate_hour_stem(5, 0), 0);
+
+        // Eul (1) or Gyeong (6) day -> Zi hour is Byeong-Zi (2)
+        assert_eq!(calculate_hour_stem(1, 0), 2);
+        assert_eq!(calculate_hour_stem(6, 0), 2);
+
+        // Byeong (2) or Shin (7) day -> Zi hour is Mu-Zi (4)
+        assert_eq!(calculate_hour_stem(2, 0), 4);
+        assert_eq!(calculate_hour_stem(7, 0), 4);
+
+        // Jeong (3) or Im (8) day -> Zi hour is Gyeong-Zi (6)
+        assert_eq!(calculate_hour_stem(3, 0), 6);
+        assert_eq!(calculate_hour_stem(8, 0), 6);
+
+        // Mu (4) or Gye (9) day -> Zi hour is Im-Zi (8)
+        assert_eq!(calculate_hour_stem(4, 0), 8);
+        assert_eq!(calculate_hour_stem(9, 0), 8);
+    }
+
+    #[test]
+    fn test_daeun_modular_progression() {
+        // Month: Gap-In (stem 0, branch 2)
+        // Forward: step 1 -> Eul-Myo (1, 3), step 10 -> Gye-Hae (9, 11)
+        let f_1 = calculate_daeun_pillar(0, 2, 1, true);
+        assert_eq!(f_1.stem_index, 1);
+        assert_eq!(f_1.branch_index, 3);
+
+        let f_10 = calculate_daeun_pillar(0, 2, 10, true);
+        assert_eq!(f_10.stem_index, 0); // 0 + 10 = 10 % 10 = 0 (Gap)
+        assert_eq!(f_10.branch_index, 0); // 2 + 10 = 12 % 12 = 0 (Zi)
+
+        // Reverse: step 1 -> Gye-Chuk (9, 1)
+        let r_1 = calculate_daeun_pillar(0, 2, 1, false);
+        assert_eq!(r_1.stem_index, 9); // (0 - 1).rem_euclid(10) = 9 (Gye)
+        assert_eq!(r_1.branch_index, 1); // (2 - 1).rem_euclid(12) = 1 (Chuk)
     }
 }
 
