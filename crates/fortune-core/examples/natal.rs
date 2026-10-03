@@ -260,7 +260,7 @@ fn main() {
     println!("\n");
 
     // 3. Western Astrology
-    println!("[3. Western Astrology (Tropical, Placidus)]");
+    println!("[3. Western Astrology (Tropical, Regiomontanus)]");
     println!(
         "  Ascendant (ASC) : {}",
         format_deg(output.western.ascendant)
@@ -269,7 +269,7 @@ fn main() {
         "  Midheaven (MC)  : {}",
         format_deg(output.western.midheaven)
     );
-    println!("  Houses (Placidus Cusps):");
+    println!("  Houses (Regiomontanus Cusps):");
     for (i, cusp) in output.western.house_cusps.iter().enumerate() {
         println!("    House {:02} : {}", i + 1, format_deg(*cusp));
     }
@@ -399,7 +399,7 @@ fn main() {
         output.western.ascendant,
         output.western.midheaven,
         &natal_planet_tuples,
-        Some(vedaksha::astro::houses::HouseSystem::Placidus),
+        Some(vedaksha::astro::houses::HouseSystem::Regiomontanus),
         Some(output.ephemeris.true_obliquity_deg),
     );
 

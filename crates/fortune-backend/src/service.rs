@@ -379,7 +379,7 @@ impl FortuneBackendService {
 
         let western_house_sys = house_system_name
             .and_then(WesternHouseSystem::from_str_name)
-            .unwrap_or(WesternHouseSystem::Placidus);
+            .unwrap_or_default();
 
         let house_result = fortune_core::western::compute_houses(
             ephem.ramc,
@@ -976,5 +976,43 @@ mod tests {
         assert!(traditional.get("fixed_star_conjunctions").is_some(), "missing fixed_star_conjunctions in traditional");
         assert!(traditional.get("perfection").is_some(), "missing perfection in traditional");
         assert!(traditional.get("prenatal_syzygy").is_some(), "missing prenatal_syzygy in traditional");
+    }
+
+    #[test]
+    fn test_default_house_system_is_regiomontanus() {
+        let service = FortuneBackendService::new(":memory:").expect("service init failed");
+
+        let p = service
+            .create_profile(CreateProfileParams {
+                name: "기본 하우스 검증 인물".to_string(),
+                gender: "male".to_string(),
+                birth_year: 1990,
+                birth_month: 3,
+                birth_day: 15,
+                birth_hour: 9,
+                birth_minute: 30,
+                latitude: 37.5665,
+                longitude: 126.9780,
+                timezone_id: Some("Asia/Seoul".to_string()),
+                notes: None,
+            })
+            .expect("profile creation failed");
+
+        let default_out = service
+            .calculate_profile_western(&p.id, None)
+            .expect("default calculation failed");
+
+        let regio_out = service
+            .calculate_profile_western(&p.id, Some("Regiomontanus"))
+            .expect("regio calculation failed");
+
+        let placidus_out = service
+            .calculate_profile_western(&p.id, Some("Placidus"))
+            .expect("placidus calculation failed");
+
+        // 기본값(None)의 커스프가 Regiomontanus의 커스프와 정확히 일치해야 함
+        assert_eq!(default_out.western.house_cusps, regio_out.western.house_cusps);
+        // 중간 하우스 커스프(예: 11번 커스프)는 Placidus와 달라야 함
+        assert_ne!(regio_out.western.house_cusps[10], placidus_out.western.house_cusps[10]);
     }
 }

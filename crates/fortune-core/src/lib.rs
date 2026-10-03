@@ -154,7 +154,7 @@ pub fn calculate_fortune_western(
     input: FortuneCalculationInput,
 ) -> Result<WesternCalculationOutput, String> {
     let (tz_res, ephem) = resolve_fortune_context(&input)?;
-    let house_sys = input.western_house_system.unwrap_or(WesternHouseSystem::Placidus);
+    let house_sys = input.western_house_system.unwrap_or_default();
     let western = calculate_western(&ephem, input.latitude, house_sys);
 
     Ok(WesternCalculationOutput {
@@ -184,7 +184,7 @@ pub fn calculate_fortune(
     input: FortuneCalculationInput,
 ) -> Result<FortuneCalculationOutput, String> {
     let (tz_res, ephem) = resolve_fortune_context(&input)?;
-    let house_sys = input.western_house_system.unwrap_or(WesternHouseSystem::Placidus);
+    let house_sys = input.western_house_system.unwrap_or_default();
     let western = calculate_western(&ephem, input.latitude, house_sys);
     let vedic = calculate_vedic(&ephem, input.latitude);
     let saju = calculate_saju(&ephem, input.year, input.longitude, input.gender)

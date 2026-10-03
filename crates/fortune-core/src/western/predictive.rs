@@ -383,7 +383,7 @@ pub fn calculate_solar_return_with_natal_sun(
     let final_ephem = compute_ephemeris(ry, rm, rd, rh, rmin, rs, latitude, longitude)
         .map_err(|e| format!("Solar return ephemeris calculation failed: {}", e))?;
 
-    let h_sys = house_system.unwrap_or(vedaksha::astro::houses::HouseSystem::Placidus);
+    let h_sys = house_system.unwrap_or(vedaksha::astro::houses::HouseSystem::Regiomontanus);
     let house_result = vedaksha::astro::houses::compute_houses(
         final_ephem.ramc,
         latitude,

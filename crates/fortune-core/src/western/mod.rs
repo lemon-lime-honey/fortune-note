@@ -24,14 +24,15 @@ pub mod reception;
 pub mod syzygy;
 
 /// Supported Western house division systems.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum WesternHouseSystem {
+    #[default]
+    Regiomontanus,
     Placidus,
     Koch,
     Equal,
     WholeSign,
     Campanus,
-    Regiomontanus,
 }
 
 impl WesternHouseSystem {

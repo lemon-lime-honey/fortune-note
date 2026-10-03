@@ -66,7 +66,7 @@ fun ProfileDetailScreen(
     var westernOutput by remember { mutableStateOf<WesternCalculationOutputDto?>(null) }
     var isWesternLoading by remember { mutableStateOf(false) }
     var westernError by remember { mutableStateOf<String?>(null) }
-    var selectedHouse by remember { mutableStateOf("Placidus") }
+    var selectedHouse by remember { mutableStateOf("Regiomontanus") }
 
     var vedicOutput by remember { mutableStateOf<VedicCalculationOutputDto?>(null) }
     var isVedicLoading by remember { mutableStateOf(false) }
@@ -281,7 +281,7 @@ fun ProfileDetailScreen(
                             }
                         }
                         1 -> {
-                            val houseSystems = listOf("Placidus", "Regiomontanus", "WholeSign", "Equal", "Koch", "Campanus")
+                            val houseSystems = listOf("Regiomontanus", "Placidus", "WholeSign", "Equal", "Koch", "Campanus")
 
                             Text(
                                 text = "하우스 시스템 (House System)",
