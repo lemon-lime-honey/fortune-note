@@ -171,7 +171,8 @@ data class WesternAspectData(
     val aspect_type: String,
     val exact_angle: Double,
     val actual_angle: Double,
-    val orb: Double
+    val orb: Double,
+    val is_applying: Boolean = false
 )
 
 @Serializable

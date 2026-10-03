@@ -178,11 +178,22 @@ fun HoraryDetailScreen(
                                 Text("Major Aspects", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                                 Spacer(modifier = Modifier.height(10.dp))
                                 chart.western.aspects.forEach { a ->
+                                    val dynStr = if (a.is_applying) "App" else "Sep"
                                     Row(
                                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(text = "${a.planet1} · ${a.planet2}", color = TextPrimary, fontSize = 13.sp)
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(text = "${a.planet1} · ${a.planet2}", color = TextPrimary, fontSize = 13.sp)
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = dynStr,
+                                                color = if (a.is_applying) CelestialBlue else TextSecondary.copy(alpha = 0.7f),
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
                                         Text(
                                             text = "${a.aspect_type} (Orb ${String.format("%.2f°", a.orb)})",
                                             color = TextSecondary,

@@ -277,11 +277,12 @@ fn main() {
     for planet in &output.western.planets {
         let retro = if planet.is_retrograde { " [R]" } else { "" };
         println!(
-            "    {:<8} : {} (House {:02}){}",
+            "    {:<8} : {} (House {:02}){} [Speed: {:+0.2}°/day]",
             planet.name,
             format_deg(planet.longitude),
             planet.house_number,
-            retro
+            retro,
+            planet.speed
         );
     }
     println!("  Lunar Nodes (Dragon's Head & Tail):");
@@ -300,9 +301,10 @@ fn main() {
         println!("    None detected within standard orbs.");
     } else {
         for asp in &output.western.aspects {
+            let dynamic = if asp.is_applying { "Applying" } else { "Separating" };
             println!(
-                "    {:<7} {:<10} {:<7} (Actual: {:.2}°, Orb: {:.2}°)",
-                asp.planet1, asp.aspect_type, asp.planet2, asp.actual_angle, asp.orb
+                "    {:<7} {:<10} {:<7} (Actual: {:.2}°, Orb: {:.2}°, {})",
+                asp.planet1, asp.aspect_type, asp.planet2, asp.actual_angle, asp.orb, dynamic
             );
         }
     }

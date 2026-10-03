@@ -960,18 +960,24 @@ mod tests {
         assert!(a0.get("antiscion_degree").is_some(), "missing antiscion_degree in antiscia");
         assert!(a0.get("contra_antiscion_longitude").is_some(), "missing contra_antiscion_longitude in antiscia");
 
-        // 2. Latitude contract verification
+        // 2. Latitude and Speed contract verification
         let planets = parsed["western"]["planets"].as_array().expect("planets must be array");
         assert!(!planets.is_empty());
         assert!(planets[0].get("latitude").is_some(), "missing latitude in WesternPlanet");
+        assert!(planets[0].get("speed").is_some(), "missing speed in WesternPlanet");
 
-        // 3. Cusp dignities contract verification
+        // 3. Aspects contract verification
+        let aspects = parsed["western"]["aspects"].as_array().expect("aspects must be array");
+        assert!(!aspects.is_empty(), "aspects should not be empty");
+        assert!(aspects[0].get("is_applying").is_some(), "missing is_applying in WesternAspect");
+
+        // 4. Cusp dignities contract verification
         let cusp_dignities = traditional["cusp_dignities"].as_array().expect("cusp_dignities must be array");
         assert_eq!(cusp_dignities.len(), 12, "must have 12 cusp dignities");
         assert!(cusp_dignities[0].get("almuten").is_some(), "missing almuten in cusp_dignities");
         assert!(cusp_dignities[0].get("almuten_score").is_some(), "missing almuten_score in cusp_dignities");
 
-        // 4. Fixed stars contract verification
+        // 5. Fixed stars contract verification
         assert!(traditional.get("fixed_stars").is_some(), "missing fixed_stars in traditional");
         assert!(traditional.get("fixed_star_conjunctions").is_some(), "missing fixed_star_conjunctions in traditional");
         assert!(traditional.get("perfection").is_some(), "missing perfection in traditional");

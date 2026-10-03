@@ -363,7 +363,8 @@ fun ProfileDetailScreen(
                                                 sb.appendLine("Midheaven (MC): ${String.format("%.2f°", westernChart.midheaven)} (${getSignName((westernChart.midheaven / 30.0).toInt() % 12)})")
                                                 westernChart.planets.forEach { p ->
                                                     val rx = if (p.is_retrograde) " [Rx]" else ""
-                                                    sb.appendLine("• ${p.name}$rx: ${String.format("%.2f°", p.sign_degree)} ${getSignName(p.sign_index)} · House ${p.house_number}")
+                                                    val speedStr = String.format("%+0.2f°/d", p.speed)
+                                                    sb.appendLine("• ${p.name}$rx: ${String.format("%.2f°", p.sign_degree)} ${getSignName(p.sign_index)} · House ${p.house_number} · $speedStr")
                                                 }
                                                 westernChart.nodes.forEach { n ->
                                                     sb.appendLine("• ${n.name}: ${String.format("%.2f°", n.sign_degree)} ${getSignName(n.sign_index)} · House ${n.house_number}")
@@ -384,12 +385,22 @@ fun ProfileDetailScreen(
                                     Spacer(modifier = Modifier.height(10.dp))
                                     westernChart.planets.forEach { p ->
                                         val rx = if (p.is_retrograde) " [Rx]" else ""
+                                        val speedStr = String.format("%+0.2f°/d", p.speed)
                                         Row(
                                             modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(text = "${p.name}$rx", color = TextPrimary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(text = "${p.name}$rx", color = TextPrimary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = speedStr,
+                                                    color = if (p.is_retrograde) AccentPrimary else TextSecondary.copy(alpha = 0.8f),
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Normal
+                                                )
+                                            }
                                             Text(
                                                 text = "${String.format("%.2f°", p.sign_degree)} ${getSignName(p.sign_index)} · House ${p.house_number}",
                                                 color = TextSecondary,
@@ -437,7 +448,8 @@ fun ProfileDetailScreen(
                                                     val sb = StringBuilder()
                                                     sb.appendLine("[Western Tropical Chart - Major Aspects]")
                                                     westernChart.aspects.forEach { a ->
-                                                        sb.appendLine("• ${a.planet1} · ${a.planet2}: ${a.aspect_type} (Orb ${String.format("%.2f°", a.orb)})")
+                                                        val dynStr = if (a.is_applying) "Applying" else "Separating"
+                                                        sb.appendLine("• ${a.planet1} · ${a.planet2}: ${a.aspect_type} (Orb ${String.format("%.2f°", a.orb)}, $dynStr)")
                                                     }
                                                     clipboardManager.setText(AnnotatedString(sb.toString().trimEnd()))
                                                     Toast.makeText(context, "Major Aspects 복사 완료", Toast.LENGTH_SHORT).show()
@@ -454,12 +466,22 @@ fun ProfileDetailScreen(
                                         }
                                         Spacer(modifier = Modifier.height(10.dp))
                                         westernChart.aspects.forEach { a ->
+                                            val dynStr = if (a.is_applying) "App" else "Sep"
                                             Row(
                                                 modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
                                                 horizontalArrangement = Arrangement.SpaceBetween,
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Text(text = "${a.planet1} · ${a.planet2}", color = TextPrimary, fontSize = 13.sp)
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(text = "${a.planet1} · ${a.planet2}", color = TextPrimary, fontSize = 13.sp)
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text(
+                                                        text = dynStr,
+                                                        color = if (a.is_applying) AccentPrimary else TextSecondary.copy(alpha = 0.7f),
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Medium
+                                                    )
+                                                }
                                                 Text(
                                                     text = "${a.aspect_type} (Orb ${String.format("%.2f°", a.orb)})",
                                                     color = TextSecondary,

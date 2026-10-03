@@ -106,6 +106,8 @@ pub struct WesternAspect {
     pub exact_angle: f64,
     pub actual_angle: f64,
     pub orb: f64,
+    #[serde(default)]
+    pub is_applying: bool,
 }
 
 /// Complete William Lilly Traditional Astrology Analysis Data.
@@ -242,6 +244,13 @@ pub fn calculate_western(
             for (name, target, max_orb) in aspect_defs {
                 let orb = (shortest - target).abs();
                 if orb <= max_orb {
+                    let future_p1 = (p1.longitude + p1.speed).rem_euclid(360.0);
+                    let future_p2 = (p2.longitude + p2.speed).rem_euclid(360.0);
+                    let future_diff = (future_p1 - future_p2).abs();
+                    let future_shortest = if future_diff > 180.0 { 360.0 - future_diff } else { future_diff };
+                    let future_orb = (future_shortest - target).abs();
+                    let is_applying = future_orb < orb;
+
                     aspects.push(WesternAspect {
                         planet1: p1.name.clone(),
                         planet2: p2.name.clone(),
@@ -249,6 +258,7 @@ pub fn calculate_western(
                         exact_angle: target,
                         actual_angle: shortest,
                         orb,
+                        is_applying,
                     });
                 }
             }

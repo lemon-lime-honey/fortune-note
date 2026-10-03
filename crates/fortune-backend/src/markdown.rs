@@ -86,8 +86,8 @@ fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput) {
         let sign_name = ZODIAC_SIGNS[p.sign_index as usize % 12];
         let retro_str = if p.is_retrograde { " [Rx]" } else { "" };
         out.push_str(&format!(
-            "  * {}: {:.2}° ({}) - House {}{}\n",
-            p.name, p.longitude, sign_name, p.house_number, retro_str
+            "  * {}: {:.2}° ({}) - House {}{} (Speed: {:+0.2}°/day)\n",
+            p.name, p.longitude, sign_name, p.house_number, retro_str, p.speed
         ));
     }
     out.push_str("- Lunar Nodes:\n");
@@ -103,9 +103,10 @@ fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput) {
         out.push_str("  * No major aspects within orb\n");
     } else {
         for a in &chart.western.aspects {
+            let dynamic_str = if a.is_applying { "Applying" } else { "Separating" };
             out.push_str(&format!(
-                "  * {} - {}: {} (Orb: {:.2}°)\n",
-                a.planet1, a.planet2, a.aspect_type, a.orb
+                "  * {} - {}: {} (Orb: {:.2}°, {})\n",
+                a.planet1, a.planet2, a.aspect_type, a.orb, dynamic_str
             ));
         }
     }

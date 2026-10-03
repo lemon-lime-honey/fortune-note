@@ -328,7 +328,8 @@ private fun generateSelectiveMarkdown(
                     w.planets.forEach { p ->
                         val sign = ZODIAC_NAMES.getOrElse(p.sign_index % 12) { "" }
                         val rx = if (p.is_retrograde) " [Rx]" else ""
-                        sb.append("  * ${p.name}: ${String.format("%.2f°", p.longitude)} ($sign) - House ${p.house_number}$rx\n")
+                        val speedStr = String.format("%+0.2f°/day", p.speed)
+                        sb.append("  * ${p.name}: ${String.format("%.2f°", p.longitude)} ($sign) - House ${p.house_number}$rx (Speed: $speedStr)\n")
                     }
                     sb.append("- Lunar Nodes:\n")
                     w.nodes.forEach { n ->
@@ -342,7 +343,8 @@ private fun generateSelectiveMarkdown(
                         sb.append("  * No major aspects within orb\n")
                     } else {
                         w.aspects.forEach { a ->
-                            sb.append("  * ${a.planet1} - ${a.planet2}: ${a.aspect_type} (Orb: ${String.format("%.2f°", a.orb)})\n")
+                            val dyn = if (a.is_applying) "Applying" else "Separating"
+                            sb.append("  * ${a.planet1} - ${a.planet2}: ${a.aspect_type} (Orb: ${String.format("%.2f°", a.orb)}, $dyn)\n")
                         }
                     }
                 }
