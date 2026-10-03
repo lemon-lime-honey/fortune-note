@@ -30,34 +30,101 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fortunexample.note.FortuneApp
-import com.fortunexample.note.data.FortuneChartOutput
 import com.fortunexample.note.data.PredictiveSuiteData
 import com.fortunexample.note.data.ProfileDto
+import com.fortunexample.note.data.SajuCalculationOutputDto
+import com.fortunexample.note.data.VedicCalculationOutputDto
+import com.fortunexample.note.data.WesternCalculationOutputDto
 import com.fortunexample.note.ui.components.*
 import com.fortunexample.note.ui.theme.*
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileDetailScreen(
     profile: ProfileDto,
-    chart: FortuneChartOutput?,
     onBack: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit,
-    onHouseSystemChange: (String) -> Unit = {}
+    onDelete: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var selectedDomainTab by remember { mutableStateOf(0) }
     var selectedVarga by remember { mutableStateOf("D1") }
     var expandedDashaLord by remember { mutableStateOf<String?>(null) }
 
     var showSelectiveCopySheet by remember { mutableStateOf(false) }
 
+    // Decoupled domain states
+    var sajuOutput by remember { mutableStateOf<SajuCalculationOutputDto?>(null) }
+    var isSajuLoading by remember { mutableStateOf(false) }
+    var sajuError by remember { mutableStateOf<String?>(null) }
+
+    var westernOutput by remember { mutableStateOf<WesternCalculationOutputDto?>(null) }
+    var isWesternLoading by remember { mutableStateOf(false) }
+    var westernError by remember { mutableStateOf<String?>(null) }
+    var selectedHouse by remember { mutableStateOf("Placidus") }
+
+    var vedicOutput by remember { mutableStateOf<VedicCalculationOutputDto?>(null) }
+    var isVedicLoading by remember { mutableStateOf(false) }
+    var vedicError by remember { mutableStateOf<String?>(null) }
+
     var predictiveTargetYear by remember { mutableIntStateOf(2026) }
     var predictiveData by remember { mutableStateOf<PredictiveSuiteData?>(null) }
     var isPredictiveLoading by remember { mutableStateOf(false) }
 
-    // Lazy-load predictive suite only when user enters Western tab (tab index 1)
+    // 1. Saju immediate load on screen enter
+    LaunchedEffect(profile.id) {
+        if (sajuOutput == null) {
+            isSajuLoading = true
+            sajuError = null
+            FortuneApp.repository.calculateProfileSaju(profile.id)
+                .onSuccess {
+                    sajuOutput = it
+                    isSajuLoading = false
+                }
+                .onFailure {
+                    sajuError = it.message ?: "사주명리 데이터 계산에 실패했습니다."
+                    isSajuLoading = false
+                }
+        }
+    }
+
+    // 2. Western lazy load on Western tab (tab index 1)
+    LaunchedEffect(profile.id, selectedDomainTab, selectedHouse) {
+        if (selectedDomainTab == 1 && (westernOutput == null || westernOutput?.western?.house_system != selectedHouse)) {
+            isWesternLoading = true
+            westernError = null
+            FortuneApp.repository.calculateProfileWestern(profile.id, selectedHouse)
+                .onSuccess {
+                    westernOutput = it
+                    isWesternLoading = false
+                }
+                .onFailure {
+                    westernError = it.message ?: "서양 점성술 데이터 계산에 실패했습니다."
+                    isWesternLoading = false
+                }
+        }
+    }
+
+    // 3. Vedic lazy load on Vedic tab (tab index 2)
+    LaunchedEffect(profile.id, selectedDomainTab) {
+        if (selectedDomainTab == 2 && vedicOutput == null) {
+            isVedicLoading = true
+            vedicError = null
+            FortuneApp.repository.calculateProfileVedic(profile.id)
+                .onSuccess {
+                    vedicOutput = it
+                    isVedicLoading = false
+                }
+                .onFailure {
+                    vedicError = it.message ?: "베딕 점성술 데이터 계산에 실패했습니다."
+                    isVedicLoading = false
+                }
+        }
+    }
+
+    // 4. Lazy-load predictive suite only when user enters Western tab (tab index 1)
     LaunchedEffect(profile.id, predictiveTargetYear, selectedDomainTab) {
         if (selectedDomainTab == 1 && predictiveData == null) {
             isPredictiveLoading = true
@@ -136,17 +203,12 @@ fun ProfileDetailScreen(
                 Tab(selected = selectedDomainTab == 2, onClick = { selectedDomainTab = 2 }, text = { Text("Vedic", fontWeight = FontWeight.SemiBold) })
             }
 
-            if (chart == null) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = AccentPrimary)
-                }
-            } else {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp)
-                ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp)
+            ) {
                     // 차트 상단 헤더 및 데이터 선택 복사 버튼
                     Row(
                         modifier = Modifier
@@ -167,6 +229,11 @@ fun ProfileDetailScreen(
                         )
                         OutlinedButton(
                             onClick = { showSelectiveCopySheet = true },
+                            enabled = when (selectedDomainTab) {
+                                0 -> sajuOutput != null
+                                1 -> westernOutput != null
+                                else -> vedicOutput != null
+                            },
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                             shape = RoundedCornerShape(8.dp),
                             border = BorderStroke(1.dp, BorderColor)
@@ -183,10 +250,27 @@ fun ProfileDetailScreen(
                     }
 
                     when (selectedDomainTab) {
-                        0 -> SajuChartTable(chart = chart.saju)
+                        0 -> {
+                            if (isSajuLoading) {
+                                Box(modifier = Modifier.fillMaxWidth().height(260.dp), contentAlignment = Alignment.Center) {
+                                    CircularProgressIndicator(color = AccentPrimary)
+                                }
+                            } else if (sajuError != null) {
+                                DomainErrorCard(message = sajuError!!, onRetry = {
+                                    scope.launch {
+                                        isSajuLoading = true
+                                        sajuError = null
+                                        FortuneApp.repository.calculateProfileSaju(profile.id)
+                                            .onSuccess { sajuOutput = it; isSajuLoading = false }
+                                            .onFailure { sajuError = it.message ?: "계산 실패"; isSajuLoading = false }
+                                    }
+                                })
+                            } else if (sajuOutput != null) {
+                                SajuChartTable(chart = sajuOutput!!.saju)
+                            }
+                        }
                         1 -> {
                             val houseSystems = listOf("Placidus", "Regiomontanus", "WholeSign", "Equal", "Koch", "Campanus")
-                            var selectedHouse by remember { mutableStateOf(chart.western.house_system ?: "Placidus") }
 
                             Text(
                                 text = "하우스 시스템 (House System)",
@@ -207,7 +291,6 @@ fun ProfileDetailScreen(
                                         selected = isSelected,
                                         onClick = {
                                             selectedHouse = hSys
-                                            onHouseSystemChange(hSys)
                                         },
                                         label = { Text(hSys, fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
                                         colors = FilterChipDefaults.filterChipColors(
@@ -227,8 +310,25 @@ fun ProfileDetailScreen(
                             }
 
                             Spacer(modifier = Modifier.height(14.dp))
-                            WesternChartWheel(chart = chart.western)
-                            Spacer(modifier = Modifier.height(20.dp))
+
+                            if (isWesternLoading) {
+                                Box(modifier = Modifier.fillMaxWidth().height(260.dp), contentAlignment = Alignment.Center) {
+                                    CircularProgressIndicator(color = AccentPrimary)
+                                }
+                            } else if (westernError != null) {
+                                DomainErrorCard(message = westernError!!, onRetry = {
+                                    scope.launch {
+                                        isWesternLoading = true
+                                        westernError = null
+                                        FortuneApp.repository.calculateProfileWestern(profile.id, selectedHouse)
+                                            .onSuccess { westernOutput = it; isWesternLoading = false }
+                                            .onFailure { westernError = it.message ?: "계산 실패"; isWesternLoading = false }
+                                    }
+                                })
+                            } else if (westernOutput != null) {
+                                val westernChart = westernOutput!!.western
+                                WesternChartWheel(chart = westernChart)
+                                Spacer(modifier = Modifier.height(20.dp))
 
                             // Western Planetary Placements 카드
                             Card(
@@ -240,7 +340,7 @@ fun ProfileDetailScreen(
                                 Column(modifier = Modifier.padding(16.dp)) {
                                     Text("Planets & Points", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                                     Spacer(modifier = Modifier.height(10.dp))
-                                    chart.western.planets.forEach { p ->
+                                    westernChart.planets.forEach { p ->
                                         val rx = if (p.is_retrograde) " [Rx]" else ""
                                         Row(
                                             modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
@@ -256,7 +356,7 @@ fun ProfileDetailScreen(
                                         }
                                         HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
                                     }
-                                    chart.western.nodes.forEach { n ->
+                                    westernChart.nodes.forEach { n ->
                                         Row(
                                             modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
                                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -276,7 +376,7 @@ fun ProfileDetailScreen(
 
                             Spacer(modifier = Modifier.height(14.dp))
 
-                            if (chart.western.aspects.isNotEmpty()) {
+                            if (westernChart.aspects.isNotEmpty()) {
                                 Card(
                                     shape = RoundedCornerShape(12.dp),
                                     colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
@@ -286,7 +386,7 @@ fun ProfileDetailScreen(
                                     Column(modifier = Modifier.padding(16.dp)) {
                                         Text("Major Aspects", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                                         Spacer(modifier = Modifier.height(10.dp))
-                                        chart.western.aspects.forEach { a ->
+                                        westernChart.aspects.forEach { a ->
                                             Row(
                                                 modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
                                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -307,7 +407,7 @@ fun ProfileDetailScreen(
                             }
 
                             // 윌리엄 릴리 전통 점성술 분석 섹션
-                            WesternTraditionalSection(traditional = chart.western.traditional)
+                            WesternTraditionalSection(traditional = westernChart.traditional)
 
                             Spacer(modifier = Modifier.height(14.dp))
 
@@ -322,6 +422,7 @@ fun ProfileDetailScreen(
                                     predictiveData = null
                                 }
                             )
+                            }
                         }
                         2 -> {
                             // 11종 바르가 분점도 선택 칩 바
@@ -357,13 +458,30 @@ fun ProfileDetailScreen(
 
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            // 선택된 바르가 다이아몬드 차트
-                            VedicChartDiamond(
-                                chart = chart.vedic,
-                                selectedVargaKey = selectedVarga
-                            )
+                            if (isVedicLoading) {
+                                Box(modifier = Modifier.fillMaxWidth().height(260.dp), contentAlignment = Alignment.Center) {
+                                    CircularProgressIndicator(color = AccentPrimary)
+                                }
+                            } else if (vedicError != null) {
+                                DomainErrorCard(message = vedicError!!, onRetry = {
+                                    scope.launch {
+                                        isVedicLoading = true
+                                        vedicError = null
+                                        FortuneApp.repository.calculateProfileVedic(profile.id)
+                                            .onSuccess { vedicOutput = it; isVedicLoading = false }
+                                            .onFailure { vedicError = it.message ?: "계산 실패"; isVedicLoading = false }
+                                    }
+                                })
+                            } else if (vedicOutput != null) {
+                                val vedicChart = vedicOutput!!.vedic
 
-                            Spacer(modifier = Modifier.height(20.dp))
+                                // 선택된 바르가 다이아몬드 차트
+                                VedicChartDiamond(
+                                    chart = vedicChart,
+                                    selectedVargaKey = selectedVarga
+                                )
+
+                                Spacer(modifier = Modifier.height(20.dp))
 
                             // Sidereal Planetary Placements (낙샤트라 줄바꿈 깨짐 완전 해결)
                             Card(
@@ -373,8 +491,8 @@ fun ProfileDetailScreen(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
-                                    val activeVarga = chart.vedic.vargas[selectedVarga]
-                                    val vargaLagnaSign = activeVarga?.lagna_sign ?: chart.vedic.lagna_sign
+                                    val activeVarga = vedicChart.vargas[selectedVarga]
+                                    val vargaLagnaSign = activeVarga?.lagna_sign ?: vedicChart.lagna_sign
                                     val vargaTitle = vargaList.find { it.first == selectedVarga }?.second ?: selectedVarga
                                     Text(
                                         text = "$vargaTitle Placements",
@@ -393,7 +511,7 @@ fun ProfileDetailScreen(
                                     )
                                     Spacer(modifier = Modifier.height(10.dp))
 
-                                    chart.vedic.planets.forEach { p ->
+                                    vedicChart.planets.forEach { p ->
                                         val rx = if (p.is_retrograde) " [Rx]" else ""
                                         val pPlacement = activeVarga?.placements?.find { it.planet_name == p.name }
                                         val houseNum = pPlacement?.house ?: (((p.sign_index - vargaLagnaSign + 12) % 12) + 1)
@@ -475,7 +593,7 @@ fun ProfileDetailScreen(
                                     )
                                     Spacer(modifier = Modifier.height(10.dp))
 
-                                    chart.vedic.vimshottari_dashas.forEach { d ->
+                                    vedicChart.vimshottari_dashas.forEach { d ->
                                         val isExpanded = expandedDashaLord == d.lord
                                         Column(modifier = Modifier.fillMaxWidth()) {
                                             Row(
@@ -566,9 +684,49 @@ fun ProfileDetailScreen(
             isOpen = showSelectiveCopySheet,
             onDismiss = { showSelectiveCopySheet = false },
             profile = profile,
-            chart = chart,
+            saju = sajuOutput?.saju,
+            western = westernOutput?.western,
+            vedic = vedicOutput?.vedic,
+            timezoneId = sajuOutput?.timezone_id ?: westernOutput?.timezone_id ?: vedicOutput?.timezone_id ?: profile.timezone_id,
+            utcOffsetHours = sajuOutput?.utc_offset_hours ?: westernOutput?.utc_offset_hours ?: vedicOutput?.utc_offset_hours ?: 9.0,
             selectedDomainTab = selectedDomainTab
         )
+    }
+}
+
+@Composable
+private fun DomainErrorCard(
+    message: String,
+    onRetry: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 16.dp),
+        colors = CardDefaults.cardColors(containerColor = AstrologicalRed.copy(alpha = 0.08f)),
+        border = BorderStroke(1.dp, AstrologicalRed.copy(alpha = 0.3f)),
+        shape = RoundedCornerShape(10.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = message,
+                color = AstrologicalRed,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Button(
+                onClick = onRetry,
+                colors = ButtonDefaults.buttonColors(containerColor = AccentPrimary)
+            ) {
+                Text("다시 시도", color = BackgroundWhite, fontSize = 13.sp)
+            }
+        }
     }
 }
 

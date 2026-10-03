@@ -18,8 +18,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.fortunexample.note.data.FortuneChartOutput
-import com.fortunexample.note.data.ProfileDto
+import com.fortunexample.note.data.*
 import com.fortunexample.note.ui.theme.*
 
 private val ZODIAC_NAMES = listOf(
@@ -39,10 +38,20 @@ fun SelectiveCopyBottomSheet(
     isOpen: Boolean,
     onDismiss: () -> Unit,
     profile: ProfileDto,
-    chart: FortuneChartOutput?,
+    chart: FortuneChartOutput? = null,
+    saju: SajuChartData? = chart?.saju,
+    western: WesternChartData? = chart?.western,
+    vedic: VedicChartData? = chart?.vedic,
+    timezoneId: String = chart?.timezone_id ?: profile.timezone_id,
+    utcOffsetHours: Double = chart?.utc_offset_hours ?: 9.0,
     selectedDomainTab: Int // 0: Saju, 1: Western, 2: Vedic
 ) {
-    if (!isOpen || chart == null) return
+    val isDomainDataReady = when (selectedDomainTab) {
+        0 -> saju != null
+        1 -> western != null
+        else -> vedic != null
+    }
+    if (!isOpen || !isDomainDataReady) return
 
     val context = LocalContext.current
 
@@ -182,7 +191,11 @@ fun SelectiveCopyBottomSheet(
                 onClick = {
                     val markdown = generateSelectiveMarkdown(
                         profile = profile,
-                        chart = chart,
+                        timezoneId = timezoneId,
+                        utcOffsetHours = utcOffsetHours,
+                        saju = saju,
+                        western = western,
+                        vedic = vedic,
                         selectedDomainTab = selectedDomainTab,
                         incMeta = incMeta,
                         incSajuPillars = incSajuPillars,
@@ -243,7 +256,11 @@ private fun CopyCheckboxItem(
 
 private fun generateSelectiveMarkdown(
     profile: ProfileDto,
-    chart: FortuneChartOutput,
+    timezoneId: String,
+    utcOffsetHours: Double,
+    saju: SajuChartData?,
+    western: WesternChartData?,
+    vedic: VedicChartData?,
     selectedDomainTab: Int,
     incMeta: Boolean,
     incSajuPillars: Boolean,
@@ -275,7 +292,7 @@ private fun generateSelectiveMarkdown(
         sb.append("- 성별: ${if (profile.gender == "male") "남성" else "여성"}\n")
         sb.append("- 출생 일시: ${profile.birth_year}-${String.format("%02d", profile.birth_month)}-${String.format("%02d", profile.birth_day)} ${String.format("%02d:%02d", profile.birth_hour, profile.birth_minute)} (현지 기준)\n")
         sb.append("- 관측 위치: 위도 ${String.format("%.4f°", profile.latitude)}, 경도 ${String.format("%.4f°", profile.longitude)}\n")
-        sb.append("- 시간대 보정: ${chart.timezone_id} (UTC ${String.format("%+0.1f시간", chart.utc_offset_hours)})\n")
+        sb.append("- 시간대 보정: $timezoneId (UTC ${String.format("%+0.1f시간", utcOffsetHours)})\n")
         if (profile.notes.isNotEmpty()) {
             sb.append("- 비고: ${profile.notes}\n")
         }
@@ -284,144 +301,148 @@ private fun generateSelectiveMarkdown(
 
     when (selectedDomainTab) {
         0 -> {
-            if (incSajuPillars) {
-                sb.append("## 2. 사주팔자 명식 (Four Pillars of Destiny)\n")
-                sb.append("- 명식: 연주 [${chart.saju.year_pillar.korean} (${chart.saju.year_pillar.hanja})], 월주 [${chart.saju.month_pillar.korean} (${chart.saju.month_pillar.hanja})], 일주 [${chart.saju.day_pillar.korean} (${chart.saju.day_pillar.hanja})], 시주 [${chart.saju.hour_pillar.korean} (${chart.saju.hour_pillar.hanja})]\n")
-                sb.append("- 대운 방향: ${if (chart.saju.is_forward_daeun) "순행" else "역행"} (대운수: ${chart.saju.daeun_number})\n")
-            }
-            if (incSajuDaeun) {
-                sb.append("- 10년 주기 대운 흐름:\n")
-                chart.saju.daeun_periods.forEach { d ->
-                    sb.append("  * ${d.start_age}세 ~ ${d.start_age + 9}세: [${d.pillar.korean} (${d.pillar.hanja})]\n")
+            saju?.let { s ->
+                if (incSajuPillars) {
+                    sb.append("## 2. 사주팔자 명식 (Four Pillars of Destiny)\n")
+                    sb.append("- 명식: 연주 [${s.year_pillar.korean} (${s.year_pillar.hanja})], 월주 [${s.month_pillar.korean} (${s.month_pillar.hanja})], 일주 [${s.day_pillar.korean} (${s.day_pillar.hanja})], 시주 [${s.hour_pillar.korean} (${s.hour_pillar.hanja})]\n")
+                    sb.append("- 대운 방향: ${if (s.is_forward_daeun) "순행" else "역행"} (대운수: ${s.daeun_number})\n")
+                }
+                if (incSajuDaeun) {
+                    sb.append("- 10년 주기 대운 흐름:\n")
+                    s.daeun_periods.forEach { d ->
+                        sb.append("  * ${d.start_age}세 ~ ${d.start_age + 9}세: [${d.pillar.korean} (${d.pillar.hanja})]\n")
+                    }
                 }
             }
         }
         1 -> {
-            if (incWesternPlanets) {
-                val ascSign = ZODIAC_NAMES.getOrElse((chart.western.ascendant / 30.0).toInt() % 12) { "" }
-                val mcSign = ZODIAC_NAMES.getOrElse((chart.western.midheaven / 30.0).toInt() % 12) { "" }
-                sb.append("## 2. Celestial Placements & House Cusps\n")
-                sb.append("- Ascendant: ${String.format("%.2f°", chart.western.ascendant)} ($ascSign)\n")
-                sb.append("- Midheaven (MC): ${String.format("%.2f°", chart.western.midheaven)} ($mcSign)\n")
-                chart.western.house_system?.let { sb.append("- House System: $it\n") }
-                sb.append("- Planetary Placements:\n")
-                chart.western.planets.forEach { p ->
-                    val sign = ZODIAC_NAMES.getOrElse(p.sign_index % 12) { "" }
-                    val rx = if (p.is_retrograde) " [Rx]" else ""
-                    sb.append("  * ${p.name}: ${String.format("%.2f°", p.longitude)} ($sign) - House ${p.house_number}$rx\n")
-                }
-                sb.append("- Lunar Nodes:\n")
-                chart.western.nodes.forEach { n ->
-                    val sign = ZODIAC_NAMES.getOrElse(n.sign_index % 12) { "" }
-                    sb.append("  * ${n.name}: ${String.format("%.2f°", n.longitude)} ($sign) - House ${n.house_number}\n")
-                }
-            }
-            if (incWesternAspects) {
-                sb.append("- Major Aspects:\n")
-                if (chart.western.aspects.isEmpty()) {
-                    sb.append("  * No major aspects within orb\n")
-                } else {
-                    chart.western.aspects.forEach { a ->
-                        sb.append("  * ${a.planet1} - ${a.planet2}: ${a.aspect_type} (Orb: ${String.format("%.2f°", a.orb)})\n")
+            western?.let { w ->
+                if (incWesternPlanets) {
+                    val ascSign = ZODIAC_NAMES.getOrElse((w.ascendant / 30.0).toInt() % 12) { "" }
+                    val mcSign = ZODIAC_NAMES.getOrElse((w.midheaven / 30.0).toInt() % 12) { "" }
+                    sb.append("## 2. Celestial Placements & House Cusps\n")
+                    sb.append("- Ascendant: ${String.format("%.2f°", w.ascendant)} ($ascSign)\n")
+                    sb.append("- Midheaven (MC): ${String.format("%.2f°", w.midheaven)} ($mcSign)\n")
+                    w.house_system?.let { sb.append("- House System: $it\n") }
+                    sb.append("- Planetary Placements:\n")
+                    w.planets.forEach { p ->
+                        val sign = ZODIAC_NAMES.getOrElse(p.sign_index % 12) { "" }
+                        val rx = if (p.is_retrograde) " [Rx]" else ""
+                        sb.append("  * ${p.name}: ${String.format("%.2f°", p.longitude)} ($sign) - House ${p.house_number}$rx\n")
+                    }
+                    sb.append("- Lunar Nodes:\n")
+                    w.nodes.forEach { n ->
+                        val sign = ZODIAC_NAMES.getOrElse(n.sign_index % 12) { "" }
+                        sb.append("  * ${n.name}: ${String.format("%.2f°", n.longitude)} ($sign) - House ${n.house_number}\n")
                     }
                 }
-            }
-
-            chart.western.traditional?.let { trad ->
-                sb.append("\n## 3. William Lilly Traditional Analysis\n")
-                if (incWesternHours) {
-                    sb.append("- Planetary Hours: Day of ${trad.planetary_hours.day_ruler}, Hour of ${trad.planetary_hours.hour_ruler} (Radicality: ${if (trad.planetary_hours.is_radical) "Radical" else "Non-radical"} - ${trad.planetary_hours.radicality_reason})\n")
-                    if (trad.planetary_hours.considerations.isNotEmpty()) {
-                        sb.append("- Considerations Before Judgment:\n")
-                        trad.planetary_hours.considerations.forEach { c ->
-                            sb.append("  * $c\n")
+                if (incWesternAspects) {
+                    sb.append("- Major Aspects:\n")
+                    if (w.aspects.isEmpty()) {
+                        sb.append("  * No major aspects within orb\n")
+                    } else {
+                        w.aspects.forEach { a ->
+                            sb.append("  * ${a.planet1} - ${a.planet2}: ${a.aspect_type} (Orb: ${String.format("%.2f°", a.orb)})\n")
                         }
                     }
                 }
-                if (incWesternMoon) {
-                    sb.append("- Moon Condition: Phase [${trad.moon_condition.lunar_phase_name}], VOC [${if (trad.moon_condition.is_void_of_course) "Void of Course" else "None"}], Via Combusta [${if (trad.moon_condition.is_via_combusta) "Via Combusta (15° Lib - 15° Sco)" else "None"}]\n")
-                    trad.moon_condition.next_applying_aspect?.let {
-                        sb.append("  * Next Applying Aspect: $it\n")
+
+                w.traditional?.let { trad ->
+                    sb.append("\n## 3. William Lilly Traditional Analysis\n")
+                    if (incWesternHours) {
+                        sb.append("- Planetary Hours: Day of ${trad.planetary_hours.day_ruler}, Hour of ${trad.planetary_hours.hour_ruler} (Radicality: ${if (trad.planetary_hours.is_radical) "Radical" else "Non-radical"} - ${trad.planetary_hours.radicality_reason})\n")
+                        if (trad.planetary_hours.considerations.isNotEmpty()) {
+                            sb.append("- Considerations Before Judgment:\n")
+                            trad.planetary_hours.considerations.forEach { c ->
+                                sb.append("  * $c\n")
+                            }
+                        }
                     }
-                }
-                if (incWesternDignities && trad.planet_dignities.isNotEmpty()) {
-                    sb.append("\n### Essential Dignities & Lilly Scores\n")
-                    sb.append("| Planet | Longitude | House | Dignity Status | Essential | Accidental | Total Lilly Score |\n")
-                    sb.append("| :--- | :--- | :---: | :--- | :---: | :---: | :---: |\n")
-                    trad.planet_dignities.forEach { d ->
-                        val st = mutableListOf<String>()
-                        if (d.is_in_domicile) st.add("Domicile (+5)")
-                        if (d.is_in_exaltation) st.add("Exaltation (+4)")
-                        if (d.is_in_triplicity) st.add("Triplicity (+3)")
-                        if (d.is_in_term) st.add("Term (+2)")
-                        if (d.is_in_face) st.add("Face (+1)")
-                        if (d.is_in_detriment) st.add("Detriment (-5)")
-                        if (d.is_in_fall) st.add("Fall (-4)")
-                        if (d.is_peregrine) st.add("Peregrine (-5)")
-                        if (st.isEmpty()) st.add("Neutral")
-                        sb.append("| ${d.planet} | ${String.format("%.2f°", d.longitude)} | H${d.house_number} | ${st.joinToString(", ")} | ${String.format("%+d", d.essential_score)} | ${String.format("%+d", d.accidental_score)} | **${String.format("%+d", d.total_lilly_score)}** |\n")
+                    if (incWesternMoon) {
+                        sb.append("- Moon Condition: Phase [${trad.moon_condition.lunar_phase_name}], VOC [${if (trad.moon_condition.is_void_of_course) "Yes" else "None"}], Via Combusta [${if (trad.moon_condition.is_via_combusta) "Yes" else "None"}]\n")
+                        trad.moon_condition.next_applying_aspect?.let { next ->
+                            sb.append("  * Next Applying Aspect: $next\n")
+                        }
                     }
-                }
-                if (incWesternDynamicAspects && trad.traditional_aspects.isNotEmpty()) {
-                    sb.append("\n### Traditional Dynamic Aspects (Applying / Separating, Moiety Orb)\n")
-                    trad.traditional_aspects.forEach { ta ->
-                        val dyn = if (ta.is_applying) "Applying" else "Separating"
-                        val partile = if (ta.is_partile) " [Partile]" else ""
-                        sb.append("- ${ta.planet1} - ${ta.planet2}: ${ta.aspect_type} (Orb: ${String.format("%.2f°", ta.orb)} / Max: ${String.format("%.2f°", ta.max_allowed_orb)})$partile, $dyn\n")
+                    if (incWesternDignities) {
+                        sb.append("- Essential Dignities & Lilly Scores:\n")
+                        trad.planet_dignities.forEach { d ->
+                            val scoreSign = if (d.total_lilly_score >= 0) "+${d.total_lilly_score}" else "${d.total_lilly_score}"
+                            val essSign = if (d.essential_score >= 0) "+${d.essential_score}" else "${d.essential_score}"
+                            val accSign = if (d.accidental_score >= 0) "+${d.accidental_score}" else "${d.accidental_score}"
+                            sb.append("  * ${d.planet}: $scoreSign ($essSign Ess, $accSign Acc)\n")
+                        }
                     }
-                }
-                if (incWesternReceptions && trad.mutual_receptions.isNotEmpty()) {
-                    sb.append("\n### Mutual Reception & Besiegement\n")
-                    trad.mutual_receptions.forEach { mr ->
-                        sb.append("- ${mr.planet1} - ${mr.planet2}: [${mr.reception_type}] ${mr.description}\n")
+                    if (incWesternDynamicAspects) {
+                        sb.append("- Dynamic Classical Aspects:\n")
+                        trad.traditional_aspects.forEach { a ->
+                            val app = if (a.is_applying) "Applying" else "Separating"
+                            val part = if (a.is_partile) " [Partile]" else ""
+                            sb.append("  * ${a.planet1} ${a.aspect_type} ${a.planet2}: $app (Orb: ${String.format("%.2f°", a.orb)})$part\n")
+                        }
                     }
-                }
-                if (incWesternStars && trad.fixed_star_conjunctions.isNotEmpty()) {
-                    sb.append("\n### Fixed Star Conjunctions (Orb ≤ 1.5°)\n")
-                    trad.fixed_star_conjunctions.forEach { fs ->
-                        sb.append("- ${fs.star_name} ☌ ${fs.planet_name}: Orb ${String.format("%.2f°", fs.orb)} (Nature: ${fs.nature}, Mag: ${fs.magnitude}) - ${fs.description}\n")
+                    if (incWesternReceptions) {
+                        sb.append("- Mutual Receptions & Perfections:\n")
+                        trad.mutual_receptions.forEach { r ->
+                            sb.append("  * ${r.planet1} - ${r.planet2}: ${r.reception_type} (${r.description})\n")
+                        }
+                        trad.perfection_report.besiegement.forEach { b ->
+                            sb.append("  * Besiegement: $b\n")
+                        }
                     }
-                }
-                if (incWesternParts && trad.arabic_parts.isNotEmpty()) {
-                    sb.append("\n### Arabic Parts\n")
-                    trad.arabic_parts.forEach { part ->
-                        val sign = ZODIAC_NAMES.getOrElse(part.sign_index % 12) { "" }
-                        sb.append("- ${part.name}: ${String.format("%.2f°", part.longitude)} ($sign, House ${part.house_number}) [Formula: ${part.formula}]\n")
+                    if (incWesternStars) {
+                        sb.append("- Fixed Stars Conjunctions (Orb <= 1.5°):\n")
+                        if (trad.fixed_star_conjunctions.isEmpty()) {
+                            sb.append("  * No major fixed star conjunctions within orb\n")
+                        } else {
+                            trad.fixed_star_conjunctions.forEach { s ->
+                                sb.append("  * ${s.star_name} ☌ ${s.planet_name} (Orb: ${String.format("%.2f°", s.orb)}, Nature: ${s.nature}): ${s.description}\n")
+                            }
+                        }
+                    }
+                    if (incWesternParts) {
+                        sb.append("- Arabic Parts (Hermetic Lots):\n")
+                        trad.arabic_parts.forEach { p ->
+                            val sName = ZODIAC_NAMES.getOrElse(p.sign_index % 12) { "" }
+                            sb.append("  * ${p.name}: ${String.format("%.2f°", p.longitude)} ($sName) - House ${p.house_number}\n")
+                        }
                     }
                 }
             }
         }
         2 -> {
-            if (incVedicRasi) {
-                val lagnaSign = VEDIC_SIGNS.getOrElse(chart.vedic.lagna_sign % 12) { "" }
-                sb.append("## 2. 라시 차트 (Vedic Sidereal Placements)\n")
-                sb.append("- Lagna: ${String.format("%.2f°", chart.vedic.lagna_sidereal)} ($lagnaSign)\n")
-                chart.vedic.planets.forEach { p ->
-                    val sign = VEDIC_SIGNS.getOrElse(p.sign_index % 12) { "" }
-                    val rx = if (p.is_retrograde) " [Rx]" else ""
-                    sb.append("  * ${p.name}: ${String.format("%.2f°", p.sidereal_longitude)} ($sign, ${p.nakshatra_name} Pada ${p.nakshatra_pada})$rx\n")
-                }
-            }
-            if (incVedicVargas) {
-                sb.append("\n## 3. 분점도 (Vargas)\n")
-                chart.vedic.vargas.forEach { (key, v) ->
-                    val lSign = VEDIC_SIGNS.getOrElse(v.lagna_sign % 12) { "" }
-                    sb.append("- $key: Lagna $lSign\n")
-                    val pl = v.placements.map { p ->
-                        val pSign = VEDIC_SIGNS.getOrElse(p.sign_index % 12) { "" }
-                        "${p.planet_name}: H${p.house} $pSign"
-                    }
-                    if (pl.isNotEmpty()) {
-                        sb.append("  * ${pl.joinToString(", ")}\n")
+            vedic?.let { v ->
+                if (incVedicRasi) {
+                    val lagnaSign = VEDIC_SIGNS.getOrElse(v.lagna_sign % 12) { "" }
+                    sb.append("## 2. 라시 차트 (Vedic Sidereal Placements)\n")
+                    sb.append("- Lagna: ${String.format("%.2f°", v.lagna_sidereal)} ($lagnaSign)\n")
+                    v.planets.forEach { p ->
+                        val sign = VEDIC_SIGNS.getOrElse(p.sign_index % 12) { "" }
+                        val rx = if (p.is_retrograde) " [Rx]" else ""
+                        sb.append("  * ${p.name}: ${String.format("%.2f°", p.sidereal_longitude)} ($sign, ${p.nakshatra_name} Pada ${p.nakshatra_pada})$rx\n")
                     }
                 }
-            }
-            if (incVedicDasha) {
-                sb.append("\n## 4. 빔쇼타리 다샤 운로 (Vimshottari Dasha)\n")
-                chart.vedic.vimshottari_dashas.forEach { d ->
-                    sb.append("- Mahadasha ${d.lord}: ${d.startDateFormatted} ~ ${d.endDateFormatted}\n")
-                    d.sub_periods.forEach { sub ->
-                        sb.append("  * Antardasha ${sub.lord}: ${sub.startDateFormatted} ~ ${sub.endDateFormatted}\n")
+                if (incVedicVargas) {
+                    sb.append("\n## 3. 분점도 (Vargas)\n")
+                    v.vargas.forEach { (key, chart) ->
+                        val lSign = VEDIC_SIGNS.getOrElse(chart.lagna_sign % 12) { "" }
+                        sb.append("- $key: Lagna $lSign\n")
+                        val pl = chart.placements.map { p ->
+                            val pSign = VEDIC_SIGNS.getOrElse(p.sign_index % 12) { "" }
+                            "${p.planet_name}: H${p.house} $pSign"
+                        }
+                        if (pl.isNotEmpty()) {
+                            sb.append("  * ${pl.joinToString(", ")}\n")
+                        }
+                    }
+                }
+                if (incVedicDasha) {
+                    sb.append("\n## 4. 빔쇼타리 다샤 운로 (Vimshottari Dasha)\n")
+                    v.vimshottari_dashas.forEach { d ->
+                        sb.append("- Mahadasha ${d.lord}: ${d.startDateFormatted} ~ ${d.endDateFormatted}\n")
+                        d.sub_periods.forEach { sub ->
+                            sb.append("  * Antardasha ${sub.lord}: ${sub.startDateFormatted} ~ ${sub.endDateFormatted}\n")
+                        }
                     }
                 }
             }

@@ -139,16 +139,9 @@ class MainActivity : ComponentActivity() {
                     ) { backStackEntry ->
                         val id = backStackEntry.arguments?.getString("id") ?: return@composable
                         val profile = profiles.find { it.id == id }
-                        var chart by remember { mutableStateOf<FortuneChartOutput?>(null) }
-
-                        LaunchedEffect(id) {
-                            FortuneApp.repository.calculateProfileChart(id).onSuccess { chart = it }
-                        }
-
                         if (profile != null) {
                             ProfileDetailScreen(
                                 profile = profile,
-                                chart = chart,
                                 onBack = { navController.popBackStack() },
                                 onEdit = { navController.navigate("profile_edit?id=$id") },
                                 onDelete = {
@@ -157,11 +150,6 @@ class MainActivity : ComponentActivity() {
                                             refreshData()
                                             navController.popBackStack()
                                         }
-                                    }
-                                },
-                                onHouseSystemChange = { hSys ->
-                                    scope.launch {
-                                        FortuneApp.repository.calculateProfileChartWithHouse(id, hSys).onSuccess { chart = it }
                                     }
                                 }
                             )

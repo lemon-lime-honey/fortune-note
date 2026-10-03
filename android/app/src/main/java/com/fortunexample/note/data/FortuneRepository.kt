@@ -64,6 +64,27 @@ class FortuneRepository(
         }
     }
 
+    suspend fun calculateProfileSaju(id: String): Result<SajuCalculationOutputDto> = withContext(Dispatchers.IO) {
+        runCatching {
+            val resJson = client.calculateProfileSaju(id)
+            json.decodeFromString(SajuCalculationOutputDto.serializer(), resJson)
+        }
+    }
+
+    suspend fun calculateProfileWestern(id: String, houseSystem: String?): Result<WesternCalculationOutputDto> = withContext(Dispatchers.IO) {
+        runCatching {
+            val resJson = client.calculateProfileWestern(id, houseSystem)
+            json.decodeFromString(WesternCalculationOutputDto.serializer(), resJson)
+        }
+    }
+
+    suspend fun calculateProfileVedic(id: String): Result<VedicCalculationOutputDto> = withContext(Dispatchers.IO) {
+        runCatching {
+            val resJson = client.calculateProfileVedic(id)
+            json.decodeFromString(VedicCalculationOutputDto.serializer(), resJson)
+        }
+    }
+
     suspend fun calculateHoraryChartWithHouse(id: String, houseSystem: String?): Result<FortuneChartOutput> = withContext(Dispatchers.IO) {
         runCatching {
             val resJson = client.calculateHoraryChartWithHouse(id, houseSystem)

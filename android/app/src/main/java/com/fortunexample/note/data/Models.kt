@@ -484,6 +484,27 @@ data class FortuneChartOutput(
 )
 
 @Serializable
+data class SajuCalculationOutputDto(
+    val timezone_id: String,
+    val utc_offset_hours: Double,
+    val saju: SajuChartData
+)
+
+@Serializable
+data class WesternCalculationOutputDto(
+    val timezone_id: String,
+    val utc_offset_hours: Double,
+    val western: WesternChartData
+)
+
+@Serializable
+data class VedicCalculationOutputDto(
+    val timezone_id: String,
+    val utc_offset_hours: Double,
+    val vedic: VedicChartData
+)
+
+@Serializable
 data class ImportSummaryDto(
     val imported_profiles: Int,
     val imported_horary: Int,
