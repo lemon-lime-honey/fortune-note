@@ -906,4 +906,60 @@ mod tests {
         assert_eq!(restored_horaries[0].title, "이직 성공 여부");
         assert_eq!(restored_horaries[0].querent_profile_id, Some(p1.id));
     }
+
+    #[test]
+    fn test_calculate_profile_western_json_contract() {
+        let service = FortuneBackendService::new(":memory:").expect("service init failed");
+        let p = service
+            .create_profile(CreateProfileParams {
+                name: "테스트 인물".to_string(),
+                gender: "female".to_string(),
+                birth_year: 1992,
+                birth_month: 7,
+                birth_day: 10,
+                birth_hour: 15,
+                birth_minute: 45,
+                latitude: 37.5665,
+                longitude: 126.9780,
+                timezone_id: Some("Asia/Seoul".to_string()),
+                notes: None,
+            })
+            .expect("profile creation failed");
+
+        let western_output = service
+            .calculate_profile_western(&p.id, Some("Placidus"))
+            .expect("western calculation failed");
+
+        let json_str = serde_json::to_string(&western_output).expect("must serialize to json");
+        let parsed: serde_json::Value = serde_json::from_str(&json_str).expect("must parse as json");
+        let traditional = &parsed["western"]["traditional"];
+
+        // 1. Antiscia contract verification
+        let antiscia = traditional["antiscia"].as_array().expect("antiscia must be array");
+        assert!(!antiscia.is_empty(), "antiscia should not be empty");
+        let a0 = &antiscia[0];
+        assert!(a0.get("body_name").is_some(), "missing body_name in antiscia");
+        assert!(a0.get("true_longitude").is_some(), "missing true_longitude in antiscia");
+        assert!(a0.get("antiscion_longitude").is_some(), "missing antiscion_longitude in antiscia");
+        assert!(a0.get("antiscion_sign_index").is_some(), "missing antiscion_sign_index in antiscia");
+        assert!(a0.get("antiscion_degree").is_some(), "missing antiscion_degree in antiscia");
+        assert!(a0.get("contra_antiscion_longitude").is_some(), "missing contra_antiscion_longitude in antiscia");
+
+        // 2. Latitude contract verification
+        let planets = parsed["western"]["planets"].as_array().expect("planets must be array");
+        assert!(!planets.is_empty());
+        assert!(planets[0].get("latitude").is_some(), "missing latitude in WesternPlanet");
+
+        // 3. Cusp dignities contract verification
+        let cusp_dignities = traditional["cusp_dignities"].as_array().expect("cusp_dignities must be array");
+        assert_eq!(cusp_dignities.len(), 12, "must have 12 cusp dignities");
+        assert!(cusp_dignities[0].get("almuten").is_some(), "missing almuten in cusp_dignities");
+        assert!(cusp_dignities[0].get("almuten_score").is_some(), "missing almuten_score in cusp_dignities");
+
+        // 4. Fixed stars contract verification
+        assert!(traditional.get("fixed_stars").is_some(), "missing fixed_stars in traditional");
+        assert!(traditional.get("fixed_star_conjunctions").is_some(), "missing fixed_star_conjunctions in traditional");
+        assert!(traditional.get("perfection").is_some(), "missing perfection in traditional");
+        assert!(traditional.get("prenatal_syzygy").is_some(), "missing prenatal_syzygy in traditional");
+    }
 }

@@ -81,6 +81,8 @@ pub struct WesternPlanet {
     pub is_retrograde: bool,
     #[serde(default)]
     pub speed: f64,
+    #[serde(default)]
+    pub latitude: f64,
 }
 
 /// Lunar node placement in the Western tropical chart (Dragon's Head and Tail).
@@ -212,6 +214,7 @@ pub fn calculate_western(
                     house_number,
                     is_retrograde: b.is_retrograde,
                     speed: b.speed,
+                    latitude: b.latitude,
                 });
             }
         }

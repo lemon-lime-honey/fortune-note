@@ -231,6 +231,8 @@ pub struct VedicPlanet {
     pub nakshatra_name: String,
     pub nakshatra_pada: u8,   // 1 .. 4
     pub is_retrograde: bool,
+    #[serde(default)]
+    pub latitude: f64,
 }
 
 /// Single planet placement within a divisional chart.
@@ -323,6 +325,7 @@ pub fn calculate_vedic(ephem: &EphemerisSnapshot, latitude: f64) -> VedicChart {
             nakshatra_name: format!("{:?}", nak),
             nakshatra_pada: pada,
             is_retrograde: b.is_retrograde,
+            latitude: b.latitude,
         });
     }
 
