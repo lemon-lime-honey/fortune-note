@@ -10,11 +10,11 @@
 //!   # 1. Exact transit hits timeline (Jupiter & Saturn to ASC & MC in 2026):
 //!   cargo run --example transit_events -- 1990 5 15 14 30 37.5665 126.9780 2026 1 1 2026 12 31 Saturn,Jupiter ASC,MC
 //!
-//!   # 2. Daily in-orb transit data where transit planets touch natal Jupiter within 1.0°:
-//!   cargo run --example transit_events -- 1990 5 15 14 30 37.5665 126.9780 2026 1 1 2026 12 31 Saturn,Jupiter,Mars Jupiter --orb 1.0
-
+//!   # 3. Exact transit hits to natal cusps (e.g. Mars & Jupiter to all house cusps):
+//!   cargo run --example transit_events -- 1990 5 15 14 30 37.5665 126.9780 2026 1 1 2026 12 31 Mars,Jupiter cusps
+//!
 use fortune_core::western::predictive::{
-    find_in_orb_transit_days, find_transit_events, TransitSearchQuery,
+    find_in_orb_transit_days, find_transit_events, TransitSearchQuery, NATAL_CUSP_NAMES,
 };
 use fortune_core::{calculate_fortune_western, FortuneCalculationInput, Gender, WesternHouseSystem};
 use std::env;
@@ -115,10 +115,13 @@ fn main() {
 
     let western = calculate_fortune_western(input).expect("Natal calculation failed");
 
-    // 2. Prepare natal points (ASC, MC, and Planets)
+    // 2. Prepare natal points (ASC, MC, Cusps, and Planets)
     let mut natal_points: Vec<(&str, f64)> = Vec::new();
     natal_points.push(("ASC", western.western.ascendant));
     natal_points.push(("MC", western.western.midheaven));
+    for (i, &cusp_deg) in western.western.house_cusps.iter().enumerate() {
+        natal_points.push((NATAL_CUSP_NAMES[i], cusp_deg));
+    }
     for p in &western.western.planets {
         if p.name != "Rahu" && p.name != "Ketu" {
             natal_points.push((p.name.as_str(), p.longitude));
@@ -128,8 +131,11 @@ fn main() {
     println!("Natal Chart Placements:");
     println!("  • ASC: {}", format_deg(western.western.ascendant));
     println!("  • MC : {}", format_deg(western.western.midheaven));
+    for (i, &cusp_deg) in western.western.house_cusps.iter().enumerate() {
+        println!("  • {:<7}: {}", NATAL_CUSP_NAMES[i], format_deg(cusp_deg));
+    }
     for &(name, lon) in &natal_points {
-        if name != "ASC" && name != "MC" {
+        if !name.starts_with("Cusp") && name != "ASC" && name != "MC" {
             println!("  • {:<7}: {}", name, format_deg(lon));
         }
     }

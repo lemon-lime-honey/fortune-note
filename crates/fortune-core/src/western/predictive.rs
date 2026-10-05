@@ -873,6 +873,46 @@ fn get_body_tropical_lon(body: vedaksha::ephem::bodies::Body, jd: f64) -> Result
     Ok(vedaksha::math::angle::normalize_degrees(pos.ecliptic.longitude.to_degrees()))
 }
 
+pub const NATAL_CUSP_NAMES: [&str; 12] = [
+    "Cusp 1", "Cusp 2", "Cusp 3", "Cusp 4", "Cusp 5", "Cusp 6",
+    "Cusp 7", "Cusp 8", "Cusp 9", "Cusp 10", "Cusp 11", "Cusp 12",
+];
+
+pub fn matches_natal_target(target_spec: &str, point_name: &str) -> bool {
+    let t = target_spec.trim();
+    if t.eq_ignore_ascii_case("cusps") || t.eq_ignore_ascii_case("all_cusps") {
+        return point_name.starts_with("Cusp")
+            || point_name.starts_with('H')
+            || point_name == "ASC"
+            || point_name == "MC"
+            || point_name == "IC"
+            || point_name == "DSC";
+    }
+    t.eq_ignore_ascii_case(point_name)
+        || (t.eq_ignore_ascii_case("ASC") && (point_name == "Cusp 1" || point_name == "H1"))
+        || (t.eq_ignore_ascii_case("MC") && (point_name == "Cusp 10" || point_name == "H10"))
+        || (t.eq_ignore_ascii_case("IC") && (point_name == "Cusp 4" || point_name == "H4"))
+        || (t.eq_ignore_ascii_case("DSC") && (point_name == "Cusp 7" || point_name == "H7"))
+        || (t.replace(' ', "").eq_ignore_ascii_case(&point_name.replace(' ', "")))
+}
+
+fn filter_natal_points<'a>(
+    natal_points: &[(&'a str, f64)],
+    targets_opt: Option<&[String]>,
+) -> Vec<(&'a str, f64)> {
+    let mut filtered = Vec::new();
+    for &(name, lon) in natal_points {
+        if let Some(targets) = targets_opt {
+            if targets.iter().any(|t| matches_natal_target(t, name)) {
+                filtered.push((name, lon));
+            }
+        } else {
+            filtered.push((name, lon));
+        }
+    }
+    filtered
+}
+
 fn separation_error(lon_tr: f64, lon_nat: f64, target_sep: f64) -> f64 {
     let sep = (lon_tr - lon_nat).rem_euclid(360.0);
     (sep - target_sep + 540.0).rem_euclid(360.0) - 180.0
@@ -911,16 +951,7 @@ pub fn find_transit_events(
         ("Opposition", &[180.0]),
     ];
 
-    let mut filtered_natal = Vec::new();
-    for &(name, lon) in natal_points {
-        if let Some(ref targets) = query.natal_targets {
-            if targets.iter().any(|t| t.eq_ignore_ascii_case(name)) {
-                filtered_natal.push((name, lon));
-            }
-        } else {
-            filtered_natal.push((name, lon));
-        }
-    }
+    let filtered_natal = filter_natal_points(natal_points, query.natal_targets.as_deref());
 
     let mut active_aspects = Vec::new();
     for &(asp_name, targets) in aspect_defs {
@@ -1109,16 +1140,7 @@ pub fn find_in_orb_transit_days(
         ("Opposition", &[180.0]),
     ];
 
-    let mut filtered_natal = Vec::new();
-    for &(name, lon) in natal_points {
-        if let Some(ref targets) = query.natal_targets {
-            if targets.iter().any(|t| t.eq_ignore_ascii_case(name)) {
-                filtered_natal.push((name, lon));
-            }
-        } else {
-            filtered_natal.push((name, lon));
-        }
-    }
+    let filtered_natal = filter_natal_points(natal_points, query.natal_targets.as_deref());
 
     let mut active_aspects = Vec::new();
     for &(asp_name, targets) in aspect_defs {
@@ -1653,6 +1675,73 @@ mod tests {
             a.return_point == "ASC" || a.return_point == "MC" || a.natal_point == "ASC" || a.natal_point == "MC"
         });
         assert!(has_axis_aspect, "Inter-chart aspects must include ASC and MC contacts");
+    }
+
+    #[test]
+    fn test_find_transit_events_with_cusps() {
+        let natal_cusps = [
+            ("Cusp 1", 15.0),
+            ("Cusp 2", 45.0),
+            ("Cusp 3", 75.0),
+            ("Cusp 4", 105.0),
+            ("Cusp 5", 135.0),
+            ("Cusp 6", 165.0),
+            ("Cusp 7", 195.0),
+            ("Cusp 8", 225.0),
+            ("Cusp 9", 255.0),
+            ("Cusp 10", 285.0),
+            ("Cusp 11", 315.0),
+            ("Cusp 12", 345.0),
+        ];
+
+        // 1. Search with "cusps" wildcard target
+        let query_all_cusps = TransitSearchQuery {
+            start_year: 2026,
+            start_month: 1,
+            start_day: 1,
+            end_year: 2026,
+            end_month: 3,
+            end_day: 31,
+            moving_bodies: Some(vec!["Sun".to_string(), "Mars".to_string()]),
+            natal_targets: Some(vec!["cusps".to_string()]),
+            aspect_types: Some(vec!["Conjunction".to_string(), "Opposition".to_string()]),
+        };
+
+        let hits_all = find_transit_events(&query_all_cusps, &natal_cusps).expect("Search all cusps should succeed");
+        assert!(!hits_all.is_empty(), "Expected transit hits to natal cusps");
+        for hit in &hits_all {
+            assert!(hit.natal_point.starts_with("Cusp "), "All targets must be cusps: {}", hit.natal_point);
+            assert!(hit.orb_deg < 0.05);
+        }
+
+        // 2. Search specific cusps: Cusp 4 and Cusp 7
+        let query_specific = TransitSearchQuery {
+            start_year: 2026,
+            start_month: 1,
+            start_day: 1,
+            end_year: 2026,
+            end_month: 6,
+            end_day: 30,
+            moving_bodies: Some(vec!["Mars".to_string()]),
+            natal_targets: Some(vec!["Cusp 4".to_string(), "Cusp 7".to_string()]),
+            aspect_types: Some(vec!["Conjunction".to_string()]),
+        };
+
+        let hits_specific = find_transit_events(&query_specific, &natal_cusps).expect("Search specific cusps should succeed");
+        for hit in &hits_specific {
+            assert!(hit.natal_point == "Cusp 4" || hit.natal_point == "Cusp 7");
+            assert_eq!(hit.aspect_type, "Conjunction");
+        }
+
+        // 3. Test alias matching: "IC" matches "Cusp 4", "DSC" matches "Cusp 7"
+        assert!(matches_natal_target("cusps", "Cusp 3"));
+        assert!(matches_natal_target("all_cusps", "Cusp 9"));
+        assert!(matches_natal_target("ASC", "Cusp 1"));
+        assert!(matches_natal_target("MC", "Cusp 10"));
+        assert!(matches_natal_target("IC", "Cusp 4"));
+        assert!(matches_natal_target("DSC", "Cusp 7"));
+        assert!(matches_natal_target("Cusp 4", "Cusp 4"));
+        assert!(matches_natal_target("cusp4", "Cusp 4"));
     }
 }
 
