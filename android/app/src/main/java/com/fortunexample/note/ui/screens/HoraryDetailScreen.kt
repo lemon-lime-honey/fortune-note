@@ -306,7 +306,7 @@ fun HoraryDetailScreen(
                         }
 
                         Spacer(modifier = Modifier.height(14.dp))
-                        WesternTraditionalSection(traditional = chart.western.traditional)
+                        WesternTraditionalSection(traditional = chart.western.traditional, isHorary = true)
                     } else {
                         VedicChartDiamond(chart = chart.vedic)
                         Spacer(modifier = Modifier.height(16.dp))

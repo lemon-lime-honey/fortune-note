@@ -170,8 +170,8 @@ fun SelectiveCopyBottomSheet(
                         CopyCheckboxItem(label = "Placements & House Cusps (Planets, Nodes, Angles)", checked = incWesternPlanets, onCheckedChange = { incWesternPlanets = it })
                         CopyCheckboxItem(label = "Major Aspects", checked = incWesternAspects, onCheckedChange = { incWesternAspects = it })
                         CopyCheckboxItem(label = "Essential Dignities & Lilly Scores", checked = incWesternDignities, onCheckedChange = { incWesternDignities = it })
-                        CopyCheckboxItem(label = "Moon Condition (VOC, Via Combusta, Applying)", checked = incWesternMoon, onCheckedChange = { incWesternMoon = it })
-                        CopyCheckboxItem(label = "Planetary Hours & Radicality", checked = incWesternHours, onCheckedChange = { incWesternHours = it })
+                        CopyCheckboxItem(label = "Moon Condition (Phase, Applying)", checked = incWesternMoon, onCheckedChange = { incWesternMoon = it })
+                        CopyCheckboxItem(label = "Planetary Hours", checked = incWesternHours, onCheckedChange = { incWesternHours = it })
                         CopyCheckboxItem(label = "Traditional Dynamic Aspects (Applying/Separating, Moiety)", checked = incWesternDynamicAspects, onCheckedChange = { incWesternDynamicAspects = it })
                         CopyCheckboxItem(label = "Mutual Receptions & Besiegement", checked = incWesternReceptions, onCheckedChange = { incWesternReceptions = it })
                         CopyCheckboxItem(label = "Fixed Star Conjunctions (Orb ≤ 1.5°)", checked = incWesternStars, onCheckedChange = { incWesternStars = it })
@@ -369,16 +369,10 @@ private fun generateSelectiveMarkdown(
                 w.traditional?.let { trad ->
                     sb.append("\n## 3. William Lilly Traditional Analysis\n")
                     if (incWesternHours) {
-                        sb.append("- Planetary Hours: Day of ${trad.planetary_hours.day_ruler}, Hour of ${trad.planetary_hours.hour_ruler} (Radicality: ${if (trad.planetary_hours.is_radical) "Radical" else "Non-radical"} - ${trad.planetary_hours.radicality_reason})\n")
-                        if (trad.planetary_hours.considerations.isNotEmpty()) {
-                            sb.append("- Considerations Before Judgment:\n")
-                            trad.planetary_hours.considerations.forEach { c ->
-                                sb.append("  * $c\n")
-                            }
-                        }
+                        sb.append("- Planetary Hours: Day of ${trad.planetary_hours.day_ruler}, Hour of ${trad.planetary_hours.hour_ruler} (Hour ${trad.planetary_hours.hour_number}, ${if (trad.planetary_hours.is_day_hour) "Day" else "Night"})\n")
                     }
                     if (incWesternMoon) {
-                        sb.append("- Moon Condition: Phase [${trad.moon_condition.lunar_phase_name}], VOC [${if (trad.moon_condition.is_void_of_course) "Yes" else "None"}], Via Combusta [${if (trad.moon_condition.is_via_combusta) "Yes" else "None"}]\n")
+                        sb.append("- Moon Condition: Phase [${trad.moon_condition.lunar_phase_name}]\n")
                         trad.moon_condition.next_applying_aspect?.let { next ->
                             sb.append("  * Next Applying Aspect: $next\n")
                         }

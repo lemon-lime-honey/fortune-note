@@ -598,8 +598,8 @@ fun ProfileDetailScreen(
                                 Spacer(modifier = Modifier.height(14.dp))
                             }
 
-                            // 윌리엄 릴리 전통 점성술 분석 섹션
-                            WesternTraditionalSection(traditional = westernChart.traditional)
+                            // 윌리엄 릴리 전통 점성술 분석 섹션 (네이탈 모드: 라디칼리티 및 호라리 결함 배제)
+                            WesternTraditionalSection(traditional = westernChart.traditional, isHorary = false)
 
                             Spacer(modifier = Modifier.height(14.dp))
 

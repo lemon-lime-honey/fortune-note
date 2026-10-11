@@ -57,7 +57,8 @@ private fun SectionCopyButton(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun WesternTraditionalSection(
-    traditional: WesternTraditionalData?
+    traditional: WesternTraditionalData?,
+    isHorary: Boolean = false
 ) {
     if (traditional == null) return
 
@@ -66,7 +67,7 @@ fun WesternTraditionalSection(
     var isPartsExpanded by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        // 1. Planetary Hours & Radicality Card (상하 2행 분리로 배지 잘림 방지)
+        // 1. Planetary Hours Card (호라리일 때만 Radicality 및 판단 전 고려사항 표시)
         Card(
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
@@ -80,64 +81,82 @@ fun WesternTraditionalSection(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Planetary Hours & Radicality", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text(
+                        text = if (isHorary) "Planetary Hours & Radicality" else "Planetary Hours",
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
                     SectionCopyButton(title = "Planetary Hours") {
                         val sb = StringBuilder()
-                        sb.appendLine("[Planetary Hours & Radicality]")
-                        sb.appendLine("• Status: ${if (traditional.planetary_hours.is_radical) "Radical" else "Non-radical"}")
-                        sb.appendLine("• Day of ${traditional.planetary_hours.day_ruler} · Hour of ${traditional.planetary_hours.hour_ruler} (Hour ${traditional.planetary_hours.hour_number}, ${if (traditional.planetary_hours.is_day_hour) "Day" else "Night"})")
-                        sb.appendLine("• Reason: ${traditional.planetary_hours.radicality_reason}")
-                        if (traditional.planetary_hours.considerations.isNotEmpty()) {
-                            sb.appendLine("• Considerations Before Judgment:")
-                            traditional.planetary_hours.considerations.forEach { c -> sb.appendLine("  - $c") }
+                        if (isHorary) {
+                            sb.appendLine("[Planetary Hours & Radicality]")
+                            sb.appendLine("• Status: ${if (traditional.planetary_hours.is_radical) "Radical" else "Non-radical"}")
+                            sb.appendLine("• Day of ${traditional.planetary_hours.day_ruler} · Hour of ${traditional.planetary_hours.hour_ruler} (Hour ${traditional.planetary_hours.hour_number}, ${if (traditional.planetary_hours.is_day_hour) "Day" else "Night"})")
+                            sb.appendLine("• Reason: ${traditional.planetary_hours.radicality_reason}")
+                            if (traditional.planetary_hours.considerations.isNotEmpty()) {
+                                sb.appendLine("• Considerations Before Judgment:")
+                                traditional.planetary_hours.considerations.forEach { c -> sb.appendLine("  - $c") }
+                            }
+                        } else {
+                            sb.appendLine("[Planetary Hours]")
+                            sb.appendLine("• Day of ${traditional.planetary_hours.day_ruler} · Hour of ${traditional.planetary_hours.hour_ruler} (Hour ${traditional.planetary_hours.hour_number}, ${if (traditional.planetary_hours.is_day_hour) "Day" else "Night"})")
                         }
                         sb.toString().trimEnd()
                     }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                if (isHorary) {
+                    Spacer(modifier = Modifier.height(6.dp))
 
-                // 2행: Radicality 배지 (단독 행으로 잘림 원천 차단)
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = if (traditional.planetary_hours.is_radical) VedicGreen.copy(alpha = 0.12f) else AstrologicalRed.copy(alpha = 0.12f)
-                ) {
-                    Text(
-                        text = if (traditional.planetary_hours.is_radical) "Radical" else "Non-radical",
-                        color = if (traditional.planetary_hours.is_radical) VedicGreen else AstrologicalRed,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
+                    // 2행: Radicality 배지 (호라리 전용)
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (traditional.planetary_hours.is_radical) VedicGreen.copy(alpha = 0.12f) else AstrologicalRed.copy(alpha = 0.12f)
+                    ) {
+                        Text(
+                            text = if (traditional.planetary_hours.is_radical) "Radical" else "Non-radical",
+                            color = if (traditional.planetary_hours.is_radical) VedicGreen else AstrologicalRed,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                } else {
+                    Spacer(modifier = Modifier.height(10.dp))
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "Day of ${traditional.planetary_hours.day_ruler} · Hour of ${traditional.planetary_hours.hour_ruler} (Hour ${traditional.planetary_hours.hour_number}, ${if (traditional.planetary_hours.is_day_hour) "Day" else "Night"})",
                     color = TextPrimary,
                     fontSize = 13.sp
                 )
-                Text(
-                    text = traditional.planetary_hours.radicality_reason,
-                    color = TextSecondary,
-                    fontSize = 12.sp
-                )
 
-                if (traditional.planetary_hours.considerations.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(8.dp))
+                if (isHorary) {
                     Text(
-                        text = "Considerations Before Judgment:",
-                        color = AstrologicalRed,
-                        fontWeight = FontWeight.SemiBold,
+                        text = traditional.planetary_hours.radicality_reason,
+                        color = TextSecondary,
                         fontSize = 12.sp
                     )
-                    traditional.planetary_hours.considerations.forEach { c ->
+
+                    if (traditional.planetary_hours.considerations.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "• $c",
-                            color = TextSecondary,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                            text = "Considerations Before Judgment:",
+                            color = AstrologicalRed,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.sp
                         )
+                        traditional.planetary_hours.considerations.forEach { c ->
+                            Text(
+                                text = "• $c",
+                                color = TextSecondary,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -163,8 +182,10 @@ fun WesternTraditionalSection(
                         val sb = StringBuilder()
                         sb.appendLine("[Moon Condition]")
                         sb.appendLine("• Phase: ${traditional.moon_condition.lunar_phase_name}")
-                        if (traditional.moon_condition.is_void_of_course) sb.appendLine("• Void of Course: Yes")
-                        if (traditional.moon_condition.is_via_combusta) sb.appendLine("• Via Combusta: Yes")
+                        if (isHorary) {
+                            if (traditional.moon_condition.is_void_of_course) sb.appendLine("• Void of Course: Yes")
+                            if (traditional.moon_condition.is_via_combusta) sb.appendLine("• Via Combusta: Yes")
+                        }
                         traditional.moon_condition.next_applying_aspect?.let {
                             sb.appendLine("• Next Applying Aspect: $it")
                         }
@@ -191,7 +212,7 @@ fun WesternTraditionalSection(
                         )
                     }
 
-                    if (traditional.moon_condition.is_void_of_course) {
+                    if (isHorary && traditional.moon_condition.is_void_of_course) {
                         Surface(
                             shape = RoundedCornerShape(6.dp),
                             color = AstrologicalRed.copy(alpha = 0.12f)
@@ -206,7 +227,7 @@ fun WesternTraditionalSection(
                         }
                     }
 
-                    if (traditional.moon_condition.is_via_combusta) {
+                    if (isHorary && traditional.moon_condition.is_via_combusta) {
                         Surface(
                             shape = RoundedCornerShape(6.dp),
                             color = AstrologicalRed.copy(alpha = 0.12f)
