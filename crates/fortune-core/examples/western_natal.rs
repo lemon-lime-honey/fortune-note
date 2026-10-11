@@ -335,12 +335,11 @@ fn main() {
             println!("  None detected within moiety orbs.");
         } else {
             for asp in &trad.traditional_aspects {
+                let motion = if asp.is_applying { "Applying" } else { "Separating" };
                 let status = if asp.is_partile {
-                    "Partile"
-                } else if asp.is_applying {
-                    "Applying"
+                    format!("Partile ({})", motion)
                 } else {
-                    "Separating"
+                    motion.to_string()
                 };
                 println!(
                     "  {:<7} {:<11} {:<7} : Orb {:4.2}° / Max {:4.2}° | {} (To perfection: {:.2}°)",
