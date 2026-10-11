@@ -245,18 +245,19 @@ pub fn calculate_western(
             let p1 = &planets[i];
             let p2 = &planets[j];
 
-            let diff = (p1.longitude - p2.longitude).abs();
+            let diff = (p1.longitude - p2.longitude).abs().rem_euclid(360.0);
             let shortest = if diff > 180.0 { 360.0 - diff } else { diff };
 
             for (name, target, max_orb) in aspect_defs {
                 let orb = (shortest - target).abs();
                 if orb <= max_orb {
-                    let future_p1 = (p1.longitude + p1.speed).rem_euclid(360.0);
-                    let future_p2 = (p2.longitude + p2.speed).rem_euclid(360.0);
-                    let future_diff = (future_p1 - future_p2).abs();
+                    let dt = 0.001;
+                    let future_p1 = (p1.longitude + p1.speed * dt).rem_euclid(360.0);
+                    let future_p2 = (p2.longitude + p2.speed * dt).rem_euclid(360.0);
+                    let future_diff = (future_p1 - future_p2).abs().rem_euclid(360.0);
                     let future_shortest = if future_diff > 180.0 { 360.0 - future_diff } else { future_diff };
                     let future_orb = (future_shortest - target).abs();
-                    let is_applying = future_orb < orb;
+                    let is_applying = future_orb < orb - 1e-9;
 
                     aspects.push(WesternAspect {
                         planet1: p1.name.clone(),
