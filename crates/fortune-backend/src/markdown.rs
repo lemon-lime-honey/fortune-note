@@ -68,7 +68,7 @@ pub fn format_profile_saju_markdown(profile: &Profile, chart: &FortuneCalculatio
     out
 }
 
-fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput) {
+fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput, is_horary: bool) {
     let asc_sign = (chart.western.ascendant / 30.0).floor() as usize % 12;
     let mc_sign = (chart.western.midheaven / 30.0).floor() as usize % 12;
     out.push_str("## 2. Celestial Placements & House Cusps\n");
@@ -130,19 +130,33 @@ fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput) {
 
     if let Some(ref trad) = chart.western.traditional {
         out.push_str("## 3. William Lilly Traditional Analysis\n");
-        out.push_str(&format!(
-            "- Planetary Hours: Day of {}, Hour of {} (Radicality: {} - {})\n",
-            trad.planetary_hours.day_ruler,
-            trad.planetary_hours.hour_ruler,
-            if trad.planetary_hours.is_radical { "Radical" } else { "Non-radical" },
-            trad.planetary_hours.radicality_reason
-        ));
-        out.push_str(&format!(
-            "- Moon Condition: Phase [{}], VOC [{}], Via Combusta [{}]\n",
-            trad.moon_condition.lunar_phase_name,
-            if trad.moon_condition.is_void_of_course { "Void of Course" } else { "None" },
-            if trad.moon_condition.is_via_combusta { "Via Combusta (15° Lib - 15° Sco)" } else { "None" },
-        ));
+        if is_horary {
+            out.push_str(&format!(
+                "- Planetary Hours: Day of {}, Hour of {} (Radicality: {} - {})\n",
+                trad.planetary_hours.day_ruler,
+                trad.planetary_hours.hour_ruler,
+                if trad.planetary_hours.is_radical { "Radical" } else { "Non-radical" },
+                trad.planetary_hours.radicality_reason
+            ));
+            out.push_str(&format!(
+                "- Moon Condition: Phase [{}], VOC [{}], Via Combusta [{}]\n",
+                trad.moon_condition.lunar_phase_name,
+                if trad.moon_condition.is_void_of_course { "Void of Course" } else { "None" },
+                if trad.moon_condition.is_via_combusta { "Via Combusta (15° Lib - 15° Sco)" } else { "None" },
+            ));
+        } else {
+            out.push_str(&format!(
+                "- Planetary Hours: Day of {}, Hour of {} (Hour {}, {})\n",
+                trad.planetary_hours.day_ruler,
+                trad.planetary_hours.hour_ruler,
+                trad.planetary_hours.hour_number,
+                if trad.planetary_hours.is_day_hour { "Day" } else { "Night" },
+            ));
+            out.push_str(&format!(
+                "- Moon Condition: Phase [{}]\n",
+                trad.moon_condition.lunar_phase_name,
+            ));
+        }
         if let Some(ref next_asp) = trad.moon_condition.next_applying_aspect {
             out.push_str(&format!("  * Next Applying Aspect: {}\n", next_asp));
         }
@@ -154,7 +168,7 @@ fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput) {
             ));
         }
 
-        if !trad.planetary_hours.considerations.is_empty() {
+        if is_horary && !trad.planetary_hours.considerations.is_empty() {
             out.push_str("- Considerations Before Judgment:\n");
             for c in &trad.planetary_hours.considerations {
                 out.push_str(&format!("  * {}\n", c));
@@ -237,7 +251,7 @@ fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput) {
             || !trad.perfection.collection_of_light.is_empty()
             || !trad.perfection.besiegement.is_empty();
 
-        if has_perfection {
+        if is_horary && has_perfection {
             out.push_str("\n### Horary Perfection & Besiegement\n");
             for tol in &trad.perfection.translation_of_light {
                 out.push_str(&format!("- [Translation of Light] {}\n", tol));
@@ -279,7 +293,7 @@ fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput) {
 pub fn format_profile_western_markdown(profile: &Profile, chart: &FortuneCalculationOutput) -> String {
     let mut out = String::new();
     append_profile_meta(&mut out, profile, chart, "서양 점성술 (Western Tropical Natal Chart)");
-    append_western_details(&mut out, chart);
+    append_western_details(&mut out, chart, false);
     out
 }
 
@@ -361,7 +375,7 @@ fn append_horary_meta(out: &mut String, horary: &HoraryQuestion, chart: &Fortune
 pub fn format_horary_western_markdown(horary: &HoraryQuestion, chart: &FortuneCalculationOutput) -> String {
     let mut out = String::new();
     append_horary_meta(&mut out, horary, chart, "호라리 질의 분석 데이터 (Western Tropical)");
-    append_western_details(&mut out, chart);
+    append_western_details(&mut out, chart, true);
     out
 }
 

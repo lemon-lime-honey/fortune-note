@@ -242,8 +242,8 @@ fn main() {
         println!("  WILLIAM LILLY TRADITIONAL ASTROLOGY ANALYSIS");
         println!("============================================================");
 
-        // 5.1 Planetary Hours & Radicality
-        println!("[5.1 Planetary Hours & Radicality]");
+        // 5.1 Planetary Hours
+        println!("[5.1 Planetary Hours]");
         println!(
             "  Day Ruler   : {} ({})",
             trad.planetary_hours.day_ruler,
@@ -254,27 +254,11 @@ fn main() {
             trad.planetary_hours.hour_ruler,
             trad.planetary_hours.hour_number
         );
-        println!(
-            "  Radicality  : {} - {}",
-            if trad.planetary_hours.is_radical { "RADICAL (Fit for judgment)" } else { "NON-RADICAL" },
-            trad.planetary_hours.radicality_reason
-        );
-        if !trad.planetary_hours.considerations.is_empty() {
-            println!("  Considerations Before Judgment:");
-            for cons in &trad.planetary_hours.considerations {
-                println!("    * {}", cons);
-            }
-        }
         println!();
 
         // 5.2 Moon Condition
         println!("[5.2 Condition of the Moon]");
         println!("  Phase             : {} (Elongation: {:.2}°)", trad.moon_condition.lunar_phase_name, trad.moon_condition.elongation_deg);
-        println!("  Void of Course    : {}", if trad.moon_condition.is_void_of_course { "YES (Void of Course)" } else { "NO" });
-        if trad.moon_condition.is_in_tincture_exception {
-            println!("  Tincture Exception: In Taurus/Cancer/Sagittarius/Pisces where VOC rarely hurts");
-        }
-        println!("  Via Combusta      : {}", if trad.moon_condition.is_via_combusta { "YES (15° Lib - 15° Sco)" } else { "NO" });
         if let Some(ref next_asp) = trad.moon_condition.next_applying_aspect {
             println!("  Next Application  : {}", next_asp);
         }
