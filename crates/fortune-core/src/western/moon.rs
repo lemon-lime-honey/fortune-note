@@ -7,6 +7,7 @@
 //! - Next applying aspect before leaving the sign
 
 use serde::{Deserialize, Serialize};
+use super::aspects::is_valid_sign_aspect;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MoonCondition {
@@ -57,6 +58,7 @@ pub fn evaluate_moon_condition(
     // Check for applying major aspects (0°, 60°, 90°, 120°, 180°) before leaving the sign
     let aspect_angles = [0.0, 60.0, 90.0, 120.0, 180.0];
     let mut next_aspect: Option<(f64, String)> = None; // (degrees_to_perfection, description)
+    let dist_to_sign_end = 30.0 - sign_degree;
 
     for &(p_name, p_lon, p_speed) in other_planets {
         if p_name == "Moon" { continue; }
@@ -67,23 +69,55 @@ pub fn evaluate_moon_condition(
             continue;
         }
 
+        let p_sign_idx = ((p_lon.rem_euclid(360.0) / 30.0).floor() as u8) % 12;
+
         // Test each aspect angle
         for &target in &aspect_angles {
-            // Target positions where aspect is exact: p_lon + target or p_lon - target
-            for &sign_mult in &[1.0, -1.0] {
-                let exact_target_pos = (p_lon + sign_mult * target).rem_euclid(360.0);
+            // Must form a valid aspect by whole sign geometry (Lilly CA p. 112)
+            if !is_valid_sign_aspect(sign_idx, p_sign_idx, target) {
+                continue;
+            }
 
-                // Check if exact position is between Moon and sign end (in direction of Moon's motion)
-                let mut dist_to_exact = exact_target_pos - moon_longitude;
-                if dist_to_exact < 0.0 { dist_to_exact += 360.0; }
+            let c0 = [p_lon.rem_euclid(360.0)];
+            let c180 = [(p_lon + 180.0).rem_euclid(360.0)];
+            let c_both = [
+                (p_lon - target).rem_euclid(360.0),
+                (p_lon + target).rem_euclid(360.0),
+            ];
+            let candidates: &[f64] = if target == 0.0 {
+                &c0
+            } else if target == 180.0 {
+                &c180
+            } else {
+                &c_both
+            };
 
-                // The aspect must be perfected before Moon reaches sign_end
-                let dist_to_sign_end = 30.0 - sign_degree;
+            for &exact_target_pos in candidates {
+                // Check if exact position falls in Moon's current sign
+                let target_sign = ((exact_target_pos / 30.0).floor() as u8) % 12;
+                if target_sign != sign_idx {
+                    continue;
+                }
 
-                if dist_to_exact > 0.001 && dist_to_exact < dist_to_sign_end {
-                    let desc = format!("{} to {} in {:.2}°", aspect_name(target), p_name, dist_to_exact);
-                    if next_aspect.as_ref().map_or(true, |(d, _)| dist_to_exact < *d) {
-                        next_aspect = Some((dist_to_exact, desc));
+                let diff = (exact_target_pos - moon_longitude).rem_euclid(360.0);
+                if diff <= 0.001 {
+                    continue;
+                }
+
+                // Days to perfection considering other planet's movement
+                let t = diff / rel_speed;
+                let dist_moon_moves = moon_speed * t;
+
+                // The aspect must be perfected before Moon reaches sign end
+                if dist_moon_moves < dist_to_sign_end {
+                    // Check if other planet also stays in its sign until perfection
+                    let future_p_lon = (p_lon + p_speed * t).rem_euclid(360.0);
+                    let future_p_sign = ((future_p_lon / 30.0).floor() as u8) % 12;
+                    if future_p_sign == p_sign_idx {
+                        let desc = format!("{} to {} in {:.2}°", aspect_name(target), p_name, dist_moon_moves);
+                        if next_aspect.as_ref().map_or(true, |(d, _)| dist_moon_moves < *d) {
+                            next_aspect = Some((dist_moon_moves, desc));
+                        }
                     }
                 }
             }
@@ -114,3 +148,39 @@ fn aspect_name(angle: f64) -> &'static str {
         _ => "Aspect",
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_moon_next_applying_aspect_dynamics() {
+        // Moon in Aries 10° (speed 13°/d), Jupiter in Gemini 15° (speed 0.2°/d)
+        // Aries and Gemini form a Sextile (diff 2 signs).
+        // Target is Gemini 15° - 60° = Aries 15°.
+        // Gap is 5°, rel_speed is 12.8°/d -> t = 5/12.8 = 0.390625 d -> Moon travels 13 * 0.390625 = 5.078125°
+        let planets = [
+            ("Jupiter", 75.0, 0.2),
+        ];
+        let cond = evaluate_moon_condition(10.0, 13.0, 280.0, &planets);
+        assert!(!cond.is_void_of_course);
+        assert!(cond.next_applying_aspect.is_some());
+        let desc = cond.next_applying_aspect.unwrap();
+        assert!(desc.starts_with("Sextile to Jupiter in 5.08°"));
+    }
+
+    #[test]
+    fn test_moon_voc_when_no_aspect_before_sign_exit() {
+        // Moon at Aries 28° (only 2° until sign exit).
+        // Jupiter in Gemini 15° -> target is Aries 15° (already passed).
+        // Sun in Leo 20° -> Trine target is Aries 20° (already passed).
+        let planets = [
+            ("Jupiter", 75.0, 0.2),
+            ("Sun", 140.0, 1.0),
+        ];
+        let cond = evaluate_moon_condition(28.0, 13.0, 140.0, &planets);
+        assert!(cond.is_void_of_course);
+        assert!(cond.next_applying_aspect.is_none());
+    }
+}
+
