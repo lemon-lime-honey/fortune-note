@@ -383,6 +383,94 @@ fn main() {
                 println!("    Meaning: {}", fsc.meaning);
             }
         }
+    } else if let Some(ref h) = chart.hellenistic {
+        println!("============================================================");
+        println!("  HELLENISTIC ASTROLOGY ANALYSIS (VETTIUS VALENS / WHOLE SIGN)");
+        println!("============================================================");
+
+        // 5.1 Independent Angles & Action Points
+        println!("[5.1 Independent Angles & Planetary Action Points]");
+        println!(
+            "  Ascendant  (ASC) : {} (Sign Index: {})",
+            format_deg(h.angles.ascendant),
+            h.angles.ascendant_sign
+        );
+        let mc_house_note = if h.angles.is_mc_in_10th {
+            "House 10 (Culmination)".to_string()
+        } else {
+            format!("House {:02} (Special Action Point)", h.angles.midheaven_house)
+        };
+        println!(
+            "  Midheaven  (MC)  : {} ({})",
+            format_deg(h.angles.midheaven),
+            mc_house_note
+        );
+        println!();
+
+        // 5.2 Qualitative Planet Conditions (Hellenistic Dignities)
+        println!("[5.2 Qualitative Planet Conditions (Hellenistic States)]");
+        for pc in &h.planet_conditions {
+            let asc_ruler_tag = if pc.is_ruler_of_asc { " [Lord of ASC]" } else { "" };
+            println!(
+                "  {:<8} | Status: {:<12} | House {:02}{}",
+                pc.name, pc.condition_label, pc.house_number, asc_ruler_tag
+            );
+        }
+        println!();
+
+        // 5.3 Hermetic Lots (Paulus Alexandrinus / Olympiodorus)
+        println!("[5.3 Hermetic Lots (Lots of Soul & Body)]");
+        for lot in &h.lots {
+            println!(
+                "  {:<18} : {}  (House {:02}, Ruler: {})",
+                lot.name, format_deg(lot.longitude), lot.house_number, lot.ruler
+            );
+        }
+        println!();
+
+        // 5.4 Dynamic Traditional Aspects
+        println!("[5.4 Sign-Based Aspects & Degree Contacts]");
+        if h.aspects.is_empty() {
+            println!("  No major sign-based aspects detected.");
+        } else {
+            for asp in &h.aspects {
+                let partile_tag = if asp.is_partile { " [Partile <= 1°]" } else { "" };
+                let app_tag = if asp.is_applying {
+                    format!("Applying ({:.2}° to perfection)", asp.degrees_to_perfection)
+                } else {
+                    "Separating".to_string()
+                };
+                println!(
+                    "  {:<7} {:<11} {:<7} : Orb {:4.2}° | {}{}",
+                    asp.planet1, asp.aspect_type, asp.planet2, asp.orb, app_tag, partile_tag
+                );
+            }
+        }
+        println!();
+
+        // 5.5 Prenatal Syzygy (SAN)
+        if let Some(ref san) = h.prenatal_syzygy {
+            println!("[5.5 Prenatal Syzygy (SAN)]");
+            println!("  Type      : {}", san.syzygy_type);
+            println!("  Longitude : {}", format_deg(san.longitude));
+            println!("  UTC Moment: {}", san.exact_datetime_utc);
+            println!();
+        }
+
+        // 5.6 Fixed Star Conjunctions
+        println!("[5.6 Traditional Fixed Star Conjunctions (Orb <= 1.5°)]");
+        if h.fixed_star_conjunctions.is_empty() {
+            println!("  No conjunctions with major traditional fixed stars detected.");
+        } else {
+            for fsc in &h.fixed_star_conjunctions {
+                println!(
+                    "  * {} ({}) conj {} : Orb {:.2}° (Star at {})",
+                    fsc.star_name, fsc.korean_name, fsc.body_name, fsc.orb, format_deg(fsc.star_longitude)
+                );
+                println!("    Nature : {}", fsc.nature);
+                println!("    Meaning: {}", fsc.meaning);
+            }
+        }
     }
 
     println!("\n============================================================");

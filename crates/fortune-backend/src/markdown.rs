@@ -72,25 +72,37 @@ fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput, is
     let asc_sign = (chart.western.ascendant / 30.0).floor() as usize % 12;
     let mc_sign = (chart.western.midheaven / 30.0).floor() as usize % 12;
     out.push_str("## 2. Celestial Placements & House Cusps\n");
+    let is_whole_sign = chart.western.house_system == fortune_core::WesternHouseSystem::WholeSign;
+    let mc_house_desc = if is_whole_sign {
+        let mc_h = fortune_core::western::determine_house(chart.western.midheaven, &chart.western.house_cusps);
+        format!(" [Located in House {:02}]", mc_h)
+    } else {
+        String::new()
+    };
+
     out.push_str(&format!(
-        "- Ascendant: {:.2}° ({})\n",
+        "- Ascendant (ASC): {:.2}° ({})\n",
         chart.western.ascendant, ZODIAC_SIGNS[asc_sign]
     ));
     out.push_str(&format!(
-        "- Midheaven (MC): {:.2}° ({})\n",
-        chart.western.midheaven, ZODIAC_SIGNS[mc_sign]
+        "- Midheaven (MC): {:.2}° ({}){}\n",
+        chart.western.midheaven, ZODIAC_SIGNS[mc_sign], mc_house_desc
     ));
     out.push_str(&format!("- House System: {}\n", chart.western.house_system.display_name()));
     out.push_str("- House Cusps (12 Cusps):\n");
     for (i, cusp) in chart.western.house_cusps.iter().enumerate() {
         let sign_idx = (cusp / 30.0).floor() as usize % 12;
         let sign_deg = cusp - (sign_idx as f64 * 30.0);
-        let tag = match i + 1 {
-            1 => " (ASC)",
-            4 => " (IC)",
-            7 => " (DSC)",
-            10 => " (MC)",
-            _ => "",
+        let tag = if !is_whole_sign {
+            match i + 1 {
+                1 => " (ASC)",
+                4 => " (IC)",
+                7 => " (DSC)",
+                10 => " (MC)",
+                _ => "",
+            }
+        } else {
+            ""
         };
         out.push_str(&format!(
             "  * House {:02}{}: {:.2}° ({})\n",
@@ -282,6 +294,73 @@ fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput, is
                 out.push_str(&format!(
                     "- {}: {:.2}° ({}) - House {} (Ruler: {})\n",
                     part.name, part.longitude, sign_name, part.house_number, part.ruler
+                ));
+            }
+        }
+        out.push('\n');
+    } else if let Some(ref h) = chart.western.hellenistic {
+        out.push_str("## 3. Hellenistic Traditional Analysis (Whole Sign)\n");
+
+        out.push_str("### Independent Angles & Planetary Action Points\n");
+        let asc_sign = ZODIAC_SIGNS[h.angles.ascendant_sign as usize % 12];
+        let mc_sign = ZODIAC_SIGNS[h.angles.midheaven_sign as usize % 12];
+        let mc_house_note = if h.angles.is_mc_in_10th {
+            "House 10 (Culmination)".to_string()
+        } else {
+            format!("House {:02} (Special Action Point)", h.angles.midheaven_house)
+        };
+        out.push_str(&format!("- Ascendant (ASC): {:.2}° ({})\n", h.angles.ascendant_degree, asc_sign));
+        out.push_str(&format!("- Midheaven (MC): {:.2}° ({}) - {}\n", h.angles.midheaven_degree, mc_sign, mc_house_note));
+
+        out.push_str("\n### Qualitative Planet Conditions (Hellenistic States)\n");
+        out.push_str("| Planet | Status | House | Lord of ASC |\n");
+        out.push_str("| :--- | :--- | :---: | :---: |\n");
+        for pc in &h.planet_conditions {
+            let asc_tag = if pc.is_ruler_of_asc { "Yes" } else { "-" };
+            out.push_str(&format!(
+                "| **{}** | {} | H{:02} | {} |\n",
+                pc.name, pc.condition_label, pc.house_number, asc_tag
+            ));
+        }
+
+        if !h.lots.is_empty() {
+            out.push_str("\n### Hermetic Lots (Lots of Soul & Body)\n");
+            for lot in &h.lots {
+                let sign_name = ZODIAC_SIGNS[lot.sign_index as usize % 12];
+                out.push_str(&format!(
+                    "- {}: {:.2}° ({}) - House {:02} (Ruler: {})\n",
+                    lot.name, lot.longitude, sign_name, lot.house_number, lot.ruler
+                ));
+            }
+        }
+
+        if !h.aspects.is_empty() {
+            out.push_str("\n### Sign-Based Aspects & Degree Contacts\n");
+            for ta in &h.aspects {
+                let dynamic_str = if ta.is_applying { "Applying" } else { "Separating" };
+                let partile_str = if ta.is_partile { " [Partile <= 1°]" } else { "" };
+                out.push_str(&format!(
+                    "- {} - {}: {} (Orb: {:.2}°){}, {}\n",
+                    ta.planet1, ta.planet2, ta.aspect_type, ta.orb, partile_str, dynamic_str
+                ));
+            }
+        }
+
+        if let Some(ref san) = h.prenatal_syzygy {
+            let san_sign = ZODIAC_SIGNS[san.sign_index as usize % 12];
+            out.push_str("\n### Prenatal Syzygy (SAN)\n");
+            out.push_str(&format!(
+                "- Type: {}, Longitude: {:.2}° ({}), Moment: {}\n",
+                san.syzygy_type, san.longitude, san_sign, san.exact_datetime_utc
+            ));
+        }
+
+        if !h.fixed_star_conjunctions.is_empty() {
+            out.push_str("\n### Fixed Star Conjunctions (Orb ≤ 1.5°)\n");
+            for sc in &h.fixed_star_conjunctions {
+                out.push_str(&format!(
+                    "- {} ☌ {} (Orb: {:.2}°, Nature: {}): {}\n",
+                    sc.star_name, sc.body_name, sc.orb, sc.nature, sc.meaning
                 ));
             }
         }
