@@ -451,7 +451,7 @@ fun WesternTraditionalSection(
                                         .fillMaxWidth()
                                         .padding(vertical = 6.dp)
                                 ) {
-                                    // 1행: 항성명 · 결합 천체 + 가시성 뱃지
+                                    // 1행: 항성명 · 결합 천체 + 유효성 뱃지 + 가시성 뱃지
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -462,6 +462,18 @@ fun WesternTraditionalSection(
                                             fontSize = 13.sp,
                                             color = TextPrimary
                                         )
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = if (fs.is_qualified) AstrologicalGreen.copy(alpha = 0.12f) else BorderColor.copy(alpha = 0.5f)
+                                        ) {
+                                            Text(
+                                                text = if (fs.is_qualified) "Qualified" else "Filtered",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = if (fs.is_qualified) AstrologicalGreen else TextSecondary,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                            )
+                                        }
                                         Surface(
                                             shape = RoundedCornerShape(4.dp),
                                             color = if (fs.is_visible) AstrologicalGreen.copy(alpha = 0.12f) else BorderColor.copy(alpha = 0.5f)
@@ -476,11 +488,11 @@ fun WesternTraditionalSection(
                                         }
                                     }
                                     Spacer(modifier = Modifier.height(2.dp))
-                                    // 2행: 오차 · 성질
+                                    // 2행: 사유 · 오차 · 황위 · 등급 · 성질
                                     Text(
-                                        text = "Orb ${String.format("%.2f°", fs.orb)} · Nature: ${fs.nature}",
-                                        color = CelestialBlue,
-                                        fontSize = 12.sp,
+                                        text = "${fs.qualification_reason} · Orb ${String.format("%.2f°", fs.orb)} · Lat ${String.format("%+.1f°", fs.star_latitude)} · Mag ${fs.star_magnitude} · Nature: ${fs.nature}",
+                                        color = if (fs.is_qualified) CelestialBlue else TextSecondary,
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.Medium
                                     )
                                     // 3행: 전통 의미 및 해석
@@ -830,6 +842,18 @@ private fun HellenisticSectionContent(h: HellenisticData) {
                                 )
                                 Surface(
                                     shape = RoundedCornerShape(4.dp),
+                                    color = if (fsc.is_qualified) AstrologicalGreen.copy(alpha = 0.12f) else BorderColor.copy(alpha = 0.5f)
+                                ) {
+                                    Text(
+                                        text = if (fsc.is_qualified) "Qualified" else "Filtered",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (fsc.is_qualified) AstrologicalGreen else TextSecondary,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                    )
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
                                     color = if (fsc.is_visible) AstrologicalGreen.copy(alpha = 0.12f) else BorderColor.copy(alpha = 0.5f)
                                 ) {
                                     Text(
@@ -841,6 +865,12 @@ private fun HellenisticSectionContent(h: HellenisticData) {
                                     )
                                 }
                             }
+                            Text(
+                                text = "${fsc.qualification_reason} · Lat ${String.format("%+.1f°", fsc.star_latitude)} · Mag ${fsc.star_magnitude}",
+                                fontSize = 11.sp,
+                                color = if (fsc.is_qualified) CelestialBlue else TextSecondary,
+                                fontWeight = FontWeight.Medium
+                            )
                             Text(text = fsc.meaning, fontSize = 12.sp, color = TextSecondary)
                         }
                     }

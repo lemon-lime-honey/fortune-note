@@ -367,9 +367,14 @@ fn main() {
         if !trad.fixed_star_conjunctions.is_empty() {
             println!("  Fixed Star Conjunctions (Orb <= 1.5°):");
             for sc in &trad.fixed_star_conjunctions {
+                let status_tag = if sc.is_qualified {
+                    format!(" [Qualified: {}]", sc.qualification_reason)
+                } else {
+                    format!(" [Filtered: {}]", sc.qualification_reason)
+                };
                 println!(
-                    "    {} ☌ {} (Orb: {:.2}°, Nature: {}): {}",
-                    sc.star_name, sc.body_name, sc.orb, sc.nature, sc.meaning
+                    "    {} ☌ {} (Orb: {:.2}°, Lat: {:+.1}°, Mag: {:.2}, Nature: {}){}: {}",
+                    sc.star_name, sc.body_name, sc.orb, sc.star_latitude, sc.star_magnitude, sc.nature, status_tag, sc.meaning
                 );
             }
         }

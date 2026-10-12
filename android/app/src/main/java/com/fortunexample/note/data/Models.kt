@@ -290,10 +290,14 @@ data class FixedStarConjunctionData(
     val korean_name: String = "",
     val body_name: String,
     val star_longitude: Double,
+    val star_latitude: Double = 0.0,
+    val star_magnitude: Double = 0.0,
     val body_longitude: Double,
     val orb: Double,
     val is_visible: Boolean = true,
     val max_altitude: Double = 0.0,
+    val is_qualified: Boolean = true,
+    val qualification_reason: String = "",
     val nature: String,
     val meaning: String
 )
@@ -303,6 +307,8 @@ data class FixedStarInfoData(
     val name: String,
     val korean_name: String = "",
     val longitude: Double,
+    val latitude: Double = 0.0,
+    val magnitude: Double = 0.0,
     val sign_index: Int,
     val sign_degree: Double,
     val declination: Double = 0.0,

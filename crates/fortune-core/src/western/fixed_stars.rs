@@ -13,6 +13,13 @@
 //! Includes geographic horizon visibility calculation:
 //! Maximum culmination altitude: `Alt_max = 90° - |observer_lat - declination|`.
 //! A star is visible if `Alt_max > 0°`; otherwise it is below the horizon (never rises).
+//!
+//! Qualification Filters:
+//! - Visibility filter: Stars permanently below horizon are disqualified.
+//! - Latitude (|lat| <= 10°): Zodiacal stars qualified within 1.5° orb.
+//! - Mid-Latitude (10° < |lat| <= 30°): 1st mag or Algol qualified within 1.2°, others within 1.0°.
+//! - High-Latitude (|lat| > 30°): Only 1st magnitude luminaries (Sirius, Vega, Arcturus, etc.)
+//!   qualified within 1.0° orb; 2nd mag or fainter (Alkaid, Alphecca, etc.) discarded as geometric projection only.
 
 use serde::{Deserialize, Serialize};
 use vedaksha::ephem::stars::{CatalogueStar, mean_ecliptic_of_date};
@@ -22,6 +29,7 @@ const HIPPARCOS_EPOCH_JD: f64 = 2_448_349.062_5;
 struct FixedStarDef {
     name: &'static str,
     korean_name: &'static str,
+    magnitude: f64,
     nature: &'static str,
     meaning: &'static str,
     star: CatalogueStar,
@@ -32,6 +40,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Algol",
         korean_name: "알골",
+        magnitude: 2.12,
         nature: "Saturn / Mars",
         meaning: "Losing head, extreme danger, misfortune, decapitation, sudden destruction",
         star: CatalogueStar {
@@ -48,6 +57,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Alcyone (Pleiades)",
         korean_name: "알키오네 (플레이아데스)",
+        magnitude: 2.87,
         nature: "Moon / Mars",
         meaning: "Blindness, weeping, eye afflictions, ambition followed by downfall",
         star: CatalogueStar {
@@ -64,6 +74,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Aldebaran",
         korean_name: "알데바란 (동쪽의 수호자)",
+        magnitude: 0.85,
         nature: "Mars",
         meaning: "Royal star of the East, great honor, military success, courage, danger of quarrel",
         star: CatalogueStar {
@@ -80,6 +91,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Rigel",
         korean_name: "리겔",
+        magnitude: 0.13,
         nature: "Jupiter / Mars",
         meaning: "Great honor, mechanical ability, rapid rise, lasting fame",
         star: CatalogueStar {
@@ -96,6 +108,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Capella",
         korean_name: "카펠라",
+        magnitude: 0.08,
         nature: "Mars / Mercury",
         meaning: "Curiosity, thirst for knowledge, civic honors, wealth",
         star: CatalogueStar {
@@ -112,6 +125,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Betelgeuse",
         korean_name: "베텔게우스",
+        magnitude: 0.50,
         nature: "Mars / Mercury",
         meaning: "Great fortune, martial honors, brilliance, sudden wealth",
         star: CatalogueStar {
@@ -128,6 +142,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Sirius",
         korean_name: "시리우스",
+        magnitude: -1.46,
         nature: "Jupiter / Mars",
         meaning: "Brightest star, vast ambition, guardianship, renown, bite of passion",
         star: CatalogueStar {
@@ -144,6 +159,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Canopus",
         korean_name: "카노푸스 (노인성)",
+        magnitude: -0.74,
         nature: "Saturn / Jupiter",
         meaning: "Second brightest star, longevity, voyages, navigation, conservatism, profound wisdom",
         star: CatalogueStar {
@@ -160,6 +176,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Castor",
         korean_name: "카스토르",
+        magnitude: 1.58,
         nature: "Mercury",
         meaning: "Intellectual brilliance, writing, sudden downfall, sudden blindness or bone injury",
         star: CatalogueStar {
@@ -176,6 +193,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Pollux",
         korean_name: "폴룩스",
+        magnitude: 1.14,
         nature: "Mars",
         meaning: "Pugnacity, rashness, cruelty, martial courage",
         star: CatalogueStar {
@@ -192,6 +210,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Procyon",
         korean_name: "프로키온",
+        magnitude: 0.38,
         nature: "Mercury / Mars",
         meaning: "Impatience, petulance, sudden wealth followed by downfall",
         star: CatalogueStar {
@@ -208,6 +227,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Praesepe (M44)",
         korean_name: "프라에세페 (벌집성단)",
+        magnitude: 3.70,
         nature: "Moon / Mars",
         meaning: "Blindness, eye afflictions, severe defects, fatal disease, sudden tragedy",
         star: CatalogueStar {
@@ -224,6 +244,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Asellus Borealis",
         korean_name: "아셀루스 보레알리스 (북쪽 당나귀)",
+        magnitude: 4.67,
         nature: "Mars / Sun",
         meaning: "Heroic boldness, military honors, sudden attacks, eye afflictions",
         star: CatalogueStar {
@@ -240,6 +261,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Asellus Australis",
         korean_name: "아셀루스 아우스트랄리스 (남쪽 당나귀)",
+        magnitude: 3.94,
         nature: "Mars / Sun",
         meaning: "Violent fevers, eye afflictions, burns, military courage, danger of quarrel",
         star: CatalogueStar {
@@ -256,6 +278,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Regulus",
         korean_name: "레굴루스 (북쪽의 수호자)",
+        magnitude: 1.36,
         nature: "Mars / Jupiter",
         meaning: "Royal star of the North, supreme dignity, high command, ultimate fall if revenge taken",
         star: CatalogueStar {
@@ -272,6 +295,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Algorab",
         korean_name: "알고라브 (까마귀)",
+        magnitude: 2.59,
         nature: "Saturn / Mars",
         meaning: "Scavenging, deceit, malice, repulsion, danger of poison and treachery",
         star: CatalogueStar {
@@ -288,6 +312,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Vindemiatrix",
         korean_name: "빈데미아트릭스 (과부의 별)",
+        magnitude: 2.83,
         nature: "Saturn / Mercury",
         meaning: "Widowhood, loss of partner, deception, depression",
         star: CatalogueStar {
@@ -304,6 +329,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Spica",
         korean_name: "스피카",
+        magnitude: 0.98,
         nature: "Venus / Mars",
         meaning: "Supreme beneficence, lasting talent, honor, protection against misfortune",
         star: CatalogueStar {
@@ -320,6 +346,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Alkaid",
         korean_name: "알카이드 (파군성)",
+        magnitude: 1.86,
         nature: "Mars / Saturn",
         meaning: "Destruction, mourning, loss of partner, severe mortality, sudden conflict",
         star: CatalogueStar {
@@ -336,6 +363,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Arcturus",
         korean_name: "아르크투루스 (목동자리 대길성)",
+        magnitude: -0.05,
         nature: "Mars / Jupiter",
         meaning: "Fourth brightest star, supreme justice, prosperity, naval honors, protective renown",
         star: CatalogueStar {
@@ -352,6 +380,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Alphecca",
         korean_name: "알페카 (보석/젬마)",
+        magnitude: 2.22,
         nature: "Venus / Mercury",
         meaning: "Artistic genius, poetic dignity, beloved standing, fruitful honor",
         star: CatalogueStar {
@@ -368,6 +397,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Antares",
         korean_name: "안타레스 (서쪽의 수호자)",
+        magnitude: 1.06,
         nature: "Mars / Jupiter",
         meaning: "Royal star of the West, destructive rage, military daring, danger of sudden ruin",
         star: CatalogueStar {
@@ -384,6 +414,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Facies",
         korean_name: "파키에스 (궁수자리 성단)",
+        magnitude: 5.90,
         nature: "Sun / Mars",
         meaning: "Extreme ruthless focus, eye afflictions, violent danger, unyielding conviction",
         star: CatalogueStar {
@@ -400,6 +431,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Vega",
         korean_name: "베가 (직녀성)",
+        magnitude: 0.03,
         nature: "Venus / Mercury",
         meaning: "Music, poetry, magical charm, artistic genius, transient prosperity",
         star: CatalogueStar {
@@ -416,6 +448,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Altair",
         korean_name: "알타이르 (견우성/독수리)",
+        magnitude: 0.77,
         nature: "Mars / Jupiter",
         meaning: "Audacity, unconquerable ambition, martial honors, swift daring",
         star: CatalogueStar {
@@ -432,6 +465,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Deneb",
         korean_name: "데네브 (백조자리 알파)",
+        magnitude: 1.25,
         nature: "Venus / Mercury",
         meaning: "Lucid intelligence, scientific scholarship, swift learning, artistic taste",
         star: CatalogueStar {
@@ -448,6 +482,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Deneb Algedi",
         korean_name: "데넵 알게디 (사법관의 별)",
+        magnitude: 2.85,
         nature: "Saturn / Jupiter",
         meaning: "Supreme justice, judicial discernment, leadership won through sorrow, enduring victory",
         star: CatalogueStar {
@@ -464,6 +499,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Fomalhaut",
         korean_name: "포말하우트 (남쪽의 수호자)",
+        magnitude: 1.17,
         nature: "Venus / Mercury",
         meaning: "Royal star of the South, spiritual power, noble vision, transmutation of sorrow",
         star: CatalogueStar {
@@ -480,6 +516,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Scheat",
         korean_name: "셰아트 (페가수스자리 베타)",
+        magnitude: 2.42,
         nature: "Mars / Mercury",
         meaning: "Catastrophic flooding, imprisonment, misfortune, suicide, mental turmoil, acute peril",
         star: CatalogueStar {
@@ -496,6 +533,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Markab",
         korean_name: "마르카브 (페가수스자리 알파)",
+        magnitude: 2.49,
         nature: "Mars / Mercury",
         meaning: "Dignity, honor, brilliant mind, danger of fires and weapon wounds, sudden ambition",
         star: CatalogueStar {
@@ -512,6 +550,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
     FixedStarDef {
         name: "Achernar",
         korean_name: "아케르나르 (강의 끝)",
+        magnitude: 0.45,
         nature: "Jupiter",
         meaning: "High religious office, supreme beneficence, philosophical honor, success",
         star: CatalogueStar {
@@ -531,6 +570,8 @@ pub struct FixedStarInfo {
     pub name: String,
     pub korean_name: String,
     pub longitude: f64,
+    pub latitude: f64,
+    pub magnitude: f64,
     pub sign_index: u8,
     pub sign_degree: f64,
     pub declination: f64,
@@ -546,10 +587,14 @@ pub struct FixedStarConjunction {
     pub korean_name: String,
     pub body_name: String,
     pub star_longitude: f64,
+    pub star_latitude: f64,
+    pub star_magnitude: f64,
     pub body_longitude: f64,
     pub orb: f64,
     pub is_visible: bool,
     pub max_altitude: f64,
+    pub is_qualified: bool,
+    pub qualification_reason: String,
     pub nature: String,
     pub meaning: String,
 }
@@ -581,6 +626,8 @@ pub fn calculate_traditional_fixed_stars(jd_tt: f64, observer_lat: f64, obliquit
             name: def.name.to_string(),
             korean_name: def.korean_name.to_string(),
             longitude: lon,
+            latitude: lat,
+            magnitude: def.magnitude,
             sign_index,
             sign_degree,
             declination: dec,
@@ -592,7 +639,8 @@ pub fn calculate_traditional_fixed_stars(jd_tt: f64, observer_lat: f64, obliquit
     }).collect()
 }
 
-/// Detect conjunctions between chart bodies (planets, ASC, MC) and fixed stars within max_orb (default 1.5°).
+/// Detect conjunctions between chart bodies (7 planets, 4 angles) and fixed stars within max_orb (default 1.5°),
+/// applying historical qualification filters based on visibility, ecliptic latitude, and stellar magnitude.
 pub fn detect_fixed_star_conjunctions(
     stars: &[FixedStarInfo],
     bodies: &[(&str, f64)], // (name, longitude)
@@ -606,15 +654,56 @@ pub fn detect_fixed_star_conjunctions(
             let orb = if diff > 180.0 { 360.0 - diff } else { diff };
 
             if orb <= max_orb {
+                let abs_lat = star.latitude.abs();
+                let is_first_mag = star.magnitude <= 1.5;
+                let is_algol = star.name == "Algol";
+
+                // Historical & Astronomical Qualification Logic:
+                let (is_qualified, qualification_reason) = if !star.is_visible {
+                    (false, "지평선 미출몰 (관측 불가)".to_string())
+                } else if abs_lat <= 10.0 {
+                    // Near-ecliptic zodiacal stars (Regulus, Spica, Aldebaran, Antares, etc.)
+                    (true, "유효 (황도대 결합)".to_string())
+                } else if abs_lat <= 30.0 {
+                    // Mid-latitude stars (Capella, Procyon, Algol, Castor, Pollux, etc.)
+                    if is_first_mag || is_algol {
+                        if orb <= 1.2 {
+                            (true, "유효 (중황위 1등성/핵심성)".to_string())
+                        } else {
+                            (false, "허용오차 초과 (중황위 기준 1.2°)".to_string())
+                        }
+                    } else if orb <= 1.0 {
+                        (true, "유효 (중황위 2등성)".to_string())
+                    } else {
+                        (false, "허용오차 초과 (중황위 2등성 기준 1.0°)".to_string())
+                    }
+                } else {
+                    // High-latitude stars (|lat| > 30.0°, e.g. Sirius, Vega, Arcturus, Alkaid, Alphecca)
+                    if is_first_mag {
+                        if orb <= 1.0 {
+                            (true, "유효 (고황위 1등성 제한 인정)".to_string())
+                        } else {
+                            (false, "허용오차 초과 (고황위 1등성 기준 1.0°)".to_string())
+                        }
+                    } else {
+                        // 2nd magnitude or fainter with high latitude (Alkaid, Alphecca, etc.) -> Discarded
+                        (false, "단순 투영 배제 (고황위 2등성 이하)".to_string())
+                    }
+                };
+
                 conjunctions.push(FixedStarConjunction {
                     star_name: star.name.clone(),
                     korean_name: star.korean_name.clone(),
                     body_name: body_name.to_string(),
                     star_longitude: star.longitude,
+                    star_latitude: star.latitude,
+                    star_magnitude: star.magnitude,
                     body_longitude: body_lon,
                     orb,
                     is_visible: star.is_visible,
                     max_altitude: star.max_altitude,
+                    is_qualified,
+                    qualification_reason,
                     nature: star.nature.clone(),
                     meaning: star.meaning.clone(),
                 });
@@ -662,19 +751,60 @@ mod tests {
         }
 
         // Verify visibility at Seoul (Lat 37.57°):
-        // Sirius (Dec ≈ -16.7°) -> Visible (Alt_max ≈ 35.7°)
         let sirius = stars.iter().find(|s| s.name == "Sirius").unwrap();
         assert!(sirius.is_visible);
         assert!(sirius.max_altitude > 30.0);
 
-        // Canopus (Dec ≈ -52.7°) -> Below horizon in Seoul (Lat 37.57°)
         let canopus = stars.iter().find(|s| s.name == "Canopus").unwrap();
         assert!(!canopus.is_visible);
         assert!(canopus.max_altitude < 0.0);
 
-        // Achernar (Dec ≈ -57.2°) -> Below horizon in Seoul
         let achernar = stars.iter().find(|s| s.name == "Achernar").unwrap();
         assert!(!achernar.is_visible);
         assert!(achernar.max_altitude < 0.0);
+    }
+
+    #[test]
+    fn test_fixed_star_qualification_filters() {
+        let jd = 2447965.677778; // 1990-03-15
+        let seoul_lat = 37.5665;
+        let obliquity = 23.4425;
+        let stars = calculate_traditional_fixed_stars(jd, seoul_lat, obliquity);
+
+        // 1. Alkaid (|lat| > 30°, mag = 1.86 > 1.5) conjunct IC:
+        // Must be disqualified as simple geometric projection.
+        let alkaid = stars.iter().find(|s| s.name == "Alkaid").unwrap();
+        let bodies = vec![("Immum Coeli", alkaid.longitude + 0.3)];
+        let conj = detect_fixed_star_conjunctions(&stars, &bodies, 1.5);
+        let alkaid_conj = conj.iter().find(|c| c.star_name == "Alkaid").unwrap();
+        assert!(!alkaid_conj.is_qualified);
+        assert_eq!(alkaid_conj.qualification_reason, "단순 투영 배제 (고황위 2등성 이하)");
+
+        // 2. Canopus (Below horizon in Seoul) conjunct ASC:
+        // Must be disqualified as below horizon.
+        let canopus = stars.iter().find(|s| s.name == "Canopus").unwrap();
+        let bodies_canopus = vec![("Ascendant", canopus.longitude + 0.2)];
+        let conj_canopus = detect_fixed_star_conjunctions(&stars, &bodies_canopus, 1.5);
+        let canopus_conj = conj_canopus.iter().find(|c| c.star_name == "Canopus").unwrap();
+        assert!(!canopus_conj.is_qualified);
+        assert_eq!(canopus_conj.qualification_reason, "지평선 미출몰 (관측 불가)");
+
+        // 3. Regulus (Royal star, |lat| < 10°, 1st mag) conjunct MC:
+        // Must be fully qualified.
+        let regulus = stars.iter().find(|s| s.name == "Regulus").unwrap();
+        let bodies_regulus = vec![("Midheaven", regulus.longitude + 0.8)];
+        let conj_regulus = detect_fixed_star_conjunctions(&stars, &bodies_regulus, 1.5);
+        let regulus_conj = conj_regulus.iter().find(|c| c.star_name == "Regulus").unwrap();
+        assert!(regulus_conj.is_qualified);
+        assert_eq!(regulus_conj.qualification_reason, "유효 (황도대 결합)");
+
+        // 4. Sirius (1st mag, |lat| ≈ 39.6° > 30°) conjunct ASC within 0.5°:
+        // Must be qualified as restricted 1st mag high-lat luminary.
+        let sirius = stars.iter().find(|s| s.name == "Sirius").unwrap();
+        let bodies_sirius = vec![("Ascendant", sirius.longitude + 0.5)];
+        let conj_sirius = detect_fixed_star_conjunctions(&stars, &bodies_sirius, 1.5);
+        let sirius_conj = conj_sirius.iter().find(|c| c.star_name == "Sirius").unwrap();
+        assert!(sirius_conj.is_qualified);
+        assert_eq!(sirius_conj.qualification_reason, "유효 (고황위 1등성 제한 인정)");
     }
 }

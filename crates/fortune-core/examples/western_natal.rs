@@ -397,14 +397,19 @@ fn main() {
             println!("  No conjunctions with major traditional fixed stars detected.");
         } else {
             for fsc in &trad.fixed_star_conjunctions {
+                let status_tag = if fsc.is_qualified {
+                    format!(" [Qualified: {}]", fsc.qualification_reason)
+                } else {
+                    format!(" [Filtered: {}]", fsc.qualification_reason)
+                };
                 let vis_tag = if fsc.is_visible {
                     format!(" [Visible (Culm: {:+.1}°)]", fsc.max_altitude)
                 } else {
                     format!(" [Below Horizon (Culm: {:+.1}°)]", fsc.max_altitude)
                 };
                 println!(
-                    "  * {} ({}) conj {} : Orb {:.2}° (Star at {}){}",
-                    fsc.star_name, fsc.korean_name, fsc.body_name, fsc.orb, format_deg(fsc.star_longitude), vis_tag
+                    "  * {} ({}) conj {} : Orb {:.2}°, Lat {:+.1}°, Mag {:.2} (Star at {}){}{}",
+                    fsc.star_name, fsc.korean_name, fsc.body_name, fsc.orb, fsc.star_latitude, fsc.star_magnitude, format_deg(fsc.star_longitude), status_tag, vis_tag
                 );
                 println!("    Nature : {}", fsc.nature);
                 println!("    Meaning: {}", fsc.meaning);
@@ -490,14 +495,19 @@ fn main() {
             println!("  No conjunctions with major traditional fixed stars detected.");
         } else {
             for fsc in &h.fixed_star_conjunctions {
+                let status_tag = if fsc.is_qualified {
+                    format!(" [Qualified: {}]", fsc.qualification_reason)
+                } else {
+                    format!(" [Filtered: {}]", fsc.qualification_reason)
+                };
                 let vis_tag = if fsc.is_visible {
                     format!(" [Visible (Culm: {:+.1}°)]", fsc.max_altitude)
                 } else {
                     format!(" [Below Horizon (Culm: {:+.1}°)]", fsc.max_altitude)
                 };
                 println!(
-                    "  * {} ({}) conj {} : Orb {:.2}° (Star at {}){}",
-                    fsc.star_name, fsc.korean_name, fsc.body_name, fsc.orb, format_deg(fsc.star_longitude), vis_tag
+                    "  * {} ({}) conj {} : Orb {:.2}°, Lat {:+.1}°, Mag {:.2} (Star at {}){}{}",
+                    fsc.star_name, fsc.korean_name, fsc.body_name, fsc.orb, fsc.star_latitude, fsc.star_magnitude, format_deg(fsc.star_longitude), status_tag, vis_tag
                 );
                 println!("    Nature : {}", fsc.nature);
                 println!("    Meaning: {}", fsc.meaning);
