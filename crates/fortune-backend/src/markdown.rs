@@ -239,9 +239,14 @@ fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput, is
         if !trad.fixed_star_conjunctions.is_empty() {
             out.push_str("\n### Fixed Star Conjunctions (Orb ≤ 1.5°)\n");
             for sc in &trad.fixed_star_conjunctions {
+                let vis_tag = if sc.is_visible {
+                    format!(" [Visible (Culm: {:+.1}°)]", sc.max_altitude)
+                } else {
+                    format!(" [Below Horizon (Culm: {:+.1}°)]", sc.max_altitude)
+                };
                 out.push_str(&format!(
-                    "- {} ☌ {} (Orb: {:.2}°, Nature: {}): {}\n",
-                    sc.star_name, sc.body_name, sc.orb, sc.nature, sc.meaning
+                    "- {} ☌ {} (Orb: {:.2}°, Nature: {}){}: {}\n",
+                    sc.star_name, sc.body_name, sc.orb, sc.nature, vis_tag, sc.meaning
                 ));
             }
         }
@@ -368,9 +373,14 @@ fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput, is
         if !h.fixed_star_conjunctions.is_empty() {
             out.push_str("\n### Fixed Star Conjunctions (Orb ≤ 1.5°)\n");
             for sc in &h.fixed_star_conjunctions {
+                let vis_tag = if sc.is_visible {
+                    format!(" [Visible (Culm: {:+.1}°)]", sc.max_altitude)
+                } else {
+                    format!(" [Below Horizon (Culm: {:+.1}°)]", sc.max_altitude)
+                };
                 out.push_str(&format!(
-                    "- {} ☌ {} (Orb: {:.2}°, Nature: {}): {}\n",
-                    sc.star_name, sc.body_name, sc.orb, sc.nature, sc.meaning
+                    "- {} ☌ {} (Orb: {:.2}°, Nature: {}){}: {}\n",
+                    sc.star_name, sc.body_name, sc.orb, sc.nature, vis_tag, sc.meaning
                 ));
             }
         }

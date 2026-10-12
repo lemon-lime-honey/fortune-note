@@ -292,6 +292,8 @@ data class FixedStarConjunctionData(
     val star_longitude: Double,
     val body_longitude: Double,
     val orb: Double,
+    val is_visible: Boolean = true,
+    val max_altitude: Double = 0.0,
     val nature: String,
     val meaning: String
 )
@@ -303,6 +305,9 @@ data class FixedStarInfoData(
     val longitude: Double,
     val sign_index: Int,
     val sign_degree: Double,
+    val declination: Double = 0.0,
+    val is_visible: Boolean = true,
+    val max_altitude: Double = 0.0,
     val nature: String,
     val meaning: String
 )

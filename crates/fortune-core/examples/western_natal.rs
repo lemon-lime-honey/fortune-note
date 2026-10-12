@@ -397,9 +397,14 @@ fn main() {
             println!("  No conjunctions with major traditional fixed stars detected.");
         } else {
             for fsc in &trad.fixed_star_conjunctions {
+                let vis_tag = if fsc.is_visible {
+                    format!(" [Visible (Culm: {:+.1}°)]", fsc.max_altitude)
+                } else {
+                    format!(" [Below Horizon (Culm: {:+.1}°)]", fsc.max_altitude)
+                };
                 println!(
-                    "  * {} ({}) conj {} : Orb {:.2}° (Star at {})",
-                    fsc.star_name, fsc.korean_name, fsc.body_name, fsc.orb, format_deg(fsc.star_longitude)
+                    "  * {} ({}) conj {} : Orb {:.2}° (Star at {}){}",
+                    fsc.star_name, fsc.korean_name, fsc.body_name, fsc.orb, format_deg(fsc.star_longitude), vis_tag
                 );
                 println!("    Nature : {}", fsc.nature);
                 println!("    Meaning: {}", fsc.meaning);
@@ -485,9 +490,14 @@ fn main() {
             println!("  No conjunctions with major traditional fixed stars detected.");
         } else {
             for fsc in &h.fixed_star_conjunctions {
+                let vis_tag = if fsc.is_visible {
+                    format!(" [Visible (Culm: {:+.1}°)]", fsc.max_altitude)
+                } else {
+                    format!(" [Below Horizon (Culm: {:+.1}°)]", fsc.max_altitude)
+                };
                 println!(
-                    "  * {} ({}) conj {} : Orb {:.2}° (Star at {})",
-                    fsc.star_name, fsc.korean_name, fsc.body_name, fsc.orb, format_deg(fsc.star_longitude)
+                    "  * {} ({}) conj {} : Orb {:.2}° (Star at {}){}",
+                    fsc.star_name, fsc.korean_name, fsc.body_name, fsc.orb, format_deg(fsc.star_longitude), vis_tag
                 );
                 println!("    Nature : {}", fsc.nature);
                 println!("    Meaning: {}", fsc.meaning);

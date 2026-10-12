@@ -69,6 +69,8 @@ pub fn calculate_hellenistic_data(
     is_male: bool,
     jd_ut1: f64,
     jd_tt: f64,
+    observer_lat: f64,
+    obliquity_deg: f64,
     fixed_star_max_orb: f64,
 ) -> HellenisticData {
     let asc_sign = ((ascendant / 30.0).floor() as u8) % 12;
@@ -170,7 +172,7 @@ pub fn calculate_hellenistic_data(
     let aspects = aspects::calculate_traditional_aspects(planet_tuples);
 
     // 4. Fixed Star Conjunctions
-    let stars = fixed_stars::calculate_traditional_fixed_stars(jd_tt);
+    let stars = fixed_stars::calculate_traditional_fixed_stars(jd_tt, observer_lat, obliquity_deg);
     let mut check_bodies = planet_pos_tuples.to_vec();
     check_bodies.push(("Ascendant", ascendant));
     check_bodies.push(("Midheaven", midheaven));

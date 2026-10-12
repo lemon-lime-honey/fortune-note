@@ -20,6 +20,7 @@ val AccentGold = AccentPrimary // 주황색 전면 퇴출 -> 딥 차콜
 // 포인트 컬러 (주황색 완전 배제, 표준 대비 준수)
 val CelestialBlue = Color(0xFF1D4ED8)    // 클래식 로열 블루
 val AstrologicalRed = Color(0xFFB91C1C)  // 클래식 버건디 레드
-val VedicGreen = Color(0xFF15803D)       // 클래식 포레스트 그린
+val AstrologicalGreen = Color(0xFF15803D)// 클래식 포레스트 그린
+val VedicGreen = AstrologicalGreen       // 클래식 포레스트 그린
 val SajuSlate = Color(0xFF334155)        // 정갈한 다크 슬레이트
 val SajuAmber = SajuSlate                // 주황색 제거

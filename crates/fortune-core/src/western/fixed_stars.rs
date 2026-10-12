@@ -1,7 +1,18 @@
-//! 16 Major Traditional Fixed Stars with Precession and Proper Motion.
+//! 31 Elite Traditional Fixed Stars with Astrometry, Precession, and Geographic Visibility.
 //!
-//! Propagated dynamically to any epoch using Hipparcos catalogue astrometry
-//! via `vedaksha_ephem_core::stars::mean_ecliptic_of_date`.
+//! Exclusively includes authentic historical standards:
+//! - 15 Behenian Stars (Medieval & Renaissance talismanic and natal astrology)
+//! - 4 Royal Stars of Persia (Aldebaran, Regulus, Antares, Fomalhaut)
+//! - Hellenistic 1st-magnitude luminaries (Anonymous of 379, Ptolemy, Vettius Valens)
+//! - Malefic clusters and sight-afflicting stars (Praesepe, Aselli, Facies, Algol)
+//! - William Lilly's primary natal/horary significators (Vindemiatrix, Scheat, Markab)
+//!
+//! Propagated dynamically to any epoch using Hipparcos catalogue astrometry (I/311/hip2)
+//! via `vedaksha::ephem::stars::mean_ecliptic_of_date`.
+//!
+//! Includes geographic horizon visibility calculation:
+//! Maximum culmination altitude: `Alt_max = 90° - |observer_lat - declination|`.
+//! A star is visible if `Alt_max > 0°`; otherwise it is below the horizon (never rises).
 
 use serde::{Deserialize, Serialize};
 use vedaksha::ephem::stars::{CatalogueStar, mean_ecliptic_of_date};
@@ -17,6 +28,7 @@ struct FixedStarDef {
 }
 
 const TRADITIONAL_STARS: &[FixedStarDef] = &[
+    // 1. Algol (15 Behenian Stars, Caput Medusae)
     FixedStarDef {
         name: "Algol",
         korean_name: "알골",
@@ -32,6 +44,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
             pm_dec_mas_per_year: -1.41,
         },
     },
+    // 2. Alcyone / Pleiades (15 Behenian Stars, Nebulous Cluster)
     FixedStarDef {
         name: "Alcyone (Pleiades)",
         korean_name: "알키오네 (플레이아데스)",
@@ -47,6 +60,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
             pm_dec_mas_per_year: -43.67,
         },
     },
+    // 3. Aldebaran (15 Behenian Stars, Royal Star of the East)
     FixedStarDef {
         name: "Aldebaran",
         korean_name: "알데바란 (동쪽의 수호자)",
@@ -62,6 +76,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
             pm_dec_mas_per_year: -189.36,
         },
     },
+    // 4. Rigel (Hellenistic 1st Magnitude)
     FixedStarDef {
         name: "Rigel",
         korean_name: "리겔",
@@ -77,6 +92,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
             pm_dec_mas_per_year: -0.56,
         },
     },
+    // 5. Capella (15 Behenian Stars)
     FixedStarDef {
         name: "Capella",
         korean_name: "카펠라",
@@ -92,6 +108,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
             pm_dec_mas_per_year: -427.11,
         },
     },
+    // 6. Betelgeuse (Hellenistic 1st Magnitude)
     FixedStarDef {
         name: "Betelgeuse",
         korean_name: "베텔게우스",
@@ -107,6 +124,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
             pm_dec_mas_per_year: 10.86,
         },
     },
+    // 7. Sirius (15 Behenian Stars, Hellenistic #1 Luminary)
     FixedStarDef {
         name: "Sirius",
         korean_name: "시리우스",
@@ -122,261 +140,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
             pm_dec_mas_per_year: -1223.07,
         },
     },
-    FixedStarDef {
-        name: "Castor",
-        korean_name: "카스토르",
-        nature: "Mercury",
-        meaning: "Intellectual brilliance, writing, sudden downfall, sudden blindness or bone injury",
-        star: CatalogueStar {
-            catalogue: "I/311/hip2",
-            identifier: "HIP 36850",
-            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 113.649_432,
-            dec_deg: 31.888_315,
-            pm_ra_cosdec_mas_per_year: -192.40,
-            pm_dec_mas_per_year: -146.74,
-        },
-    },
-    FixedStarDef {
-        name: "Pollux",
-        korean_name: "폴룩스",
-        nature: "Mars",
-        meaning: "Pugnacity, rashness, cruelty, martial courage",
-        star: CatalogueStar {
-            catalogue: "I/311/hip2",
-            identifier: "HIP 37826",
-            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 116.328_957,
-            dec_deg: 28.026_199,
-            pm_ra_cosdec_mas_per_year: -625.69,
-            pm_dec_mas_per_year: -45.94,
-        },
-    },
-    FixedStarDef {
-        name: "Procyon",
-        korean_name: "프로키온",
-        nature: "Mercury / Mars",
-        meaning: "Impatience, petulance, sudden wealth followed by downfall",
-        star: CatalogueStar {
-            catalogue: "I/311/hip2",
-            identifier: "HIP 37279",
-            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 114.825_494,
-            dec_deg: 5.224_993,
-            pm_ra_cosdec_mas_per_year: -716.57,
-            pm_dec_mas_per_year: -1034.58,
-        },
-    },
-    FixedStarDef {
-        name: "Regulus",
-        korean_name: "레굴루스 (북쪽의 수호자)",
-        nature: "Mars / Jupiter",
-        meaning: "Royal star of the North, supreme dignity, high command, ultimate fall if revenge taken",
-        star: CatalogueStar {
-            catalogue: "I/311/hip2",
-            identifier: "HIP 49669",
-            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 152.092_962,
-            dec_deg: 11.967_209,
-            pm_ra_cosdec_mas_per_year: -249.40,
-            pm_dec_mas_per_year: 4.88,
-        },
-    },
-    FixedStarDef {
-        name: "Vindemiatrix",
-        korean_name: "빈데미아트릭스 (과부의 별)",
-        nature: "Saturn / Mercury",
-        meaning: "Widowhood, loss of partner, deception, depression",
-        star: CatalogueStar {
-            catalogue: "I/311/hip2",
-            identifier: "HIP 63608",
-            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 195.544_525,
-            dec_deg: 10.959_917,
-            pm_ra_cosdec_mas_per_year: -270.44,
-            pm_dec_mas_per_year: 14.52,
-        },
-    },
-    FixedStarDef {
-        name: "Spica",
-        korean_name: "스피카",
-        nature: "Venus / Mars",
-        meaning: "Supreme beneficence, lasting talent, honor, protection against misfortune",
-        star: CatalogueStar {
-            catalogue: "I/311/hip2",
-            identifier: "HIP 65474",
-            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 201.298_352,
-            dec_deg: -11.161_245,
-            pm_ra_cosdec_mas_per_year: -42.35,
-            pm_dec_mas_per_year: -30.67,
-        },
-    },
-    FixedStarDef {
-        name: "Antares",
-        korean_name: "안타레스 (서쪽의 수호자)",
-        nature: "Mars / Jupiter",
-        meaning: "Royal star of the West, destructive rage, military daring, danger of sudden ruin",
-        star: CatalogueStar {
-            catalogue: "I/311/hip2",
-            identifier: "HIP 80763",
-            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 247.351_915,
-            dec_deg: -26.432_002,
-            pm_ra_cosdec_mas_per_year: -10.16,
-            pm_dec_mas_per_year: -23.21,
-        },
-    },
-    FixedStarDef {
-        name: "Vega",
-        korean_name: "베가 (직녀성)",
-        nature: "Venus / Mercury",
-        meaning: "Music, poetry, magical charm, artistic genius, transient prosperity",
-        star: CatalogueStar {
-            catalogue: "I/311/hip2",
-            identifier: "HIP 91262",
-            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 279.234_735,
-            dec_deg: 38.783_689,
-            pm_ra_cosdec_mas_per_year: 200.94,
-            pm_dec_mas_per_year: 286.23,
-        },
-    },
-    FixedStarDef {
-        name: "Fomalhaut",
-        korean_name: "포말하우트 (남쪽의 수호자)",
-        nature: "Venus / Mercury",
-        meaning: "Royal star of the South, spiritual power, noble vision, transmutation of sorrow",
-        star: CatalogueStar {
-            catalogue: "I/311/hip2",
-            identifier: "HIP 113368",
-            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 344.412_693,
-            dec_deg: -29.622_237,
-            pm_ra_cosdec_mas_per_year: 329.22,
-            pm_dec_mas_per_year: -164.22,
-        },
-    },
-    FixedStarDef {
-        name: "Alpheratz",
-        korean_name: "알페라츠 (시라흐)",
-        nature: "Jupiter / Venus",
-        meaning: "Honor, intellect, grace, independence, swift rise, freedom-loving",
-        star: CatalogueStar {
-            catalogue: "I/311/hip2",
-            identifier: "HIP 677",
-            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 2.096_916,
-            dec_deg: 29.090_432,
-            pm_ra_cosdec_mas_per_year: 135.68,
-            pm_dec_mas_per_year: -162.95,
-        },
-    },
-    FixedStarDef {
-        name: "Algenib",
-        korean_name: "알게니브",
-        nature: "Mars / Mercury",
-        meaning: "Oratory, ambition, quick wit, martial courage, risk of dishonor",
-        star: CatalogueStar {
-            catalogue: "I/311/hip2",
-            identifier: "HIP 1067",
-            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 3.308_968,
-            dec_deg: 15.183_617,
-            pm_ra_cosdec_mas_per_year: 25.13,
-            pm_dec_mas_per_year: -8.93,
-        },
-    },
-    FixedStarDef {
-        name: "Achernar",
-        korean_name: "아케르나르 (강의 끝)",
-        nature: "Jupiter",
-        meaning: "High religious office, supreme beneficence, philosophical honor, success",
-        star: CatalogueStar {
-            catalogue: "I/311/hip2",
-            identifier: "HIP 7588",
-            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 24.428_524,
-            dec_deg: -57.236_754,
-            pm_ra_cosdec_mas_per_year: 88.02,
-            pm_dec_mas_per_year: -40.08,
-        },
-    },
-    FixedStarDef {
-        name: "Hamal",
-        korean_name: "하말",
-        nature: "Mars / Saturn",
-        meaning: "Martial leadership, head injuries, headstrong will, cruelty, sudden downfall",
-        star: CatalogueStar {
-            catalogue: "I/311/hip2",
-            identifier: "HIP 9884",
-            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 31.793_361,
-            dec_deg: 23.462_419,
-            pm_ra_cosdec_mas_per_year: 190.73,
-            pm_dec_mas_per_year: -145.77,
-        },
-    },
-    FixedStarDef {
-        name: "Polaris",
-        korean_name: "폴라리스 (북극성)",
-        nature: "Saturn / Venus",
-        meaning: "Guidance, pathfinding, enduring patience, grave responsibility, guardianship",
-        star: CatalogueStar {
-            catalogue: "I/311/hip2",
-            identifier: "HIP 11767",
-            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 37.954_561,
-            dec_deg: 89.264_109,
-            pm_ra_cosdec_mas_per_year: 44.22,
-            pm_dec_mas_per_year: -11.74,
-        },
-    },
-    FixedStarDef {
-        name: "Menkar",
-        korean_name: "멘카르 (고래자리 알파)",
-        nature: "Saturn",
-        meaning: "Impediments, disease, loss of fortune, throat afflictions, enduring trials",
-        star: CatalogueStar {
-            catalogue: "I/311/hip2",
-            identifier: "HIP 14135",
-            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 45.569_884,
-            dec_deg: 4.089_736,
-            pm_ra_cosdec_mas_per_year: -10.56,
-            pm_dec_mas_per_year: -78.43,
-        },
-    },
-    FixedStarDef {
-        name: "Bellatrix",
-        korean_name: "벨라트릭스 (여전사)",
-        nature: "Mars / Mercury",
-        meaning: "Military talent, strategic daring, civil honors, sudden ruin if reckless",
-        star: CatalogueStar {
-            catalogue: "I/311/hip2",
-            identifier: "HIP 25336",
-            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 81.282_764,
-            dec_deg: 6.349_703,
-            pm_ra_cosdec_mas_per_year: -8.11,
-            pm_dec_mas_per_year: -13.33,
-        },
-    },
-    FixedStarDef {
-        name: "Alnilam",
-        korean_name: "알닐람 (오리온 허리띠)",
-        nature: "Jupiter / Saturn",
-        meaning: "Brief public honor, transient authority, unexpected elevation",
-        star: CatalogueStar {
-            catalogue: "I/311/hip2",
-            identifier: "HIP 26311",
-            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 84.053_389,
-            dec_deg: -1.201_917,
-            pm_ra_cosdec_mas_per_year: 1.46,
-            pm_dec_mas_per_year: -0.66,
-        },
-    },
+    // 8. Canopus (Hellenistic #2 Luminary, Alpha Carinae)
     FixedStarDef {
         name: "Canopus",
         korean_name: "카노푸스 (노인성)",
@@ -392,81 +156,183 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
             pm_dec_mas_per_year: 23.67,
         },
     },
+    // 9. Castor (Hellenistic Alpha Geminorum)
     FixedStarDef {
-        name: "Alphard",
-        korean_name: "알파르드 (뱀의 심장)",
-        nature: "Saturn / Venus",
-        meaning: "Poison, passion, sudden tragedy, deceit, drowning, artistic passion",
+        name: "Castor",
+        korean_name: "카스토르",
+        nature: "Mercury",
+        meaning: "Intellectual brilliance, writing, sudden downfall, sudden blindness or bone injury",
         star: CatalogueStar {
             catalogue: "I/311/hip2",
-            identifier: "HIP 46390",
+            identifier: "HIP 36850",
             epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 141.606_734,
-            dec_deg: -8.658_602,
-            pm_ra_cosdec_mas_per_year: -14.49,
-            pm_dec_mas_per_year: 33.30,
+            ra_deg: 113.649_432,
+            dec_deg: 31.888_315,
+            pm_ra_cosdec_mas_per_year: -192.40,
+            pm_dec_mas_per_year: -146.74,
         },
     },
+    // 10. Pollux (Hellenistic Beta Geminorum)
     FixedStarDef {
-        name: "Zosma",
-        korean_name: "조스마",
-        nature: "Saturn / Venus",
-        meaning: "Sacrifice, victimization, melancholy, false accusations, deep endurance",
+        name: "Pollux",
+        korean_name: "폴룩스",
+        nature: "Mars",
+        meaning: "Pugnacity, rashness, cruelty, martial courage",
         star: CatalogueStar {
             catalogue: "I/311/hip2",
-            identifier: "HIP 54872",
+            identifier: "HIP 37826",
             epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 168.526_848,
-            dec_deg: 20.523_689,
-            pm_ra_cosdec_mas_per_year: 143.08,
-            pm_dec_mas_per_year: -130.40,
+            ra_deg: 116.328_957,
+            dec_deg: 28.026_199,
+            pm_ra_cosdec_mas_per_year: -625.69,
+            pm_dec_mas_per_year: -45.94,
         },
     },
+    // 11. Procyon (15 Behenian Stars, Alpha Canis Minoris)
     FixedStarDef {
-        name: "Denebola",
-        korean_name: "데네볼라 (사자의 꼬리)",
-        nature: "Saturn / Venus",
-        meaning: "Swift loss of fortune, swift judgment, public criticism, noble downfall",
+        name: "Procyon",
+        korean_name: "프로키온",
+        nature: "Mercury / Mars",
+        meaning: "Impatience, petulance, sudden wealth followed by downfall",
         star: CatalogueStar {
             catalogue: "I/311/hip2",
-            identifier: "HIP 57632",
+            identifier: "HIP 37279",
             epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 177.264_909,
-            dec_deg: 14.572_058,
-            pm_ra_cosdec_mas_per_year: -499.02,
-            pm_dec_mas_per_year: -113.78,
+            ra_deg: 114.825_494,
+            dec_deg: 5.224_993,
+            pm_ra_cosdec_mas_per_year: -716.57,
+            pm_dec_mas_per_year: -1034.58,
         },
     },
+    // 12. Praesepe / M44 (Ancient Malefic Sight-Afflicting Cluster, Epsilon Cancri)
     FixedStarDef {
-        name: "Acrux",
-        korean_name: "아크룩스 (남십자자리 알파)",
-        nature: "Jupiter",
-        meaning: "Religious insight, ceremonial authority, mystical elevation, occult wisdom",
+        name: "Praesepe (M44)",
+        korean_name: "프라에세페 (벌집성단)",
+        nature: "Moon / Mars",
+        meaning: "Blindness, eye afflictions, severe defects, fatal disease, sudden tragedy",
         star: CatalogueStar {
             catalogue: "I/311/hip2",
-            identifier: "HIP 60718",
+            identifier: "HIP 42556",
             epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 186.649_774,
-            dec_deg: -63.099_093,
-            pm_ra_cosdec_mas_per_year: -35.48,
-            pm_dec_mas_per_year: -11.96,
+            ra_deg: 130.112_542,
+            dec_deg: 19.544_806,
+            pm_ra_cosdec_mas_per_year: -36.29,
+            pm_dec_mas_per_year: -12.13,
         },
     },
+    // 13. Asellus Borealis (Ancient Malefic Asses of Cancer, Gamma Cancri)
     FixedStarDef {
-        name: "Agena",
-        korean_name: "아게나 (하자르)",
-        nature: "Venus / Jupiter",
-        meaning: "High moral standing, refinement, health, lasting friendship, honor",
+        name: "Asellus Borealis",
+        korean_name: "아셀루스 보레알리스 (북쪽 당나귀)",
+        nature: "Mars / Sun",
+        meaning: "Heroic boldness, military honors, sudden attacks, eye afflictions",
         star: CatalogueStar {
             catalogue: "I/311/hip2",
-            identifier: "HIP 68702",
+            identifier: "HIP 42806",
             epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 210.955_894,
-            dec_deg: -60.373_045,
-            pm_ra_cosdec_mas_per_year: -33.88,
-            pm_dec_mas_per_year: -25.07,
+            ra_deg: 130.821_458,
+            dec_deg: 21.468_500,
+            pm_ra_cosdec_mas_per_year: -105.76,
+            pm_dec_mas_per_year: -39.16,
         },
     },
+    // 14. Asellus Australis (Ancient Malefic Asses of Cancer, Delta Cancri)
+    FixedStarDef {
+        name: "Asellus Australis",
+        korean_name: "아셀루스 아우스트랄리스 (남쪽 당나귀)",
+        nature: "Mars / Sun",
+        meaning: "Violent fevers, eye afflictions, burns, military courage, danger of quarrel",
+        star: CatalogueStar {
+            catalogue: "I/311/hip2",
+            identifier: "HIP 42911",
+            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
+            ra_deg: 131.171_250,
+            dec_deg: 18.154_308,
+            pm_ra_cosdec_mas_per_year: -18.44,
+            pm_dec_mas_per_year: -227.81,
+        },
+    },
+    // 15. Regulus (15 Behenian Stars, Royal Star of the North)
+    FixedStarDef {
+        name: "Regulus",
+        korean_name: "레굴루스 (북쪽의 수호자)",
+        nature: "Mars / Jupiter",
+        meaning: "Royal star of the North, supreme dignity, high command, ultimate fall if revenge taken",
+        star: CatalogueStar {
+            catalogue: "I/311/hip2",
+            identifier: "HIP 49669",
+            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
+            ra_deg: 152.092_962,
+            dec_deg: 11.967_209,
+            pm_ra_cosdec_mas_per_year: -249.40,
+            pm_dec_mas_per_year: 4.88,
+        },
+    },
+    // 16. Algorab (15 Behenian Stars, Delta Corvi)
+    FixedStarDef {
+        name: "Algorab",
+        korean_name: "알고라브 (까마귀)",
+        nature: "Saturn / Mars",
+        meaning: "Scavenging, deceit, malice, repulsion, danger of poison and treachery",
+        star: CatalogueStar {
+            catalogue: "I/311/hip2",
+            identifier: "HIP 60965",
+            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
+            ra_deg: 187.466_083,
+            dec_deg: -16.515_417,
+            pm_ra_cosdec_mas_per_year: -210.49,
+            pm_dec_mas_per_year: -138.74,
+        },
+    },
+    // 17. Vindemiatrix (William Lilly CA Primary Significator, Epsilon Virginis)
+    FixedStarDef {
+        name: "Vindemiatrix",
+        korean_name: "빈데미아트릭스 (과부의 별)",
+        nature: "Saturn / Mercury",
+        meaning: "Widowhood, loss of partner, deception, depression",
+        star: CatalogueStar {
+            catalogue: "I/311/hip2",
+            identifier: "HIP 63608",
+            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
+            ra_deg: 195.544_525,
+            dec_deg: 10.959_917,
+            pm_ra_cosdec_mas_per_year: -270.44,
+            pm_dec_mas_per_year: 14.52,
+        },
+    },
+    // 18. Spica (15 Behenian Stars, Alpha Virginis)
+    FixedStarDef {
+        name: "Spica",
+        korean_name: "스피카",
+        nature: "Venus / Mars",
+        meaning: "Supreme beneficence, lasting talent, honor, protection against misfortune",
+        star: CatalogueStar {
+            catalogue: "I/311/hip2",
+            identifier: "HIP 65474",
+            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
+            ra_deg: 201.298_352,
+            dec_deg: -11.161_245,
+            pm_ra_cosdec_mas_per_year: -42.35,
+            pm_dec_mas_per_year: -30.67,
+        },
+    },
+    // 19. Alkaid / Benetnasch (15 Behenian Stars, Eta Ursae Majoris)
+    FixedStarDef {
+        name: "Alkaid",
+        korean_name: "알카이드 (파군성)",
+        nature: "Mars / Saturn",
+        meaning: "Destruction, mourning, loss of partner, severe mortality, sudden conflict",
+        star: CatalogueStar {
+            catalogue: "I/311/hip2",
+            identifier: "HIP 67301",
+            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
+            ra_deg: 206.885_157,
+            dec_deg: 49.313_265,
+            pm_ra_cosdec_mas_per_year: -121.17,
+            pm_dec_mas_per_year: -14.91,
+        },
+    },
+    // 20. Arcturus (15 Behenian Stars, Alpha Boötis)
     FixedStarDef {
         name: "Arcturus",
         korean_name: "아르크투루스 (목동자리 대길성)",
@@ -482,21 +348,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
             pm_dec_mas_per_year: -1999.40,
         },
     },
-    FixedStarDef {
-        name: "Toliman",
-        korean_name: "톨리만 (알파 센타우리)",
-        nature: "Venus / Jupiter",
-        meaning: "Benevolence, exquisite manners, high diplomatic honor, trustworthy alliances",
-        star: CatalogueStar {
-            catalogue: "I/311/hip2",
-            identifier: "HIP 71683",
-            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 219.902_058,
-            dec_deg: -60.833_989,
-            pm_ra_cosdec_mas_per_year: -3678.19,
-            pm_dec_mas_per_year: 481.84,
-        },
-    },
+    // 21. Alphecca / Gemma (15 Behenian Stars, Alpha Coronae Borealis)
     FixedStarDef {
         name: "Alphecca",
         korean_name: "알페카 (보석/젬마)",
@@ -512,66 +364,23 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
             pm_dec_mas_per_year: -89.44,
         },
     },
+    // 22. Antares (15 Behenian Stars, Royal Star of the West)
     FixedStarDef {
-        name: "Unukalhai",
-        korean_name: "우누칼하이 (뱀의 심장)",
-        nature: "Saturn / Mars",
-        meaning: "Treachery, surgical trauma, venomous deceit, severe struggle, inner transformation",
+        name: "Antares",
+        korean_name: "안타레스 (서쪽의 수호자)",
+        nature: "Mars / Jupiter",
+        meaning: "Royal star of the West, destructive rage, military daring, danger of sudden ruin",
         star: CatalogueStar {
             catalogue: "I/311/hip2",
-            identifier: "HIP 77070",
+            identifier: "HIP 80763",
             epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 236.066_978,
-            dec_deg: 6.425_556,
-            pm_ra_cosdec_mas_per_year: 135.53,
-            pm_dec_mas_per_year: 3.52,
+            ra_deg: 247.351_915,
+            dec_deg: -26.432_002,
+            pm_ra_cosdec_mas_per_year: -10.16,
+            pm_dec_mas_per_year: -23.21,
         },
     },
-    FixedStarDef {
-        name: "Shaula",
-        korean_name: "샤울라 (전갈의 독침)",
-        nature: "Mercury / Mars",
-        meaning: "Sting of danger, surgery, acute boldness, sharp crisis, lethal defense",
-        star: CatalogueStar {
-            catalogue: "I/311/hip2",
-            identifier: "HIP 85927",
-            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 263.402_167,
-            dec_deg: -37.103_822,
-            pm_ra_cosdec_mas_per_year: -8.88,
-            pm_dec_mas_per_year: -30.65,
-        },
-    },
-    FixedStarDef {
-        name: "Ras Alhague",
-        korean_name: "라스 알하게 (뱀주인자리)",
-        nature: "Saturn / Venus",
-        meaning: "Healing medicine, antidote, misfortune through carelessness, animal bites",
-        star: CatalogueStar {
-            catalogue: "I/311/hip2",
-            identifier: "HIP 86032",
-            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 263.733_621,
-            dec_deg: 12.560_039,
-            pm_ra_cosdec_mas_per_year: 108.48,
-            pm_dec_mas_per_year: -221.73,
-        },
-    },
-    FixedStarDef {
-        name: "Kaus Australis",
-        korean_name: "카우스 아우스트랄리스",
-        nature: "Jupiter / Mars",
-        meaning: "Direct idealism, heroic fortitude, philosophical daring, adventurous command",
-        star: CatalogueStar {
-            catalogue: "I/311/hip2",
-            identifier: "HIP 90185",
-            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 276.042_971,
-            dec_deg: -34.384_614,
-            pm_ra_cosdec_mas_per_year: -39.38,
-            pm_dec_mas_per_year: -124.35,
-        },
-    },
+    // 23. Facies (Ancient Malefic Nebula in Sagittarius, M22)
     FixedStarDef {
         name: "Facies",
         korean_name: "파키에스 (궁수자리 성단)",
@@ -587,6 +396,23 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
             pm_dec_mas_per_year: -5.0,
         },
     },
+    // 24. Vega (15 Behenian Stars, Alpha Lyrae)
+    FixedStarDef {
+        name: "Vega",
+        korean_name: "베가 (직녀성)",
+        nature: "Venus / Mercury",
+        meaning: "Music, poetry, magical charm, artistic genius, transient prosperity",
+        star: CatalogueStar {
+            catalogue: "I/311/hip2",
+            identifier: "HIP 91262",
+            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
+            ra_deg: 279.234_735,
+            dec_deg: 38.783_689,
+            pm_ra_cosdec_mas_per_year: 200.94,
+            pm_dec_mas_per_year: 286.23,
+        },
+    },
+    // 25. Altair (Hellenistic Alpha Aquilae)
     FixedStarDef {
         name: "Altair",
         korean_name: "알타이르 (견우성/독수리)",
@@ -602,6 +428,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
             pm_dec_mas_per_year: 385.54,
         },
     },
+    // 26. Deneb (Hellenistic Alpha Cygni)
     FixedStarDef {
         name: "Deneb",
         korean_name: "데네브 (백조자리 알파)",
@@ -617,21 +444,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
             pm_dec_mas_per_year: 1.55,
         },
     },
-    FixedStarDef {
-        name: "Sadalsuud",
-        korean_name: "사달수드 (행운 중의 행운)",
-        nature: "Saturn / Mercury",
-        meaning: "Supreme auspiciousness, visionary insight, spiritual foresight, occult discernment",
-        star: CatalogueStar {
-            catalogue: "I/311/hip2",
-            identifier: "HIP 106278",
-            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 323.352_467,
-            dec_deg: -5.570_539,
-            pm_ra_cosdec_mas_per_year: 18.73,
-            pm_dec_mas_per_year: -7.95,
-        },
-    },
+    // 27. Deneb Algedi (15 Behenian Stars, Delta Capricorni)
     FixedStarDef {
         name: "Deneb Algedi",
         korean_name: "데넵 알게디 (사법관의 별)",
@@ -647,21 +460,23 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
             pm_dec_mas_per_year: -296.85,
         },
     },
+    // 28. Fomalhaut (Royal Star of the South, Alpha Piscis Austrini)
     FixedStarDef {
-        name: "Sadalmelik",
-        korean_name: "사달멜릭 (군주의 행운)",
-        nature: "Saturn / Mercury",
-        meaning: "Sovereign favor, legal triumph, spiritual reputation, established security",
+        name: "Fomalhaut",
+        korean_name: "포말하우트 (남쪽의 수호자)",
+        nature: "Venus / Mercury",
+        meaning: "Royal star of the South, spiritual power, noble vision, transmutation of sorrow",
         star: CatalogueStar {
             catalogue: "I/311/hip2",
-            identifier: "HIP 109074",
+            identifier: "HIP 113368",
             epoch_jd_tt: HIPPARCOS_EPOCH_JD,
-            ra_deg: 331.455_208,
-            dec_deg: -0.319_859,
-            pm_ra_cosdec_mas_per_year: 18.06,
-            pm_dec_mas_per_year: -8.87,
+            ra_deg: 344.412_693,
+            dec_deg: -29.622_237,
+            pm_ra_cosdec_mas_per_year: 329.22,
+            pm_dec_mas_per_year: -164.22,
         },
     },
+    // 29. Scheat (William Lilly CA Primary Malefic, Beta Pegasi)
     FixedStarDef {
         name: "Scheat",
         korean_name: "셰아트 (페가수스자리 베타)",
@@ -677,6 +492,7 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
             pm_dec_mas_per_year: 137.69,
         },
     },
+    // 30. Markab (William Lilly CA Primary Significator, Alpha Pegasi)
     FixedStarDef {
         name: "Markab",
         korean_name: "마르카브 (페가수스자리 알파)",
@@ -692,6 +508,22 @@ const TRADITIONAL_STARS: &[FixedStarDef] = &[
             pm_dec_mas_per_year: -41.30,
         },
     },
+    // 31. Achernar (Hellenistic 1st Magnitude, Alpha Eridani)
+    FixedStarDef {
+        name: "Achernar",
+        korean_name: "아케르나르 (강의 끝)",
+        nature: "Jupiter",
+        meaning: "High religious office, supreme beneficence, philosophical honor, success",
+        star: CatalogueStar {
+            catalogue: "I/311/hip2",
+            identifier: "HIP 7588",
+            epoch_jd_tt: HIPPARCOS_EPOCH_JD,
+            ra_deg: 24.428_524,
+            dec_deg: -57.236_754,
+            pm_ra_cosdec_mas_per_year: 88.02,
+            pm_dec_mas_per_year: -40.08,
+        },
+    },
 ];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -701,6 +533,9 @@ pub struct FixedStarInfo {
     pub longitude: f64,
     pub sign_index: u8,
     pub sign_degree: f64,
+    pub declination: f64,
+    pub is_visible: bool,
+    pub max_altitude: f64,
     pub nature: String,
     pub meaning: String,
 }
@@ -713,16 +548,34 @@ pub struct FixedStarConjunction {
     pub star_longitude: f64,
     pub body_longitude: f64,
     pub orb: f64,
+    pub is_visible: bool,
+    pub max_altitude: f64,
     pub nature: String,
     pub meaning: String,
 }
 
-/// Compute all 16 traditional fixed star positions at a given Julian Day (TT).
-pub fn calculate_traditional_fixed_stars(jd_tt: f64) -> Vec<FixedStarInfo> {
+/// Compute the 31 elite traditional fixed star positions and horizon visibility at a given Julian Day (TT)
+/// for the observer's geographic latitude.
+pub fn calculate_traditional_fixed_stars(jd_tt: f64, observer_lat: f64, obliquity_deg: f64) -> Vec<FixedStarInfo> {
+    let eps_rad = obliquity_deg.to_radians();
+
     TRADITIONAL_STARS.iter().map(|def| {
-        let (lon, _) = mean_ecliptic_of_date(&def.star, jd_tt);
+        let (lon, lat) = mean_ecliptic_of_date(&def.star, jd_tt);
         let sign_index = (lon / 30.0).floor() as u8 % 12;
         let sign_degree = lon - (sign_index as f64 * 30.0);
+
+        let lon_rad = lon.to_radians();
+        let lat_rad = lat.to_radians();
+
+        // Convert ecliptic coordinates (lon, lat) to equatorial declination:
+        // sin(dec) = sin(lat)*cos(eps) + cos(lat)*sin(eps)*sin(lon)
+        let sin_dec = lat_rad.sin() * eps_rad.cos() + lat_rad.cos() * eps_rad.sin() * lon_rad.sin();
+        let dec = sin_dec.clamp(-1.0, 1.0).asin().to_degrees();
+
+        // Maximum upper meridian transit altitude at observer's latitude:
+        // Alt_max = 90° - |observer_lat - dec|
+        let max_altitude = 90.0 - (observer_lat - dec).abs();
+        let is_visible = max_altitude > 0.0;
 
         FixedStarInfo {
             name: def.name.to_string(),
@@ -730,6 +583,9 @@ pub fn calculate_traditional_fixed_stars(jd_tt: f64) -> Vec<FixedStarInfo> {
             longitude: lon,
             sign_index,
             sign_degree,
+            declination: dec,
+            is_visible,
+            max_altitude,
             nature: def.nature.to_string(),
             meaning: def.meaning.to_string(),
         }
@@ -757,6 +613,8 @@ pub fn detect_fixed_star_conjunctions(
                     star_longitude: star.longitude,
                     body_longitude: body_lon,
                     orb,
+                    is_visible: star.is_visible,
+                    max_altitude: star.max_altitude,
                     nature: star.nature.clone(),
                     meaning: star.meaning.clone(),
                 });
@@ -765,4 +623,58 @@ pub fn detect_fixed_star_conjunctions(
     }
 
     conjunctions
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_elite_fixed_stars_catalog() {
+        let jd = 2447965.677778; // 1990-03-15
+        let seoul_lat = 37.5665;
+        let obliquity = 23.4425;
+        let stars = calculate_traditional_fixed_stars(jd, seoul_lat, obliquity);
+
+        // Exact 31 elite stars
+        assert_eq!(stars.len(), 31);
+
+        // Verify 15 Behenian stars are all present
+        let behenian = [
+            "Algol", "Alcyone (Pleiades)", "Aldebaran", "Capella", "Sirius",
+            "Procyon", "Regulus", "Algorab", "Spica", "Alkaid",
+            "Arcturus", "Alphecca", "Antares", "Vega", "Deneb Algedi"
+        ];
+        for b in &behenian {
+            assert!(stars.iter().any(|s| s.name == *b), "Missing Behenian star: {}", b);
+        }
+
+        // Verify 4 Royal stars
+        let royal = ["Aldebaran", "Regulus", "Antares", "Fomalhaut"];
+        for r in &royal {
+            assert!(stars.iter().any(|s| s.name == *r), "Missing Royal star: {}", r);
+        }
+
+        // Verify Malefic clusters
+        let clusters = ["Praesepe (M44)", "Asellus Borealis", "Asellus Australis", "Facies"];
+        for c in &clusters {
+            assert!(stars.iter().any(|s| s.name == *c), "Missing cluster: {}", c);
+        }
+
+        // Verify visibility at Seoul (Lat 37.57°):
+        // Sirius (Dec ≈ -16.7°) -> Visible (Alt_max ≈ 35.7°)
+        let sirius = stars.iter().find(|s| s.name == "Sirius").unwrap();
+        assert!(sirius.is_visible);
+        assert!(sirius.max_altitude > 30.0);
+
+        // Canopus (Dec ≈ -52.7°) -> Below horizon in Seoul (Lat 37.57°)
+        let canopus = stars.iter().find(|s| s.name == "Canopus").unwrap();
+        assert!(!canopus.is_visible);
+        assert!(canopus.max_altitude < 0.0);
+
+        // Achernar (Dec ≈ -57.2°) -> Below horizon in Seoul
+        let achernar = stars.iter().find(|s| s.name == "Achernar").unwrap();
+        assert!(!achernar.is_visible);
+        assert!(achernar.max_altitude < 0.0);
+    }
 }

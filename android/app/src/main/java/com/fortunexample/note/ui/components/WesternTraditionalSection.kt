@@ -451,13 +451,30 @@ fun WesternTraditionalSection(
                                         .fillMaxWidth()
                                         .padding(vertical = 6.dp)
                                 ) {
-                                    // 1행: 항성명 · 결합 천체
-                                    Text(
-                                        text = "${fs.star_name} · ${fs.body_name}",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 13.sp,
-                                        color = TextPrimary
-                                    )
+                                    // 1행: 항성명 · 결합 천체 + 가시성 뱃지
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = "${fs.star_name} · ${fs.body_name}",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            color = TextPrimary
+                                        )
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = if (fs.is_visible) AstrologicalGreen.copy(alpha = 0.12f) else BorderColor.copy(alpha = 0.5f)
+                                        ) {
+                                            Text(
+                                                text = if (fs.is_visible) "Visible (${String.format("%+.1f°", fs.max_altitude)})" else "Below Horizon",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = if (fs.is_visible) AstrologicalGreen else TextSecondary,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
                                     Spacer(modifier = Modifier.height(2.dp))
                                     // 2행: 오차 · 성질
                                     Text(
@@ -801,12 +818,29 @@ private fun HellenisticSectionContent(h: HellenisticData) {
                     Spacer(modifier = Modifier.height(10.dp))
                     h.fixed_star_conjunctions.forEach { fsc ->
                         Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                            Text(
-                                text = "★ ${fsc.star_name} (${fsc.korean_name}) ☌ ${fsc.body_name} (Orb ${String.format("%.2f°", fsc.orb)})",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = TextPrimary
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = "★ ${fsc.star_name} (${fsc.korean_name}) ☌ ${fsc.body_name} (Orb ${String.format("%.2f°", fsc.orb)})",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = TextPrimary
+                                )
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = if (fsc.is_visible) AstrologicalGreen.copy(alpha = 0.12f) else BorderColor.copy(alpha = 0.5f)
+                                ) {
+                                    Text(
+                                        text = if (fsc.is_visible) "Visible (${String.format("%+.1f°", fsc.max_altitude)})" else "Below Horizon",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (fsc.is_visible) AstrologicalGreen else TextSecondary,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
                             Text(text = fsc.meaning, fontSize = 12.sp, color = TextSecondary)
                         }
                     }

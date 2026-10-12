@@ -311,6 +311,8 @@ pub fn calculate_western(
             is_male,
             ephem.jd_ut1,
             ephem.jd_tt,
+            latitude,
+            ephem.true_obliquity_deg,
             DEFAULT_FIXED_STAR_MAX_ORB,
         );
         (None, Some(h_data))
@@ -399,7 +401,7 @@ pub fn calculate_western(
         );
 
         // 3.9 Fixed Stars
-        let fixed_stars = fixed_stars::calculate_traditional_fixed_stars(ephem.jd_tt);
+        let fixed_stars = fixed_stars::calculate_traditional_fixed_stars(ephem.jd_tt, latitude, ephem.true_obliquity_deg);
         let mut star_check_bodies = planet_pos_tuples.clone();
         star_check_bodies.push(("Ascendant", ascendant));
         star_check_bodies.push(("Midheaven", midheaven));
@@ -508,8 +510,8 @@ mod tests {
         assert!(part_names.contains(&"Lot of Courage"));
         assert!(part_names.contains(&"Lot of Nemesis"));
 
-        // 5. Fixed Stars: 45 major stars populated
-        assert_eq!(trad.fixed_stars.len(), 45);
+        // 5. Fixed Stars: 31 elite traditional stars populated
+        assert_eq!(trad.fixed_stars.len(), 31);
         let star_names: Vec<&str> = trad.fixed_stars.iter().map(|s| s.name.as_str()).collect();
         assert!(star_names.contains(&"Arcturus"));
         assert!(star_names.contains(&"Achernar"));
