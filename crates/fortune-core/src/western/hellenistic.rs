@@ -173,9 +173,13 @@ pub fn calculate_hellenistic_data(
 
     // 4. Fixed Star Conjunctions
     let stars = fixed_stars::calculate_traditional_fixed_stars(jd_tt, observer_lat, obliquity_deg);
+    let dsc = (ascendant + 180.0).rem_euclid(360.0);
+    let ic = (midheaven + 180.0).rem_euclid(360.0);
     let mut check_bodies = planet_pos_tuples.to_vec();
     check_bodies.push(("Ascendant", ascendant));
     check_bodies.push(("Midheaven", midheaven));
+    check_bodies.push(("Descendant", dsc));
+    check_bodies.push(("Immum Coeli", ic));
     let fixed_star_conjunctions = fixed_stars::detect_fixed_star_conjunctions(&stars, &check_bodies, fixed_star_max_orb);
 
     // 5. Prenatal Syzygy (SAN)

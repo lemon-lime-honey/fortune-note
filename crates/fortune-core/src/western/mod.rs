@@ -402,9 +402,13 @@ pub fn calculate_western(
 
         // 3.9 Fixed Stars
         let fixed_stars = fixed_stars::calculate_traditional_fixed_stars(ephem.jd_tt, latitude, ephem.true_obliquity_deg);
+        let dsc = (ascendant + 180.0).rem_euclid(360.0);
+        let ic = (midheaven + 180.0).rem_euclid(360.0);
         let mut star_check_bodies = planet_pos_tuples.clone();
         star_check_bodies.push(("Ascendant", ascendant));
         star_check_bodies.push(("Midheaven", midheaven));
+        star_check_bodies.push(("Descendant", dsc));
+        star_check_bodies.push(("Immum Coeli", ic));
         let fixed_star_conjunctions = fixed_stars::detect_fixed_star_conjunctions(&fixed_stars, &star_check_bodies, DEFAULT_FIXED_STAR_MAX_ORB);
 
         // 3.10 Prenatal Syzygy (SAN)
