@@ -37,6 +37,7 @@ import com.fortunexample.note.data.ProfileDto
 import com.fortunexample.note.data.SajuCalculationOutputDto
 import com.fortunexample.note.data.VedicCalculationOutputDto
 import com.fortunexample.note.data.WesternCalculationOutputDto
+import com.fortunexample.note.data.getZodiacSignRuler
 import com.fortunexample.note.ui.components.*
 import com.fortunexample.note.ui.theme.*
 import kotlinx.coroutines.launch
@@ -481,13 +482,14 @@ fun ProfileDetailScreen(
                                         val houseSysName = westernChart.house_system ?: selectedHouse
                                         val isWholeSign = houseSysName.lowercase() in listOf("wholesign", "whole_sign", "whole")
                                         val mcHouseNum = if (westernChart.house_cusps.isNotEmpty()) findHouseNumber(westernChart.midheaven, westernChart.house_cusps) else 10
+                                        val cardTitle = if (isWholeSign) "House Signs ($houseSysName)" else "House Cusps ($houseSysName)"
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Text(
-                                                text = "House Cusps ($houseSysName)",
+                                                text = cardTitle,
                                                 color = TextPrimary,
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 15.sp
@@ -495,35 +497,35 @@ fun ProfileDetailScreen(
                                             IconButton(
                                                 onClick = {
                                                     val sb = StringBuilder()
-                                                    sb.appendLine("[Western Tropical Chart - House Cusps ($houseSysName)]")
+                                                    sb.appendLine("[Western Tropical Chart - $cardTitle]")
                                                     westernChart.house_cusps.forEachIndexed { idx, deg ->
                                                         val hNum = idx + 1
                                                         val signIdx = ((deg / 30.0).toInt() % 12 + 12) % 12
                                                         val signName = getSignName(signIdx)
+                                                        val ruler = getZodiacSignRuler(signIdx)
                                                         val signDeg = deg % 30.0
-                                                        val angleTag = if (!isWholeSign) {
-                                                            when (hNum) {
+                                                        if (isWholeSign) {
+                                                            val mcTag = if (hNum == mcHouseNum) " [MC Location]" else ""
+                                                            sb.appendLine("• House ${String.format("%02d", hNum)}$mcTag: $signName · Ruler: $ruler")
+                                                        } else {
+                                                            val angleTag = when (hNum) {
                                                                 1 -> " (ASC)"
                                                                 4 -> " (IC)"
                                                                 7 -> " (DSC)"
                                                                 10 -> " (MC)"
                                                                 else -> ""
                                                             }
-                                                        } else if (hNum == mcHouseNum) {
-                                                            " [MC Location]"
-                                                        } else {
-                                                            ""
+                                                            sb.appendLine("• House ${String.format("%02d", hNum)}$angleTag: ${String.format("%.2f°", signDeg)} $signName")
                                                         }
-                                                        sb.appendLine("• House ${String.format("%02d", hNum)}$angleTag: ${String.format("%.2f°", signDeg)} $signName")
                                                     }
                                                     clipboardManager.setText(AnnotatedString(sb.toString().trimEnd()))
-                                                    Toast.makeText(context, "House Cusps 복사 완료", Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(context, "$cardTitle 복사 완료", Toast.LENGTH_SHORT).show()
                                                 },
                                                 modifier = Modifier.size(28.dp)
                                             ) {
                                                 Icon(
                                                     Icons.Default.ContentCopy,
-                                                    contentDescription = "House Cusps 복사",
+                                                    contentDescription = "$cardTitle 복사",
                                                     tint = TextSecondary,
                                                     modifier = Modifier.size(16.dp)
                                                 )
@@ -542,6 +544,7 @@ fun ProfileDetailScreen(
                                                 val deg1 = pair[0]
                                                 val sIdx1 = ((deg1 / 30.0).toInt() % 12 + 12) % 12
                                                 val s1 = getSignName(sIdx1)
+                                                val r1 = getZodiacSignRuler(sIdx1)
                                                 val d1 = deg1 % 30.0
                                                 val tag1 = if (!isWholeSign) {
                                                     when (h1) { 1 -> " (ASC)"; 7 -> " (DSC)"; else -> "" }
@@ -550,9 +553,10 @@ fun ProfileDetailScreen(
                                                 } else {
                                                     ""
                                                 }
+                                                val text1 = if (isWholeSign) "H$h1$tag1: $s1 · $r1" else "H$h1$tag1: ${String.format("%.1f°", d1)} $s1"
                                                 val isH1Highlighted = if (!isWholeSign) (h1 == 1 || h1 == 7) else (h1 == 1 || h1 == mcHouseNum)
                                                 Text(
-                                                    text = "H$h1$tag1: ${String.format("%.1f°", d1)} $s1",
+                                                    text = text1,
                                                     fontSize = 12.sp,
                                                     color = if (isH1Highlighted) AccentPrimary else TextPrimary,
                                                     fontWeight = if (isH1Highlighted) FontWeight.SemiBold else FontWeight.Normal,
@@ -564,6 +568,7 @@ fun ProfileDetailScreen(
                                                     val deg2 = pair[1]
                                                     val sIdx2 = ((deg2 / 30.0).toInt() % 12 + 12) % 12
                                                     val s2 = getSignName(sIdx2)
+                                                    val r2 = getZodiacSignRuler(sIdx2)
                                                     val d2 = deg2 % 30.0
                                                     val tag2 = if (!isWholeSign) {
                                                         when (h2) { 4 -> " (IC)"; 10 -> " (MC)"; else -> "" }
@@ -572,9 +577,10 @@ fun ProfileDetailScreen(
                                                     } else {
                                                         ""
                                                     }
+                                                    val text2 = if (isWholeSign) "H$h2$tag2: $s2 · $r2" else "H$h2$tag2: ${String.format("%.1f°", d2)} $s2"
                                                     val isH2Highlighted = if (!isWholeSign) (h2 == 4 || h2 == 10) else (h2 == mcHouseNum)
                                                     Text(
-                                                        text = "H$h2$tag2: ${String.format("%.1f°", d2)} $s2",
+                                                        text = text2,
                                                         fontSize = 12.sp,
                                                         color = if (isH2Highlighted) AccentPrimary else TextPrimary,
                                                         fontWeight = if (isH2Highlighted) FontWeight.SemiBold else FontWeight.Normal,

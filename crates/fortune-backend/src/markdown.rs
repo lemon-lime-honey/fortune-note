@@ -89,25 +89,35 @@ fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput, is
         chart.western.midheaven, ZODIAC_SIGNS[mc_sign], mc_house_desc
     ));
     out.push_str(&format!("- House System: {}\n", chart.western.house_system.display_name()));
-    out.push_str("- House Cusps (12 Cusps):\n");
-    for (i, cusp) in chart.western.house_cusps.iter().enumerate() {
-        let sign_idx = (cusp / 30.0).floor() as usize % 12;
-        let sign_deg = cusp - (sign_idx as f64 * 30.0);
-        let tag = if !is_whole_sign {
-            match i + 1 {
+    if is_whole_sign {
+        out.push_str("- House Signs (Whole Sign Houses):\n");
+        let mc_h = fortune_core::western::determine_house(chart.western.midheaven, &chart.western.house_cusps);
+        for (i, cusp) in chart.western.house_cusps.iter().enumerate() {
+            let sign_idx = (cusp / 30.0).floor() as usize % 12;
+            let ruler = fortune_core::western::dignity::DOMICILE_RULERS[sign_idx].name();
+            let mc_tag = if (i + 1) as u8 == mc_h { " [MC Location]" } else { "" };
+            out.push_str(&format!(
+                "  * House {:02}{}: {} (Ruler: {})\n",
+                i + 1, mc_tag, ZODIAC_SIGNS[sign_idx], ruler
+            ));
+        }
+    } else {
+        out.push_str("- House Cusps (12 Cusps):\n");
+        for (i, cusp) in chart.western.house_cusps.iter().enumerate() {
+            let sign_idx = (cusp / 30.0).floor() as usize % 12;
+            let sign_deg = cusp - (sign_idx as f64 * 30.0);
+            let tag = match i + 1 {
                 1 => " (ASC)",
                 4 => " (IC)",
                 7 => " (DSC)",
                 10 => " (MC)",
                 _ => "",
-            }
-        } else {
-            ""
-        };
-        out.push_str(&format!(
-            "  * House {:02}{}: {:.2}° ({})\n",
-            i + 1, tag, sign_deg, ZODIAC_SIGNS[sign_idx]
-        ));
+            };
+            out.push_str(&format!(
+                "  * House {:02}{}: {:.2}° ({})\n",
+                i + 1, tag, sign_deg, ZODIAC_SIGNS[sign_idx]
+            ));
+        }
     }
     out.push_str("- Planetary Placements:\n");
     for p in &chart.western.planets {

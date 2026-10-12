@@ -612,3 +612,37 @@ fun getZodiacSignName(index: Int): String {
     return WESTERN_ZODIAC_SIGNS.getOrElse(((index % 12) + 12) % 12) { "" }
 }
 
+val WESTERN_DOMICILE_RULERS = listOf(
+    "Mars",     // Aries
+    "Venus",    // Taurus
+    "Mercury",  // Gemini
+    "Moon",     // Cancer
+    "Sun",      // Leo
+    "Mercury",  // Virgo
+    "Venus",    // Libra
+    "Mars",     // Scorpio
+    "Jupiter",  // Sagittarius
+    "Saturn",   // Capricorn
+    "Saturn",   // Aquarius
+    "Jupiter"   // Pisces
+)
+
+fun getZodiacSignRuler(index: Int): String {
+    return WESTERN_DOMICILE_RULERS.getOrElse(((index % 12) + 12) % 12) { "" }
+}
+
+fun findHouseNumber(lon: Double, cusps: List<Double>): Int {
+    if (cusps.size < 12) return 1
+    val normalizedLon = (lon % 360.0 + 360.0) % 360.0
+    for (i in 0 until 12) {
+        val start = (cusps[i] % 360.0 + 360.0) % 360.0
+        val end = (cusps[(i + 1) % 12] % 360.0 + 360.0) % 360.0
+        if (start < end) {
+            if (normalizedLon >= start && normalizedLon < end) return i + 1
+        } else {
+            if (normalizedLon >= start || normalizedLon < end) return i + 1
+        }
+    }
+    return 1
+}
+

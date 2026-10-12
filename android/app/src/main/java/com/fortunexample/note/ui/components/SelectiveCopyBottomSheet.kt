@@ -320,25 +320,41 @@ private fun generateSelectiveMarkdown(
                 if (incWesternPlanets) {
                     val ascSign = ZODIAC_NAMES.getOrElse((w.ascendant / 30.0).toInt() % 12) { "" }
                     val mcSign = ZODIAC_NAMES.getOrElse((w.midheaven / 30.0).toInt() % 12) { "" }
+                    val isWholeSign = w.house_system?.lowercase() in listOf("wholesign", "whole_sign", "whole")
+                    val mcHouseNum = if (w.house_cusps.isNotEmpty()) findHouseNumber(w.midheaven, w.house_cusps) else 10
+                    val mcHouseDesc = if (isWholeSign) " [Located in House ${String.format("%02d", mcHouseNum)}]" else ""
+
                     sb.append("## 2. Celestial Placements & House Cusps\n")
                     sb.append("- Ascendant: ${String.format("%.2f°", w.ascendant)} ($ascSign)\n")
-                    sb.append("- Midheaven (MC): ${String.format("%.2f°", w.midheaven)} ($mcSign)\n")
+                    sb.append("- Midheaven (MC): ${String.format("%.2f°", w.midheaven)} ($mcSign)$mcHouseDesc\n")
                     w.house_system?.let { sb.append("- House System: $it\n") }
                     if (w.house_cusps.isNotEmpty()) {
-                        sb.append("- House Cusps (12 Cusps):\n")
-                        w.house_cusps.forEachIndexed { idx, cusp ->
-                            val hNum = idx + 1
-                            val signIdx = ((cusp / 30.0).toInt() % 12 + 12) % 12
-                            val signName = ZODIAC_NAMES.getOrElse(signIdx) { "" }
-                            val signDeg = cusp % 30.0
-                            val tag = when (hNum) {
-                                1 -> " (ASC)"
-                                4 -> " (IC)"
-                                7 -> " (DSC)"
-                                10 -> " (MC)"
-                                else -> ""
+                        if (isWholeSign) {
+                            sb.append("- House Signs (Whole Sign Houses):\n")
+                            w.house_cusps.forEachIndexed { idx, cusp ->
+                                val hNum = idx + 1
+                                val signIdx = ((cusp / 30.0).toInt() % 12 + 12) % 12
+                                val signName = ZODIAC_NAMES.getOrElse(signIdx) { "" }
+                                val ruler = getZodiacSignRuler(signIdx)
+                                val mcTag = if (hNum == mcHouseNum) " [MC Location]" else ""
+                                sb.append("  * House ${String.format("%02d", hNum)}$mcTag: $signName (Ruler: $ruler)\n")
                             }
-                            sb.append("  * House ${String.format("%02d", hNum)}$tag: ${String.format("%.2f°", signDeg)} ($signName)\n")
+                        } else {
+                            sb.append("- House Cusps (12 Cusps):\n")
+                            w.house_cusps.forEachIndexed { idx, cusp ->
+                                val hNum = idx + 1
+                                val signIdx = ((cusp / 30.0).toInt() % 12 + 12) % 12
+                                val signName = ZODIAC_NAMES.getOrElse(signIdx) { "" }
+                                val signDeg = cusp % 30.0
+                                val tag = when (hNum) {
+                                    1 -> " (ASC)"
+                                    4 -> " (IC)"
+                                    7 -> " (DSC)"
+                                    10 -> " (MC)"
+                                    else -> ""
+                                }
+                                sb.append("  * House ${String.format("%02d", hNum)}$tag: ${String.format("%.2f°", signDeg)} ($signName)\n")
+                            }
                         }
                     }
                     sb.append("- Planetary Placements:\n")

@@ -184,14 +184,36 @@ fn main() {
     let dsc = (asc + 180.0).rem_euclid(360.0);
     let ic = (mc + 180.0).rem_euclid(360.0);
 
-    println!("[2. Angles & House Cusps ({})]", house_system.display_name());
-    println!("  Ascendant  (ASC) : {}", format_deg(asc));
-    println!("  Midheaven  (MC)  : {}", format_deg(mc));
-    println!("  Descendant (DSC) : {}", format_deg(dsc));
-    println!("  Immum Coeli(IC)  : {}", format_deg(ic));
-    println!("  Cusps:");
-    for (i, cusp) in chart.house_cusps.iter().enumerate() {
-        println!("    House {:02} : {}", i + 1, format_deg(*cusp));
+    if house_system == WesternHouseSystem::WholeSign {
+        let mc_h = fortune_core::western::determine_house(mc, &chart.house_cusps);
+        println!("[2. Angles & Whole Sign Houses]");
+        println!("  Ascendant  (ASC) : {}", format_deg(asc));
+        println!("  Midheaven  (MC)  : {}  [Located in House {:02}]", format_deg(mc), mc_h);
+        println!("  Descendant (DSC) : {}", format_deg(dsc));
+        println!("  Immum Coeli(IC)  : {}", format_deg(ic));
+        println!("  Houses (Sign = House):");
+        for (i, cusp) in chart.house_cusps.iter().enumerate() {
+            let sign_idx = (cusp / 30.0).floor() as usize % 12;
+            let ruler = fortune_core::western::dignity::DOMICILE_RULERS[sign_idx].name();
+            let mc_tag = if (i + 1) as u8 == mc_h { " [MC Location]" } else { "" };
+            println!(
+                "    House {:02} : {:<11} (Ruler: {}){}",
+                i + 1,
+                ZODIAC_SIGNS[sign_idx],
+                ruler,
+                mc_tag
+            );
+        }
+    } else {
+        println!("[2. Angles & House Cusps ({})]", house_system.display_name());
+        println!("  Ascendant  (ASC) : {}", format_deg(asc));
+        println!("  Midheaven  (MC)  : {}", format_deg(mc));
+        println!("  Descendant (DSC) : {}", format_deg(dsc));
+        println!("  Immum Coeli(IC)  : {}", format_deg(ic));
+        println!("  Cusps:");
+        for (i, cusp) in chart.house_cusps.iter().enumerate() {
+            println!("    House {:02} : {}", i + 1, format_deg(*cusp));
+        }
     }
     println!();
 
