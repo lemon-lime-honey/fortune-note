@@ -386,6 +386,43 @@ fun ProfileDetailScreen(
                                         }
                                     }
                                     Spacer(modifier = Modifier.height(10.dp))
+                                    // 앵글 포인트 (ASC, MC) 명시적 렌더링
+                                    val ascSignIdx = ((westernChart.ascendant / 30.0).toInt() % 12 + 12) % 12
+                                    val ascSignDeg = westernChart.ascendant % 30.0
+                                    val mcSignIdx = ((westernChart.midheaven / 30.0).toInt() % 12 + 12) % 12
+                                    val mcSignDeg = westernChart.midheaven % 30.0
+                                    val mcHouseNum = if (westernChart.house_cusps.isNotEmpty()) findHouseNumber(westernChart.midheaven, westernChart.house_cusps) else 10
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(text = "Ascendant (ASC)", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                                        Text(
+                                            text = "${String.format("%.2f°", ascSignDeg)} ${getSignName(ascSignIdx)} · House 1",
+                                            color = AccentPrimary,
+                                            fontWeight = FontWeight.Medium,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                    HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(text = "Midheaven (MC)", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                                        Text(
+                                            text = "${String.format("%.2f°", mcSignDeg)} ${getSignName(mcSignIdx)} · House $mcHouseNum",
+                                            color = AccentPrimary,
+                                            fontWeight = FontWeight.Medium,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                    HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
+
                                     westernChart.planets.forEach { p ->
                                         val rx = if (p.is_retrograde) " [Rx]" else ""
                                         val speedStr = String.format("%+.2f°/d", p.speed)
@@ -442,6 +479,8 @@ fun ProfileDetailScreen(
                                 ) {
                                     Column(modifier = Modifier.padding(16.dp)) {
                                         val houseSysName = westernChart.house_system ?: selectedHouse
+                                        val isWholeSign = houseSysName.lowercase() in listOf("wholesign", "whole_sign", "whole")
+                                        val mcHouseNum = if (westernChart.house_cusps.isNotEmpty()) findHouseNumber(westernChart.midheaven, westernChart.house_cusps) else 10
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -462,12 +501,18 @@ fun ProfileDetailScreen(
                                                         val signIdx = ((deg / 30.0).toInt() % 12 + 12) % 12
                                                         val signName = getSignName(signIdx)
                                                         val signDeg = deg % 30.0
-                                                        val angleTag = when (hNum) {
-                                                            1 -> " (ASC)"
-                                                            4 -> " (IC)"
-                                                            7 -> " (DSC)"
-                                                            10 -> " (MC)"
-                                                            else -> ""
+                                                        val angleTag = if (!isWholeSign) {
+                                                            when (hNum) {
+                                                                1 -> " (ASC)"
+                                                                4 -> " (IC)"
+                                                                7 -> " (DSC)"
+                                                                10 -> " (MC)"
+                                                                else -> ""
+                                                            }
+                                                        } else if (hNum == mcHouseNum) {
+                                                            " [MC Location]"
+                                                        } else {
+                                                            ""
                                                         }
                                                         sb.appendLine("• House ${String.format("%02d", hNum)}$angleTag: ${String.format("%.2f°", signDeg)} $signName")
                                                     }
@@ -498,12 +543,19 @@ fun ProfileDetailScreen(
                                                 val sIdx1 = ((deg1 / 30.0).toInt() % 12 + 12) % 12
                                                 val s1 = getSignName(sIdx1)
                                                 val d1 = deg1 % 30.0
-                                                val tag1 = when (h1) { 1 -> " (ASC)"; 7 -> " (DSC)"; else -> "" }
+                                                val tag1 = if (!isWholeSign) {
+                                                    when (h1) { 1 -> " (ASC)"; 7 -> " (DSC)"; else -> "" }
+                                                } else if (h1 == mcHouseNum) {
+                                                    " [MC]"
+                                                } else {
+                                                    ""
+                                                }
+                                                val isH1Highlighted = if (!isWholeSign) (h1 == 1 || h1 == 7) else (h1 == 1 || h1 == mcHouseNum)
                                                 Text(
                                                     text = "H$h1$tag1: ${String.format("%.1f°", d1)} $s1",
                                                     fontSize = 12.sp,
-                                                    color = if (h1 == 1 || h1 == 7) AccentPrimary else TextPrimary,
-                                                    fontWeight = if (h1 == 1 || h1 == 7) FontWeight.SemiBold else FontWeight.Normal,
+                                                    color = if (isH1Highlighted) AccentPrimary else TextPrimary,
+                                                    fontWeight = if (isH1Highlighted) FontWeight.SemiBold else FontWeight.Normal,
                                                     modifier = Modifier.weight(1f)
                                                 )
 
@@ -513,12 +565,19 @@ fun ProfileDetailScreen(
                                                     val sIdx2 = ((deg2 / 30.0).toInt() % 12 + 12) % 12
                                                     val s2 = getSignName(sIdx2)
                                                     val d2 = deg2 % 30.0
-                                                    val tag2 = when (h2) { 4 -> " (IC)"; 10 -> " (MC)"; else -> "" }
+                                                    val tag2 = if (!isWholeSign) {
+                                                        when (h2) { 4 -> " (IC)"; 10 -> " (MC)"; else -> "" }
+                                                    } else if (h2 == mcHouseNum) {
+                                                        " [MC]"
+                                                    } else {
+                                                        ""
+                                                    }
+                                                    val isH2Highlighted = if (!isWholeSign) (h2 == 4 || h2 == 10) else (h2 == mcHouseNum)
                                                     Text(
                                                         text = "H$h2$tag2: ${String.format("%.1f°", d2)} $s2",
                                                         fontSize = 12.sp,
-                                                        color = if (h2 == 4 || h2 == 10) AccentPrimary else TextPrimary,
-                                                        fontWeight = if (h2 == 4 || h2 == 10) FontWeight.SemiBold else FontWeight.Normal,
+                                                        color = if (isH2Highlighted) AccentPrimary else TextPrimary,
+                                                        fontWeight = if (isH2Highlighted) FontWeight.SemiBold else FontWeight.Normal,
                                                         modifier = Modifier.weight(1f)
                                                     )
                                                 }
@@ -598,8 +657,12 @@ fun ProfileDetailScreen(
                                 Spacer(modifier = Modifier.height(14.dp))
                             }
 
-                            // 윌리엄 릴리 전통 점성술 분석 섹션 (네이탈 모드: 라디칼리티 및 호라리 결함 배제)
-                            WesternTraditionalSection(traditional = westernChart.traditional, isHorary = false)
+                            // 서양 전통 점성술 분석 섹션 (헬레니즘 / 릴리 분기)
+                            WesternTraditionalSection(
+                                traditional = westernChart.traditional,
+                                isHorary = false,
+                                hellenistic = westernChart.hellenistic
+                            )
 
                             Spacer(modifier = Modifier.height(14.dp))
 
@@ -945,4 +1008,19 @@ private fun getSignName(index: Int): String {
         "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"
     )
     return signs.getOrElse((index % 12 + 12) % 12) { "" }
+}
+
+private fun findHouseNumber(lon: Double, cusps: List<Double>): Int {
+    if (cusps.size < 12) return 1
+    val normalizedLon = (lon % 360.0 + 360.0) % 360.0
+    for (i in 0 until 12) {
+        val start = (cusps[i] % 360.0 + 360.0) % 360.0
+        val end = (cusps[(i + 1) % 12] % 360.0 + 360.0) % 360.0
+        if (start < end) {
+            if (normalizedLon >= start && normalizedLon < end) return i + 1
+        } else {
+            if (normalizedLon >= start || normalizedLon < end) return i + 1
+        }
+    }
+    return 1
 }

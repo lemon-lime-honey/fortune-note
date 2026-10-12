@@ -179,6 +179,8 @@ fun HoraryDetailScreen(
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
                                     val houseSysName = chart.western.house_system ?: "Regiomontanus"
+                                    val isWholeSign = houseSysName.lowercase() in listOf("wholesign", "whole_sign", "whole")
+                                    val mcHouseNum = if (chart.western.house_cusps.isNotEmpty()) findHouseNumber(chart.western.midheaven, chart.western.house_cusps) else 10
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -199,12 +201,18 @@ fun HoraryDetailScreen(
                                                     val signIdx = ((deg / 30.0).toInt() % 12 + 12) % 12
                                                     val signName = getZodiacSignName(signIdx)
                                                     val signDeg = deg % 30.0
-                                                    val angleTag = when (hNum) {
-                                                        1 -> " (ASC)"
-                                                        4 -> " (IC)"
-                                                        7 -> " (DSC)"
-                                                        10 -> " (MC)"
-                                                        else -> ""
+                                                    val angleTag = if (!isWholeSign) {
+                                                        when (hNum) {
+                                                            1 -> " (ASC)"
+                                                            4 -> " (IC)"
+                                                            7 -> " (DSC)"
+                                                            10 -> " (MC)"
+                                                            else -> ""
+                                                        }
+                                                    } else if (hNum == mcHouseNum) {
+                                                        " [MC Location]"
+                                                    } else {
+                                                        ""
                                                     }
                                                     sb.appendLine("• House ${String.format("%02d", hNum)}$angleTag: ${String.format("%.2f°", signDeg)} $signName")
                                                 }
@@ -234,12 +242,19 @@ fun HoraryDetailScreen(
                                             val sIdx1 = ((deg1 / 30.0).toInt() % 12 + 12) % 12
                                             val s1 = getZodiacSignName(sIdx1)
                                             val d1 = deg1 % 30.0
-                                            val tag1 = when (h1) { 1 -> " (ASC)"; 7 -> " (DSC)"; else -> "" }
+                                            val tag1 = if (!isWholeSign) {
+                                                when (h1) { 1 -> " (ASC)"; 7 -> " (DSC)"; else -> "" }
+                                            } else if (h1 == mcHouseNum) {
+                                                " [MC]"
+                                            } else {
+                                                ""
+                                            }
+                                            val isH1Highlighted = if (!isWholeSign) (h1 == 1 || h1 == 7) else (h1 == 1 || h1 == mcHouseNum)
                                             Text(
                                                 text = "H$h1$tag1: ${String.format("%.1f°", d1)} $s1",
                                                 fontSize = 12.sp,
-                                                color = if (h1 == 1 || h1 == 7) CelestialBlue else TextPrimary,
-                                                fontWeight = if (h1 == 1 || h1 == 7) FontWeight.SemiBold else FontWeight.Normal,
+                                                color = if (isH1Highlighted) CelestialBlue else TextPrimary,
+                                                fontWeight = if (isH1Highlighted) FontWeight.SemiBold else FontWeight.Normal,
                                                 modifier = Modifier.weight(1f)
                                             )
 
@@ -249,12 +264,19 @@ fun HoraryDetailScreen(
                                                 val sIdx2 = ((deg2 / 30.0).toInt() % 12 + 12) % 12
                                                 val s2 = getZodiacSignName(sIdx2)
                                                 val d2 = deg2 % 30.0
-                                                val tag2 = when (h2) { 4 -> " (IC)"; 10 -> " (MC)"; else -> "" }
+                                                val tag2 = if (!isWholeSign) {
+                                                    when (h2) { 4 -> " (IC)"; 10 -> " (MC)"; else -> "" }
+                                                } else if (h2 == mcHouseNum) {
+                                                    " [MC]"
+                                                } else {
+                                                    ""
+                                                }
+                                                val isH2Highlighted = if (!isWholeSign) (h2 == 4 || h2 == 10) else (h2 == mcHouseNum)
                                                 Text(
                                                     text = "H$h2$tag2: ${String.format("%.1f°", d2)} $s2",
                                                     fontSize = 12.sp,
-                                                    color = if (h2 == 4 || h2 == 10) CelestialBlue else TextPrimary,
-                                                    fontWeight = if (h2 == 4 || h2 == 10) FontWeight.SemiBold else FontWeight.Normal,
+                                                    color = if (isH2Highlighted) CelestialBlue else TextPrimary,
+                                                    fontWeight = if (isH2Highlighted) FontWeight.SemiBold else FontWeight.Normal,
                                                     modifier = Modifier.weight(1f)
                                                 )
                                             }
@@ -305,8 +327,11 @@ fun HoraryDetailScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(14.dp))
-                        WesternTraditionalSection(traditional = chart.western.traditional, isHorary = true)
+                        WesternTraditionalSection(
+                            traditional = chart.western.traditional,
+                            isHorary = true,
+                            hellenistic = chart.western.hellenistic
+                        )
                     } else {
                         VedicChartDiamond(chart = chart.vedic)
                         Spacer(modifier = Modifier.height(16.dp))
@@ -346,4 +371,19 @@ fun HoraryDetailScreen(
             }
         }
     }
+}
+
+private fun findHouseNumber(lon: Double, cusps: List<Double>): Int {
+    if (cusps.size < 12) return 1
+    val normalizedLon = (lon % 360.0 + 360.0) % 360.0
+    for (i in 0 until 12) {
+        val start = (cusps[i] % 360.0 + 360.0) % 360.0
+        val end = (cusps[(i + 1) % 12] % 360.0 + 360.0) % 360.0
+        if (start < end) {
+            if (normalizedLon >= start && normalizedLon < end) return i + 1
+        } else {
+            if (normalizedLon >= start || normalizedLon < end) return i + 1
+        }
+    }
+    return 1
 }

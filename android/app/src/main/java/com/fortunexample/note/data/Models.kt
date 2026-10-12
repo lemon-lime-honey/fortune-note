@@ -347,7 +347,44 @@ data class WesternChartData(
     val nodes: List<WesternNodeData>,
     val aspects: List<WesternAspectData>,
     val house_system: String? = null,
-    val traditional: WesternTraditionalData? = null
+    val traditional: WesternTraditionalData? = null,
+    val hellenistic: HellenisticData? = null
+)
+
+@Serializable
+data class HellenisticPlanetConditionData(
+    val name: String,
+    val longitude: Double,
+    val sign_index: Int,
+    val sign_degree: Double,
+    val house_number: Int,
+    val is_in_domicile: Boolean,
+    val is_in_exaltation: Boolean,
+    val is_in_fall: Boolean,
+    val is_ruler_of_asc: Boolean,
+    val condition_label: String
+)
+
+@Serializable
+data class HellenisticAnglePointsData(
+    val ascendant: Double,
+    val ascendant_sign: Int,
+    val ascendant_degree: Double,
+    val midheaven: Double,
+    val midheaven_sign: Int,
+    val midheaven_degree: Double,
+    val midheaven_house: Int,
+    val is_mc_in_10th: Boolean
+)
+
+@Serializable
+data class HellenisticData(
+    val planet_conditions: List<HellenisticPlanetConditionData> = emptyList(),
+    val lots: List<ArabicPartData> = emptyList(),
+    val angles: HellenisticAnglePointsData,
+    val aspects: List<TraditionalAspectData> = emptyList(),
+    val fixed_star_conjunctions: List<FixedStarConjunctionData> = emptyList(),
+    val prenatal_syzygy: PrenatalSyzygyData? = null
 )
 
 @Serializable

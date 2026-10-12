@@ -21,6 +21,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fortunexample.note.data.HellenisticData
 import com.fortunexample.note.data.WesternTraditionalData
 import com.fortunexample.note.ui.theme.*
 
@@ -58,8 +59,14 @@ private fun SectionCopyButton(
 @Composable
 fun WesternTraditionalSection(
     traditional: WesternTraditionalData?,
-    isHorary: Boolean = false
+    isHorary: Boolean = false,
+    hellenistic: HellenisticData? = null
 ) {
+    if (hellenistic != null) {
+        HellenisticSectionContent(hellenistic)
+        return
+    }
+
     if (traditional == null) return
 
     var isDignityExpanded by remember { mutableStateOf(true) }
@@ -559,6 +566,248 @@ fun WesternTraditionalSection(
                                     fontSize = 12.sp
                                 )
                             }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HellenisticSectionContent(h: HellenisticData) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Hellenistic Analysis (Vettius Valens / Whole Sign)",
+            fontWeight = FontWeight.Bold,
+            fontSize = 17.sp,
+            color = TextPrimary,
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+
+        // 1. Independent Angles & Action Points Card
+        Card(
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
+            border = BorderStroke(1.dp, BorderColor),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Angles & Planetary Action Points", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
+                    SectionCopyButton(title = "Hellenistic Angles") {
+                        val ascSign = ZODIAC_NAMES.getOrElse(h.angles.ascendant_sign % 12) { "" }
+                        val mcSign = ZODIAC_NAMES.getOrElse(h.angles.midheaven_sign % 12) { "" }
+                        val mcHouseStr = if (h.angles.is_mc_in_10th) "House 10 (Culmination)" else "House ${h.angles.midheaven_house} (Action Point)"
+                        """
+                        [Hellenistic Angles]
+                        • Ascendant (ASC): ${String.format("%.2f°", h.angles.ascendant_degree)} $ascSign
+                        • Midheaven (MC): ${String.format("%.2f°", h.angles.midheaven_degree)} $mcSign · $mcHouseStr
+                        """.trimIndent()
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                val ascSign = ZODIAC_NAMES.getOrElse(h.angles.ascendant_sign % 12) { "" }
+                val mcSign = ZODIAC_NAMES.getOrElse(h.angles.midheaven_sign % 12) { "" }
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Ascendant (ASC)", fontSize = 13.sp, color = TextPrimary, fontWeight = FontWeight.Medium)
+                    Text("${String.format("%.2f°", h.angles.ascendant_degree)} $ascSign", fontSize = 13.sp, color = AccentPrimary, fontWeight = FontWeight.SemiBold)
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column {
+                        Text("Midheaven (MC)", fontSize = 13.sp, color = TextPrimary, fontWeight = FontWeight.Medium)
+                        val mcActionTag = if (h.angles.is_mc_in_10th) "10H Culmination" else "${h.angles.midheaven_house}H Action Point"
+                        Text(mcActionTag, fontSize = 11.sp, color = if (h.angles.is_mc_in_10th) TextSecondary else VedicGreen, fontWeight = FontWeight.Normal)
+                    }
+                    Text("${String.format("%.2f°", h.angles.midheaven_degree)} $mcSign", fontSize = 13.sp, color = AccentPrimary, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+
+        // 2. Qualitative Planet Conditions (Hellenistic Essential States)
+        Card(
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
+            border = BorderStroke(1.dp, BorderColor),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Qualitative Dignities (States)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
+                    SectionCopyButton(title = "Hellenistic Dignities") {
+                        val sb = StringBuilder()
+                        sb.appendLine("[Hellenistic Qualitative Dignities]")
+                        h.planet_conditions.forEach { pc ->
+                            val lordTag = if (pc.is_ruler_of_asc) " [Lord of ASC]" else ""
+                            sb.appendLine("• ${pc.name}: ${pc.condition_label} · House ${pc.house_number}$lordTag")
+                        }
+                        sb.toString().trimEnd()
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                h.planet_conditions.forEach { pc ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 5.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(pc.name, fontWeight = FontWeight.Medium, fontSize = 13.sp, color = TextPrimary)
+                            if (pc.is_ruler_of_asc) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    color = AccentPrimary.copy(alpha = 0.12f),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(
+                                        text = "Lord of ASC",
+                                        color = AccentPrimary,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            val badgeColor = when (pc.condition_label) {
+                                "Domicile" -> VedicGreen
+                                "Exaltation" -> CelestialBlue
+                                "Fall" -> AstrologicalRed
+                                else -> TextSecondary
+                            }
+                            Surface(
+                                color = badgeColor.copy(alpha = 0.12f),
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Text(
+                                    text = pc.condition_label,
+                                    color = badgeColor,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("House ${pc.house_number}", fontSize = 12.sp, color = TextSecondary)
+                        }
+                    }
+                    HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
+                }
+            }
+        }
+
+        // 3. Hermetic Lots (Lots of Soul & Body)
+        if (h.lots.isNotEmpty()) {
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
+                border = BorderStroke(1.dp, BorderColor),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Hermetic Lots (Paulus Alexandrinus)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
+                        SectionCopyButton(title = "Hermetic Lots") {
+                            val sb = StringBuilder()
+                            sb.appendLine("[Hermetic Lots]")
+                            h.lots.forEach { lot ->
+                                val sign = ZODIAC_NAMES.getOrElse(lot.sign_index % 12) { "" }
+                                sb.appendLine("• ${lot.name}: ${String.format("%.2f°", lot.sign_degree)} $sign · House ${lot.house_number} · Ruler: ${lot.ruler}")
+                            }
+                            sb.toString().trimEnd()
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    h.lots.forEach { lot ->
+                        val sign = ZODIAC_NAMES.getOrElse(lot.sign_index % 12) { "" }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(lot.name, fontSize = 13.sp, color = TextPrimary)
+                            Text(
+                                text = "${String.format("%.2f°", lot.sign_degree)} $sign · H${lot.house_number}",
+                                fontSize = 12.sp,
+                                color = TextSecondary
+                            )
+                        }
+                        HorizontalDivider(color = BorderColor.copy(alpha = 0.4f))
+                    }
+                }
+            }
+        }
+
+        // 4. Sign-Based Aspects & Degree Contacts
+        if (h.aspects.isNotEmpty()) {
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
+                border = BorderStroke(1.dp, BorderColor),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Sign-Based Aspects & Contacts", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    h.aspects.forEach { asp ->
+                        val appText = if (asp.is_applying) "App (${String.format("%.1f°", asp.degrees_to_perfection)})" else "Sep"
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("${asp.planet1} ${asp.aspect_type} ${asp.planet2}", fontSize = 13.sp, color = TextPrimary)
+                            Text(
+                                text = "Orb ${String.format("%.2f°", asp.orb)} · $appText",
+                                fontSize = 12.sp,
+                                color = if (asp.is_partile) AccentPrimary else TextSecondary
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5. Fixed Star Conjunctions
+        if (h.fixed_star_conjunctions.isNotEmpty()) {
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
+                border = BorderStroke(1.dp, BorderColor),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Fixed Star Conjunctions (Orb ≤ 1.5°)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    h.fixed_star_conjunctions.forEach { fsc ->
+                        Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                            Text(
+                                text = "★ ${fsc.star_name} (${fsc.korean_name}) ☌ ${fsc.body_name} (Orb ${String.format("%.2f°", fsc.orb)})",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextPrimary
+                            )
+                            Text(text = fsc.meaning, fontSize = 12.sp, color = TextSecondary)
                         }
                     }
                 }
