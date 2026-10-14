@@ -12,7 +12,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.fortunexample.note.data.VargaPlacementData
 import com.fortunexample.note.data.VedicChartData
 import com.fortunexample.note.ui.theme.*
@@ -40,24 +42,55 @@ fun VedicChartDiamondCore(
     placements: List<VargaPlacementData>,
     modifier: Modifier = Modifier
 ) {
-    val planetPaint = remember {
+    val density = LocalDensity.current
+    val planetTextSize = with(density) { 12.sp.toPx() }
+    val signNumTextSize = with(density) { 10.sp.toPx() }
+    val yOffsetSign = with(density) { 8.dp.toPx() }
+    val yOffsetP1 = with(density) { 6.dp.toPx() }
+    val yOffsetP2 = with(density) { 18.dp.toPx() }
+
+    val planetPaint = remember(planetTextSize) {
         Paint().apply {
             isAntiAlias = true
             textAlign = Paint.Align.CENTER
-            textSize = 26f
+            textSize = planetTextSize
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             color = android.graphics.Color.parseColor("#0F172A")
         }
     }
 
-    val signNumPaint = remember {
+    val signNumPaint = remember(signNumTextSize) {
         Paint().apply {
             isAntiAlias = true
             textAlign = Paint.Align.CENTER
-            textSize = 20f
+            textSize = signNumTextSize
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             color = android.graphics.Color.parseColor("#64748B")
         }
+    }
+
+    // 각 하우스별 행성 목록 메모이제이션
+    val housePlanets = remember(placements) {
+        val list = Array(12) { mutableListOf<String>() }
+        list[0].add("As") // H1 contains Lagna Ascendant
+
+        placements.forEach { p ->
+            val hIdx = (p.house - 1).coerceIn(0, 11)
+            val abbr = when (p.planet_name) {
+                "Sun" -> "Su"
+                "Moon" -> "Mo"
+                "Mercury" -> "Me"
+                "Venus" -> "Ve"
+                "Mars" -> "Ma"
+                "Jupiter" -> "Ju"
+                "Saturn" -> "Sa"
+                "Rahu" -> "Ra"
+                "Ketu" -> "Ke"
+                else -> p.planet_name.take(2)
+            }
+            list[hIdx].add(abbr)
+        }
+        list
     }
 
     Canvas(
@@ -108,35 +141,14 @@ fun VedicChartDiamondCore(
             Offset(w * 0.75f, h * 0.13f)   // H12
         )
 
-        // 5. 각 하우스별 행성 목록 구성
-        val housePlanets = Array(12) { mutableListOf<String>() }
-        housePlanets[0].add("As") // H1 contains Lagna Ascendant
-
-        placements.forEach { p ->
-            val hIdx = (p.house - 1).coerceIn(0, 11)
-            val abbr = when (p.planet_name) {
-                "Sun" -> "Su"
-                "Moon" -> "Mo"
-                "Mercury" -> "Me"
-                "Venus" -> "Ve"
-                "Mars" -> "Ma"
-                "Jupiter" -> "Ju"
-                "Saturn" -> "Sa"
-                "Rahu" -> "Ra"
-                "Ketu" -> "Ke"
-                else -> p.planet_name.take(2)
-            }
-            housePlanets[hIdx].add(abbr)
-        }
-
-        // 6. 각 하우스에 Sign 번호 및 행성 렌더링
+        // 5. 각 하우스에 Sign 번호 및 행성 렌더링
         for (i in 0..11) {
             val center = houseCenters[i]
             val signNum = ((lagnaSign + i) % 12) + 1
             drawContext.canvas.nativeCanvas.drawText(
                 "$signNum",
                 center.x,
-                center.y - 18f,
+                center.y - yOffsetSign,
                 signNumPaint
             )
 
@@ -146,7 +158,7 @@ fun VedicChartDiamondCore(
                 drawContext.canvas.nativeCanvas.drawText(
                     line1,
                     center.x,
-                    center.y + 12f,
+                    center.y + yOffsetP1,
                     planetPaint
                 )
                 if (inHouse.size > 3) {
@@ -154,7 +166,7 @@ fun VedicChartDiamondCore(
                     drawContext.canvas.nativeCanvas.drawText(
                         line2,
                         center.x,
-                        center.y + 36f,
+                        center.y + yOffsetP2,
                         planetPaint
                     )
                 }

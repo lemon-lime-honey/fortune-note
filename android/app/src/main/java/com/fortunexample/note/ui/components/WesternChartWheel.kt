@@ -14,7 +14,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.fortunexample.note.data.WesternChartData
 import com.fortunexample.note.ui.theme.*
 import kotlin.math.cos
@@ -38,69 +40,114 @@ private val ELEMENT_COLORS = listOf(
     Color(0xFFE0F2FE)  // 11 Pisces: Water
 )
 
+private data class BodyRenderItem(
+    val name: String,
+    val symbol: String,
+    val longitude: Double,
+    val signDegree: Double,
+    val isRetrograde: Boolean
+)
+
 @Composable
 fun WesternChartWheel(
     chart: WesternChartData,
     modifier: Modifier = Modifier
 ) {
-    val symbolPaint = remember {
+    val density = LocalDensity.current
+    val symbolTextSize = with(density) { 14.sp.toPx() }
+    val degreeTextSize = with(density) { 9.sp.toPx() }
+    val retroTextSize = with(density) { 8.sp.toPx() }
+    val zodiacSymbolTextSize = with(density) { 13.sp.toPx() }
+    val houseNumTextSize = with(density) { 10.sp.toPx() }
+    val angleLabelTextSize = with(density) { 11.sp.toPx() }
+
+    val symbolPaint = remember(symbolTextSize) {
         Paint().apply {
             isAntiAlias = true
             textAlign = Paint.Align.CENTER
-            textSize = 30f
+            textSize = symbolTextSize
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             color = android.graphics.Color.parseColor("#0F172A")
         }
     }
 
-    val degreePaint = remember {
+    val degreePaint = remember(degreeTextSize) {
         Paint().apply {
             isAntiAlias = true
             textAlign = Paint.Align.CENTER
-            textSize = 18f
+            textSize = degreeTextSize
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
             color = android.graphics.Color.parseColor("#475569")
         }
     }
 
-    val retroPaint = remember {
+    val retroPaint = remember(retroTextSize) {
         Paint().apply {
             isAntiAlias = true
             textAlign = Paint.Align.LEFT
-            textSize = 16f
+            textSize = retroTextSize
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             color = android.graphics.Color.parseColor("#DC2626")
         }
     }
 
-    val zodiacSymbolPaint = remember {
+    val zodiacSymbolPaint = remember(zodiacSymbolTextSize) {
         Paint().apply {
             isAntiAlias = true
             textAlign = Paint.Align.CENTER
-            textSize = 28f
+            textSize = zodiacSymbolTextSize
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             color = android.graphics.Color.parseColor("#334155")
         }
     }
 
-    val houseNumPaint = remember {
+    val houseNumPaint = remember(houseNumTextSize) {
         Paint().apply {
             isAntiAlias = true
             textAlign = Paint.Align.CENTER
-            textSize = 20f
+            textSize = houseNumTextSize
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             color = android.graphics.Color.parseColor("#64748B")
         }
     }
 
-    val angleLabelPaint = remember {
+    val angleLabelPaint = remember(angleLabelTextSize) {
         Paint().apply {
             isAntiAlias = true
             textAlign = Paint.Align.CENTER
-            textSize = 22f
+            textSize = angleLabelTextSize
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             color = android.graphics.Color.parseColor("#D97706") // Accent primary
         }
+    }
+
+    // 행성 정렬 및 스텔리움 분산 배열 메모이제이션
+    val (renderedBodies, radialOffsets) = remember(chart) {
+        val items = (chart.planets.map {
+            BodyRenderItem(it.name, getPlanetSymbol(it.name), it.longitude, it.sign_degree, it.is_retrograde)
+        } + chart.nodes.map {
+            BodyRenderItem(it.name, getPlanetSymbol(it.name), it.longitude, it.sign_degree, it.is_retrograde)
+        }).sortedBy { it.longitude }
+
+        val offsets = FloatArray(items.size) { 0f }
+        var level = 0
+        for (i in items.indices) {
+            val curr = items[i]
+            val prev = if (i > 0) items[i - 1] else items.last()
+            val diff = (curr.longitude - prev.longitude).remEuclid(360.0)
+            if (diff < 7.0 && i > 0) {
+                level = (level + 1) % 3
+                offsets[i] = when (level) {
+                    1 -> 20f
+                    2 -> -20f
+                    else -> 0f
+                }
+            } else {
+                level = 0
+                offsets[i] = 0f
+            }
+        }
+        Pair(items, offsets)
     }
 
     Canvas(
@@ -268,46 +315,9 @@ fun WesternChartWheel(
             }
         }
 
-        // -------------------------------------------------------------
-        // 5. 행성 및 노드 심볼과 도수 표시 (3단계 밀집 분산 배치 알고리즘)
-        // -------------------------------------------------------------
-        data class BodyRenderItem(
-            val name: String,
-            val symbol: String,
-            val longitude: Double,
-            val signDegree: Double,
-            val isRetrograde: Boolean
-        )
-
-        val items = (chart.planets.map {
-            BodyRenderItem(it.name, getPlanetSymbol(it.name), it.longitude, it.sign_degree, it.is_retrograde)
-        } + chart.nodes.map {
-            BodyRenderItem(it.name, getPlanetSymbol(it.name), it.longitude, it.sign_degree, it.is_retrograde)
-        }).sortedBy { it.longitude }
-
         val planetBandMid = (zodiacInnerRadius + planetBandInnerRadius) / 2f
-        val radialOffsets = FloatArray(items.size) { 0f }
 
-        // 스텔리움 대응 3단계 방사상 오프셋 분산 (-20f, 0f, +20f)
-        var level = 0
-        for (i in items.indices) {
-            val curr = items[i]
-            val prev = if (i > 0) items[i - 1] else items.last()
-            var diff = (curr.longitude - prev.longitude).remEuclid(360.0)
-            if (diff < 7.0 && i > 0) {
-                level = (level + 1) % 3
-                radialOffsets[i] = when (level) {
-                    1 -> 20f
-                    2 -> -20f
-                    else -> 0f
-                }
-            } else {
-                level = 0
-                radialOffsets[i] = 0f
-            }
-        }
-
-        items.forEachIndexed { idx, body ->
+        renderedBodies.forEachIndexed { idx, body ->
             val angleRad = Math.toRadians(body.longitude - chart.ascendant + 180.0)
             val dotRadius = planetBandInnerRadius + 4f
             val dotPos = Offset(
