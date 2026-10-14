@@ -297,7 +297,9 @@ pub fn calculate_western(
     let moon_speed = moon_opt.map_or(13.176, |b| b.speed);
 
     let sun_house = determine_house(sun_lon, &cusps);
-    let is_day_chart = matches!(sun_house, 7 | 8 | 9 | 10 | 11 | 12);
+    // True astronomical day/night sect based on the eastern horizon (ASC) and western horizon (DSC = ASC + 180°).
+    // Above the horizon spans from DSC (180°) counter-clockwise to ASC (360°/0°).
+    let is_day_chart = (sun_lon - ascendant).rem_euclid(360.0) >= 180.0;
 
     // 3. Traditional Domain Layer: Branch between Hellenistic (Whole Sign) and Lilly (Quadrant)
     let (traditional, hellenistic) = if system == WesternHouseSystem::WholeSign {
@@ -571,5 +573,34 @@ mod tests {
         assert_eq!(h.angles.midheaven_sign, 6, "Libra is sign 6");
         assert_eq!(h.angles.midheaven_house, 12, "MC falls in 12th House");
         assert!(!h.angles.is_mc_in_10th, "MC is not in 10th House");
+    }
+
+    #[test]
+    fn test_whole_sign_post_sunrise_day_sect() {
+        // Seoul on 2024-06-21 (Summer Solstice, sunrise ~05:11 KST)
+        // 06:00 KST (UTC 2024-06-20 21:00): Sun is already well above the horizon (Day chart)
+        let ephem = compute_ephemeris(2024, 6, 20, 21, 0, 0.0, 37.5665, 126.9780)
+            .expect("ephemeris should succeed");
+
+        let chart = calculate_western(&ephem, 37.5665, WesternHouseSystem::WholeSign, true);
+        let h = chart.hellenistic.expect("Hellenistic data must exist");
+
+        let sun = chart.planets.iter().find(|p| p.name == "Sun").unwrap();
+        // Ascendant is in Cancer (sign 3), Sun is also in Cancer (sign 3)
+        // In Whole Sign, Sun is in House 1, but geometrically above the horizon
+        assert_eq!(sun.house_number, 1);
+
+        // In a day chart, Lot of Fortune = ASC + Moon - Sun
+        // Lot of Spirit = ASC + Sun - Moon
+        // If it were wrongly treated as night chart, Fortune would be ASC + Sun - Moon (swapped)
+        let p_fortune = h.lots.iter().find(|l| l.name == "Part of Fortune").unwrap();
+        let p_spirit = h.lots.iter().find(|l| l.name == "Part of Spirit").unwrap();
+
+        let moon = chart.planets.iter().find(|p| p.name == "Moon").unwrap();
+        let expected_fortune = (chart.ascendant + moon.longitude - sun.longitude).rem_euclid(360.0);
+        let expected_spirit = (chart.ascendant + sun.longitude - moon.longitude).rem_euclid(360.0);
+
+        assert!((p_fortune.longitude - expected_fortune).abs() < 1e-6, "Fortune must follow daytime formula");
+        assert!((p_spirit.longitude - expected_spirit).abs() < 1e-6, "Spirit must follow daytime formula");
     }
 }

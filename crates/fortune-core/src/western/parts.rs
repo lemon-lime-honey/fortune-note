@@ -130,22 +130,7 @@ fn create_part(name: &str, lon: f64, cusps: &[f64; 12]) -> ArabicPart {
     let sign_index = (lon / 30.0).floor() as u8 % 12;
     let sign_degree = lon - (sign_index as f64 * 30.0);
     let ruler = DOMICILE_RULERS[sign_index as usize].name().to_string();
-
-    // Determine house
-    let mut house_number = 1;
-    for h in 0..12 {
-        let curr = cusps[h];
-        let next = cusps[(h + 1) % 12];
-        let inside = if curr <= next {
-            lon >= curr && lon < next
-        } else {
-            lon >= curr || lon < next
-        };
-        if inside {
-            house_number = (h + 1) as u8;
-            break;
-        }
-    }
+    let house_number = super::determine_house(lon, cusps);
 
     ArabicPart {
         name: name.to_string(),
