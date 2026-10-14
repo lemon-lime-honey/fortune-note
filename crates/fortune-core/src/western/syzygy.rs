@@ -70,11 +70,11 @@ pub fn calculate_prenatal_syzygy_with_coords(
         }
 
         if diff.abs() < 1e-6 {
-            // Converged
-            let (y, m, d_frac) = jd_to_calendar(cur_jd);
+            // Converged: add 0.5s before calendar conversion so 59.5s+ rolls over date/hour/minute accurately
+            let (y, m, d_frac) = jd_to_calendar(cur_jd + 0.5 / 86400.0);
             let day = d_frac.floor() as u32;
-            let total_sec = ((d_frac - day as f64) * 86400.0).round() as u32;
-            let hour = (total_sec / 3600) % 24;
+            let total_sec = ((d_frac - day as f64) * 86400.0).floor() as u32;
+            let hour = (total_sec / 3600).min(23);
             let minute = (total_sec % 3600) / 60;
             let second = total_sec % 60;
 

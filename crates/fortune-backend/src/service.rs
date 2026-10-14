@@ -211,6 +211,8 @@ impl FortuneBackendService {
             gender,
             western_house_system,
             timezone_id: Some(profile.timezone_id.clone()),
+            is_horary: false,
+            saju_options: Default::default(),
         };
 
         calculate_fortune(input).map_err(FortuneBackendError::CalculationError)
@@ -242,6 +244,8 @@ impl FortuneBackendService {
             gender,
             western_house_system: None,
             timezone_id: Some(profile.timezone_id.clone()),
+            is_horary: false,
+            saju_options: Default::default(),
         };
 
         calculate_fortune_saju(input).map_err(FortuneBackendError::CalculationError)
@@ -276,6 +280,8 @@ impl FortuneBackendService {
             gender,
             western_house_system,
             timezone_id: Some(profile.timezone_id.clone()),
+            is_horary: false,
+            saju_options: Default::default(),
         };
 
         calculate_fortune_western(input).map_err(FortuneBackendError::CalculationError)
@@ -307,6 +313,8 @@ impl FortuneBackendService {
             gender,
             western_house_system: None,
             timezone_id: Some(profile.timezone_id.clone()),
+            is_horary: false,
+            saju_options: Default::default(),
         };
 
         calculate_fortune_vedic(input).map_err(FortuneBackendError::CalculationError)
@@ -390,12 +398,15 @@ impl FortuneBackendService {
 
         let mut natal_planets = Vec::new();
         for b in &ephem.bodies {
-            if b.name != "Rahu" && b.name != "Ketu" {
-                natal_planets.push((b.name.as_str(), b.tropical_longitude));
-            }
+            let name = match b.name.as_str() {
+                "Rahu" => "North Node",
+                "Ketu" => "South Node",
+                other => other,
+            };
+            natal_planets.push((name, b.tropical_longitude));
         }
 
-        let suite = fortune_core::western::predictive::calculate_predictive_suite(
+        let suite = fortune_core::western::predictive::calculate_predictive_suite_with_timezone(
             profile.birth_year,
             profile.birth_month,
             profile.birth_day,
@@ -414,6 +425,7 @@ impl FortuneBackendService {
             &natal_planets,
             Some(western_house_sys.to_vedaksha_system()),
             Some(ephem.true_obliquity_deg),
+            Some(&profile.timezone_id),
         );
 
         Ok(suite)
@@ -591,6 +603,8 @@ impl FortuneBackendService {
             gender,
             western_house_system,
             timezone_id: Some(item.timezone_id.clone()),
+            is_horary: true,
+            saju_options: Default::default(),
         };
 
         calculate_fortune(input).map_err(FortuneBackendError::CalculationError)
@@ -642,6 +656,8 @@ impl FortuneBackendService {
             gender,
             western_house_system: None,
             timezone_id: None,
+            is_horary: false,
+            saju_options: Default::default(),
         };
         calculate_fortune(input).map_err(FortuneBackendError::CalculationError)
     }

@@ -98,6 +98,25 @@ pub fn resolve_local_to_utc(
     resolve_with_timezone(year, month, day, hour, minute, second, &tz_id)
 }
 
+/// Convert local date/time into UTC using an optional pre-resolved timezone ID,
+/// falling back to coordinate lookup when `timezone_id` is `None`.
+pub fn resolve_local_to_utc_with_tz(
+    year: i32,
+    month: u32,
+    day: u32,
+    hour: u32,
+    minute: u32,
+    second: f64,
+    latitude: f64,
+    longitude: f64,
+    timezone_id: Option<&str>,
+) -> Result<TimezoneResolution, TimezoneError> {
+    if let Some(tz_id) = timezone_id.filter(|s| !s.is_empty()) {
+        return resolve_with_timezone(year, month, day, hour, minute, second, tz_id);
+    }
+    resolve_local_to_utc(year, month, day, hour, minute, second, latitude, longitude)
+}
+
 /// Convert local date/time with an explicit IANA timezone ID into UTC.
 pub fn resolve_with_timezone(
     year: i32,

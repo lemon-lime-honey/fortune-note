@@ -1,6 +1,6 @@
 //! Planetary Return Chart & Inter-Chart Aspects CLI Tool.
 //!
-//! Computes exact return moment(s) for any celestial body (Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn, Rahu)
+//! Computes exact return moment(s) for any celestial body (Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn, North Node, South Node)
 //! in a given target year, along with full return chart placements and inter-chart aspects
 //! between return points (Return Planets, Return ASC, Return MC) and natal points (Natal Planets, Natal ASC, Natal MC).
 //!
@@ -108,6 +108,8 @@ fn main() {
         longitude: lon,
         western_house_system: Some(house_sys_enum),
         timezone_id: None,
+        is_horary: false,
+        saju_options: Default::default(),
     };
 
     let natal_chart = calculate_fortune_western(natal_input)
