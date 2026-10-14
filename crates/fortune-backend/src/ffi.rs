@@ -259,7 +259,11 @@ impl FortuneClient {
     pub fn calculate_annual_profection(
         &self,
         birth_year: i32,
+        birth_month: u32,
+        birth_day: u32,
         target_year: i32,
+        target_month: u32,
+        target_day: u32,
         natal_ascendant: f64,
         natal_planets_json: String,
     ) -> Result<String, FortuneBackendFfiError> {
@@ -271,7 +275,11 @@ impl FortuneClient {
         let planet_tuples: Vec<(&str, f64)> = planets.iter().map(|(n, l)| (n.as_str(), *l)).collect();
         let res = fortune_core::western::predictive::calculate_annual_profection(
             birth_year,
+            birth_month,
+            birth_day,
             target_year,
+            target_month,
+            target_day,
             natal_ascendant,
             &planet_tuples,
         );
@@ -408,6 +416,17 @@ mod tests {
         assert!(json.contains("\"western\""));
         assert!(json.contains("\"vedic\""));
         assert!(json.contains("\"saju\""));
+
+        let prof_json = client
+            .calculate_annual_profection(1990, 5, 15, 2026, 5, 15, 15.0, r#"[["Sun", 50.0]]"#.to_string())
+            .expect("annual profection ffi failed");
+        assert!(prof_json.contains("\"target_age\":36"));
+        assert!(prof_json.contains("\"profected_house\":1"));
+
+        let solar_arc_json = client
+            .calculate_solar_arc(1990, 5, 15, 2026, 5, 15, r#"[["Sun", 54.0]]"#.to_string())
+            .expect("solar arc ffi failed");
+        assert!(solar_arc_json.contains("\"solar_arc_degrees\""));
     }
 
     #[test]

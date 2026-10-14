@@ -79,12 +79,20 @@ pub struct AnnualProfectionResult {
 
 pub fn calculate_annual_profection(
     birth_year: i32,
+    birth_month: u32,
+    birth_day: u32,
     target_year: i32,
+    target_month: u32,
+    target_day: u32,
     natal_ascendant: f64,
     natal_planets: &[(&str, f64)],
 ) -> AnnualProfectionResult {
-    let age = if target_year >= birth_year { (target_year - birth_year) as u32 } else { 0 };
-    let shift_signs = (age % 12) as u8;
+    let completed_age = if (target_month, target_day) >= (birth_month, birth_day) {
+        (target_year - birth_year).max(0) as u32
+    } else {
+        (target_year - birth_year - 1).max(0) as u32
+    };
+    let shift_signs = (completed_age % 12) as u8;
 
     let asc_sign = (natal_ascendant / 30.0).floor() as u8 % 12;
     let profected_sign_index = (asc_sign + shift_signs) % 12;
@@ -102,7 +110,7 @@ pub fn calculate_annual_profection(
     }
 
     AnnualProfectionResult {
-        target_age: age,
+        target_age: completed_age,
         target_year,
         profected_house,
         profected_sign_index,
@@ -111,6 +119,7 @@ pub fn calculate_annual_profection(
         active_natal_planets,
     }
 }
+
 
 // ---------------------------------------------------------------------------
 // 2. Solar Arc Directions
@@ -149,11 +158,32 @@ pub fn calculate_solar_arc(
     target_day: u32,
     natal_planets: &[(&str, f64)],
 ) -> (f64, Vec<SolarArcBody>) {
-    let fractional_years = (target_year - birth_year) as f64
-        + (target_month as f64 - birth_month as f64) / 12.0
-        + (target_day as f64 - birth_day as f64) / 365.25;
+    let (last_bday_year, next_bday_year, completed_years) = if (target_month, target_day) >= (birth_month, birth_day) {
+        (target_year, target_year + 1, (target_year - birth_year).max(0) as f64)
+    } else {
+        (target_year - 1, target_year, (target_year - birth_year - 1).max(0) as f64)
+    };
 
-    let arc = (fractional_years * (59.0 / 60.0 + 8.0 / 3600.0)).rem_euclid(360.0);
+    let last_bday_jd = calendar_to_jd(last_bday_year, birth_month, birth_day as f64);
+    let next_bday_jd = calendar_to_jd(next_bday_year, birth_month, birth_day as f64);
+    let target_day_jd = calendar_to_jd(target_year, target_month, target_day as f64);
+
+    let year_span = (next_bday_jd - last_bday_jd).max(1.0);
+    let year_fraction = ((target_day_jd - last_bday_jd) / year_span).clamp(0.0, 1.0);
+    let elapsed_years = completed_years + year_fraction;
+
+    let birth_jd = calendar_to_jd(birth_year, birth_month, birth_day as f64);
+    let prog_jd = birth_jd + elapsed_years;
+
+    let natal_sun_lon = natal_planets
+        .iter()
+        .find(|(name, _)| *name == "Sun")
+        .map(|(_, lon)| *lon);
+
+    let arc = match (natal_sun_lon, get_body_tropical_lon(vedaksha::ephem::bodies::Body::Sun, prog_jd)) {
+        (Some(natal_sun), Ok(prog_sun)) => (prog_sun - natal_sun).rem_euclid(360.0),
+        _ => (elapsed_years * (59.0 / 60.0 + 8.0 / 3600.0)).rem_euclid(360.0),
+    };
 
     let directed = natal_planets.iter().map(|&(name, lon)| {
         let dir_lon = (lon + arc).rem_euclid(360.0);
@@ -171,6 +201,7 @@ pub fn calculate_solar_arc(
 
     (arc, directed)
 }
+
 
 pub fn calculate_solar_arc_detailed(
     birth_year: i32,
@@ -1350,6 +1381,19 @@ pub fn calculate_primary_directions(
                     });
                 }
 
+                // Converse direction to MC: Diurnal motion carries MC to promittor
+                let arc_mc_conv = (ramc - ra_asp).rem_euclid(360.0);
+                if arc_mc_conv > 0.05 && arc_mc_conv <= max_arc && arc_mc_conv <= 110.0 {
+                    let age = arc_mc_conv / naibod_key;
+                    all_directions.push(PrimaryDirectionContact {
+                        promittor: prom_name.clone(),
+                        significator: "MC".to_string(),
+                        aspect_type: format!("{} (Converse)", asp_name),
+                        direction_arc_deg: arc_mc_conv,
+                        realization_age: age,
+                    });
+                }
+
                 // B. Direct direction to ASC: Diurnal motion carries promittor to Horizon
                 let arc_asc = (oa_asp - oa_asc).rem_euclid(360.0);
                 if arc_asc > 0.05 && arc_asc <= max_arc && arc_asc <= 110.0 {
@@ -1359,6 +1403,19 @@ pub fn calculate_primary_directions(
                         significator: "ASC".to_string(),
                         aspect_type: asp_name.to_string(),
                         direction_arc_deg: arc_asc,
+                        realization_age: age,
+                    });
+                }
+
+                // Converse direction to ASC: Diurnal motion carries ASC to promittor
+                let arc_asc_conv = (oa_asc - oa_asp).rem_euclid(360.0);
+                if arc_asc_conv > 0.05 && arc_asc_conv <= max_arc && arc_asc_conv <= 110.0 {
+                    let age = arc_asc_conv / naibod_key;
+                    all_directions.push(PrimaryDirectionContact {
+                        promittor: prom_name.clone(),
+                        significator: "ASC".to_string(),
+                        aspect_type: format!("{} (Converse)", asp_name),
+                        direction_arc_deg: arc_asc_conv,
                         realization_age: age,
                     });
                 }
@@ -1384,12 +1441,14 @@ pub fn calculate_primary_directions(
         }
     }
 
-    // Window around target_age: prioritize directions within target_age ± 5 years,
-    // then sort by proximity to target_age so the user sees relevant life milestones.
+    // Window around target_age: prioritize directions closest to target_age,
+    // breaking ties by lower realization_age
     unique_directions.sort_by(|a, b| {
         let diff_a = (a.realization_age - target_age).abs();
         let diff_b = (b.realization_age - target_age).abs();
-        diff_a.partial_cmp(&diff_b).unwrap_or(std::cmp::Ordering::Equal)
+        diff_a.partial_cmp(&diff_b)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.realization_age.partial_cmp(&b.realization_age).unwrap_or(std::cmp::Ordering::Equal))
     });
 
     unique_directions
@@ -1435,7 +1494,11 @@ pub fn calculate_predictive_suite(
     house_system: Option<vedaksha::astro::houses::HouseSystem>,
     true_obliquity_deg: Option<f64>,
 ) -> PredictiveSuite {
-    let profection = calculate_annual_profection(birth_year, target_year, natal_ascendant, natal_planets);
+    let profection = calculate_annual_profection(
+        birth_year, birth_month, birth_day,
+        target_year, target_month, target_day,
+        natal_ascendant, natal_planets,
+    );
     let solar_arc = calculate_solar_arc_detailed(
         birth_year, birth_month, birth_day,
         target_year, target_month, target_day,
@@ -1476,7 +1539,11 @@ pub fn calculate_predictive_suite(
         latitude, longitude, natal_planets,
     ).unwrap_or_default();
 
-    let age = if target_year >= birth_year { (target_year - birth_year) as u32 } else { 0 };
+    let age = if (target_month, target_day) >= (birth_month, birth_day) {
+        (target_year - birth_year).max(0) as u32
+    } else {
+        (target_year - birth_year - 1).max(0) as u32
+    };
 
     let eps = true_obliquity_deg.unwrap_or(23.4392911);
     let primary = calculate_primary_directions(
@@ -1544,7 +1611,58 @@ mod tests {
         assert!(!rahu_found, "Rahu must not be present in western primary directions");
         let north_node_found = suite.primary_directions.iter().any(|d| d.promittor == "North Node");
         assert!(north_node_found, "North Node must be present in western primary directions");
+
+        // Verify that Converse primary directions are present
+        let converse_found = suite.primary_directions.iter().any(|d| d.aspect_type.contains("(Converse)"));
+        assert!(converse_found, "Converse primary directions must be calculated alongside direct directions");
     }
+
+    #[test]
+    fn test_annual_profection_birthday_boundary() {
+        let natal_planets = [("Sun", 50.0), ("Moon", 120.0)];
+        let asc = 15.0; // Aries ASC (sign index 0)
+
+        // Case 1: Birthday is May 15, 1990.
+        // Before birthday (May 14, 2026) -> age 35 -> shift = 35 % 12 = 11 -> Pisces (12th house)
+        let prof_before = calculate_annual_profection(1990, 5, 15, 2026, 5, 14, asc, &natal_planets);
+        assert_eq!(prof_before.target_age, 35);
+        assert_eq!(prof_before.profected_house, 12);
+        assert_eq!(prof_before.profected_sign_name, "Pisces");
+
+        // Case 2: On birthday (May 15, 2026) -> age 36 -> shift = 36 % 12 = 0 -> Aries (1st house)
+        let prof_on = calculate_annual_profection(1990, 5, 15, 2026, 5, 15, asc, &natal_planets);
+        assert_eq!(prof_on.target_age, 36);
+        assert_eq!(prof_on.profected_house, 1);
+        assert_eq!(prof_on.profected_sign_name, "Aries");
+
+        // Case 3: After birthday (May 16, 2026) -> age 36 -> shift = 0 -> Aries (1st house)
+        let prof_after = calculate_annual_profection(1990, 5, 15, 2026, 5, 16, asc, &natal_planets);
+        assert_eq!(prof_after.target_age, 36);
+        assert_eq!(prof_after.profected_house, 1);
+        assert_eq!(prof_after.profected_sign_name, "Aries");
+    }
+
+    #[test]
+    fn test_true_solar_arc_calculation() {
+        // True Solar Arc should use actual progression of the Sun between birth and target
+        let natal_planets = [
+            ("Sun", 54.32),
+            ("Moon", 120.0),
+            ("Venus", 80.0),
+        ];
+
+        let (arc, directed) = calculate_solar_arc(1990, 5, 15, 2026, 5, 15, &natal_planets);
+
+        // Over 36 years, arc should be roughly ~35.48° (roughly 36 days of Sun motion)
+        assert!(arc > 34.0 && arc < 37.0, "True solar arc should be around ~35-36 degrees, got {}", arc);
+
+        let dir_sun = directed.iter().find(|p| p.name == "Sun").unwrap();
+        assert!((dir_sun.directed_longitude - (54.32 + arc).rem_euclid(360.0)).abs() < 1e-4);
+
+        let dir_moon = directed.iter().find(|p| p.name == "Moon").unwrap();
+        assert!((dir_moon.directed_longitude - (120.0 + arc).rem_euclid(360.0)).abs() < 1e-4);
+    }
+
 
     #[test]
     fn test_equatorial_coordinates() {
