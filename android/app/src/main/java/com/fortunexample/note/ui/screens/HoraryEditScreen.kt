@@ -220,32 +220,78 @@ fun HoraryEditScreen(
                 }
             )
 
+            var validationError by remember { mutableStateOf<String?>(null) }
+
+            if (validationError != null) {
+                Text(
+                    text = validationError ?: "",
+                    color = AccentWarning,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
                 onClick = {
-                    val y = yearStr.toIntOrNull() ?: 2026
-                    val m = (monthStr.toIntOrNull() ?: 1).coerceIn(1, 12)
-                    val d = (dayStr.toIntOrNull() ?: 1).coerceIn(1, 31)
-                    val h = (hourStr.toIntOrNull() ?: 0).coerceIn(0, 23)
-                    val min = (minuteStr.toIntOrNull() ?: 0).coerceIn(0, 59)
-                    val sec = (secondStr.toDoubleOrNull() ?: 0.0).coerceIn(0.0, 59.999)
-
-                    if (title.trim().isNotEmpty()) {
-                        onSave(
-                            title.trim(),
-                            category.trim(),
-                            questionText.trim(),
-                            y,
-                            m,
-                            d,
-                            h,
-                            min,
-                            sec,
-                            latitude,
-                            longitude
-                        )
+                    if (title.trim().isEmpty()) {
+                        validationError = "질문 제목을 입력해 주세요."
+                        return@Button
                     }
+                    val y = yearStr.toIntOrNull()
+                    val m = monthStr.toIntOrNull()
+                    val d = dayStr.toIntOrNull()
+                    val h = hourStr.toIntOrNull()
+                    val min = minuteStr.toIntOrNull()
+                    val sec = secondStr.toDoubleOrNull()
+
+                    if (y == null || y !in -4000..3000) {
+                        validationError = "올바른 연도를 입력해 주세요 (-4000~3000)."
+                        return@Button
+                    }
+                    if (m == null || m !in 1..12) {
+                        validationError = "올바른 월을 입력해 주세요 (1~12)."
+                        return@Button
+                    }
+                    if (d == null || d !in 1..31) {
+                        validationError = "올바른 일을 입력해 주세요 (1~31)."
+                        return@Button
+                    }
+                    if (h == null || h !in 0..23) {
+                        validationError = "올바른 시를 입력해 주세요 (0~23)."
+                        return@Button
+                    }
+                    if (min == null || min !in 0..59) {
+                        validationError = "올바른 분을 입력해 주세요 (0~59)."
+                        return@Button
+                    }
+                    if (sec == null || sec < 0.0 || sec >= 60.0) {
+                        validationError = "올바른 초를 입력해 주세요 (0~59.99)."
+                        return@Button
+                    }
+                    try {
+                        java.time.LocalDate.of(y, m, d)
+                    } catch (_: Exception) {
+                        validationError = "존재하지 않는 날짜입니다."
+                        return@Button
+                    }
+
+                    validationError = null
+                    onSave(
+                        title.trim(),
+                        category.trim(),
+                        questionText.trim(),
+                        y,
+                        m,
+                        d,
+                        h,
+                        min,
+                        sec,
+                        latitude,
+                        longitude
+                    )
                 },
                 modifier = Modifier
                     .fillMaxWidth()

@@ -82,25 +82,27 @@ fun ProfileDetailScreen(
     var predictiveData by remember { mutableStateOf<PredictiveSuiteData?>(null) }
     var isPredictiveLoading by remember { mutableStateOf(false) }
 
-    // 1. Saju immediate load on screen enter
-    LaunchedEffect(profile.id) {
-        if (sajuOutput == null) {
-            isSajuLoading = true
-            sajuError = null
-            FortuneApp.repository.calculateProfileSaju(profile.id)
-                .onSuccess {
-                    sajuOutput = it
-                    isSajuLoading = false
-                }
-                .onFailure {
-                    sajuError = it.message ?: "사주명리 데이터 계산에 실패했습니다."
-                    isSajuLoading = false
-                }
-        }
+    // 1. Saju immediate load on screen enter or profile update
+    LaunchedEffect(profile) {
+        sajuOutput = null
+        westernOutput = null
+        vedicOutput = null
+        predictiveData = null
+        isSajuLoading = true
+        sajuError = null
+        FortuneApp.repository.calculateProfileSaju(profile.id)
+            .onSuccess {
+                sajuOutput = it
+                isSajuLoading = false
+            }
+            .onFailure {
+                sajuError = it.message ?: "사주명리 데이터 계산에 실패했습니다."
+                isSajuLoading = false
+            }
     }
 
     // 2. Western lazy load on Western tab (tab index 1)
-    LaunchedEffect(profile.id, selectedDomainTab, selectedHouse) {
+    LaunchedEffect(profile, selectedDomainTab, selectedHouse) {
         if (selectedDomainTab == 1 && (westernOutput == null || westernOutput?.western?.house_system != selectedHouse)) {
             isWesternLoading = true
             westernError = null
@@ -117,7 +119,7 @@ fun ProfileDetailScreen(
     }
 
     // 3. Vedic lazy load on Vedic tab (tab index 2)
-    LaunchedEffect(profile.id, selectedDomainTab) {
+    LaunchedEffect(profile, selectedDomainTab) {
         if (selectedDomainTab == 2 && vedicOutput == null) {
             isVedicLoading = true
             vedicError = null
@@ -134,7 +136,7 @@ fun ProfileDetailScreen(
     }
 
     // 4. Lazy-load predictive suite when user enters Western tab (tab index 1) or changes target date/time/house
-    LaunchedEffect(profile.id, predictiveTargetYear, predictiveTargetMonth, predictiveTargetDay, predictiveTargetHour, predictiveTargetMinute, selectedHouse, selectedDomainTab) {
+    LaunchedEffect(profile, predictiveTargetYear, predictiveTargetMonth, predictiveTargetDay, predictiveTargetHour, predictiveTargetMinute, selectedHouse, selectedDomainTab) {
         if (selectedDomainTab == 1) {
             isPredictiveLoading = true
             FortuneApp.repository.calculateProfilePredictiveSuite(
@@ -836,15 +838,19 @@ fun ProfileDetailScreen(
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
                                                 Text(
-                                                    text = "${String.format("%.2f°", displayDegree)} $degreeLabel",
+                                                    text = "${String.format(java.util.Locale.US, "%.2f°", displayDegree)} $degreeLabel",
                                                     color = TextSecondary,
-                                                    fontSize = 12.sp
+                                                    fontSize = 12.sp,
+                                                    modifier = Modifier.weight(1f, fill = false)
                                                 )
+                                                Spacer(modifier = Modifier.width(8.dp))
                                                 Text(
                                                     text = nakshatraLabel,
                                                     color = CelestialBlue,
                                                     fontSize = 12.sp,
-                                                    fontWeight = FontWeight.Medium
+                                                    fontWeight = FontWeight.Medium,
+                                                    textAlign = TextAlign.End,
+                                                    modifier = Modifier.weight(1f, fill = false)
                                                 )
                                             }
                                         }

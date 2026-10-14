@@ -28,12 +28,24 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 val scope = rememberCoroutineScope()
 
-                var profiles by remember { mutableStateOf<List<ProfileDto>>(emptyList()) }
+                var allProfiles by remember { mutableStateOf<List<ProfileDto>>(emptyList()) }
+                var profileSearchQuery by remember { mutableStateOf("") }
                 var horaryList by remember { mutableStateOf<List<HoraryDto>>(emptyList()) }
+
+                val displayedProfiles = remember(allProfiles, profileSearchQuery) {
+                    if (profileSearchQuery.isBlank()) {
+                        allProfiles
+                    } else {
+                        allProfiles.filter {
+                            it.name.contains(profileSearchQuery, ignoreCase = true) ||
+                            it.notes.contains(profileSearchQuery, ignoreCase = true)
+                        }
+                    }
+                }
 
                 fun refreshData() {
                     scope.launch {
-                        FortuneApp.repository.listProfiles().onSuccess { profiles = it }
+                        FortuneApp.repository.listProfiles().onSuccess { allProfiles = it }
                         FortuneApp.repository.listHorary().onSuccess { horaryList = it }
                     }
                 }
@@ -45,17 +57,13 @@ class MainActivity : ComponentActivity() {
                 NavHost(navController = navController, startDestination = "home") {
                     composable("home") {
                         HomeScreen(
-                            profiles = profiles,
+                            profiles = displayedProfiles,
                             horaryQuestions = horaryList,
                             onProfileClick = { id -> navController.navigate("profile_detail/$id") },
                             onHoraryClick = { id -> navController.navigate("horary_detail/$id") },
                             onAddProfile = { navController.navigate("profile_edit") },
                             onAddHorary = { navController.navigate("horary_edit") },
-                            onSearch = { query ->
-                                scope.launch {
-                                    FortuneApp.repository.listProfiles(query).onSuccess { profiles = it }
-                                }
-                            },
+                            onSearch = { query -> profileSearchQuery = query },
                             onNavigateToDataManagement = {
                                 navController.navigate("data_management")
                             }
@@ -64,7 +72,7 @@ class MainActivity : ComponentActivity() {
 
                     composable("data_management") {
                         DataManagementScreen(
-                            profileCount = profiles.size,
+                            profileCount = allProfiles.size,
                             horaryCount = horaryList.size,
                             onBack = { navController.popBackStack() },
                             onDataRestored = {
@@ -83,7 +91,7 @@ class MainActivity : ComponentActivity() {
                         })
                     ) { backStackEntry ->
                         val editId = backStackEntry.arguments?.getString("id")
-                        val existingProfile = profiles.find { it.id == editId }
+                        val existingProfile = allProfiles.find { it.id == editId }
 
                         ProfileEditScreen(
                             initialProfile = existingProfile,
@@ -108,6 +116,8 @@ class MainActivity : ComponentActivity() {
                                         ).onSuccess {
                                             refreshData()
                                             navController.popBackStack()
+                                        }.onFailure {
+                                            Toast.makeText(context, it.message ?: "인물 정보 수정에 실패했습니다.", Toast.LENGTH_SHORT).show()
                                         }
                                     } else {
                                         FortuneApp.repository.createProfile(
@@ -126,6 +136,8 @@ class MainActivity : ComponentActivity() {
                                         ).onSuccess {
                                             refreshData()
                                             navController.popBackStack()
+                                        }.onFailure {
+                                            Toast.makeText(context, it.message ?: "인물 등록에 실패했습니다.", Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 }
@@ -138,7 +150,7 @@ class MainActivity : ComponentActivity() {
                         arguments = listOf(navArgument("id") { type = NavType.StringType })
                     ) { backStackEntry ->
                         val id = backStackEntry.arguments?.getString("id") ?: return@composable
-                        val profile = profiles.find { it.id == id }
+                        val profile = allProfiles.find { it.id == id }
                         if (profile != null) {
                             ProfileDetailScreen(
                                 profile = profile,
@@ -149,6 +161,8 @@ class MainActivity : ComponentActivity() {
                                         FortuneApp.repository.deleteProfile(id).onSuccess {
                                             refreshData()
                                             navController.popBackStack()
+                                        }.onFailure {
+                                            Toast.makeText(context, it.message ?: "인물 삭제에 실패했습니다.", Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 }
@@ -191,6 +205,8 @@ class MainActivity : ComponentActivity() {
                                         ).onSuccess {
                                             refreshData()
                                             navController.popBackStack()
+                                        }.onFailure {
+                                            Toast.makeText(context, it.message ?: "호라리 질문 수정에 실패했습니다.", Toast.LENGTH_SHORT).show()
                                         }
                                     } else {
                                         FortuneApp.repository.createHorary(
@@ -210,6 +226,8 @@ class MainActivity : ComponentActivity() {
                                         ).onSuccess {
                                             refreshData()
                                             navController.popBackStack()
+                                        }.onFailure {
+                                            Toast.makeText(context, it.message ?: "호라리 질문 등록에 실패했습니다.", Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 }
@@ -246,6 +264,8 @@ class MainActivity : ComponentActivity() {
                                         FortuneApp.repository.deleteHorary(id).onSuccess {
                                             refreshData()
                                             navController.popBackStack()
+                                        }.onFailure {
+                                            Toast.makeText(context, it.message ?: "호라리 질문 삭제에 실패했습니다.", Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 }

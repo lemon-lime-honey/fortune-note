@@ -25,6 +25,7 @@ data class CachedLocation(
 object GeocodingCache {
     private const val FILE_NAME = "geocoding_cache.json"
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
+    private val lock = Any()
     private var inMemoryCache: MutableMap<String, CachedLocation>? = null
 
     private val DEFAULT_SEEDS = listOf(
@@ -79,7 +80,7 @@ object GeocodingCache {
         return File(context.filesDir, FILE_NAME)
     }
 
-    private fun ensureLoaded(context: Context): MutableMap<String, CachedLocation> {
+    private fun ensureLoaded(context: Context): MutableMap<String, CachedLocation> = synchronized(lock) {
         inMemoryCache?.let { return it }
         val file = getFile(context)
         val map = if (file.exists()) {
@@ -108,7 +109,9 @@ object GeocodingCache {
 
     fun searchLocal(context: Context, query: String): List<CachedLocation> {
         val q = query.trim().lowercase()
-        val all = ensureLoaded(context).values.toList()
+        val all = synchronized(lock) {
+            ensureLoaded(context).values.toList()
+        }
         if (q.isEmpty()) {
             return all.sortedByDescending { it.timestamp }
         }
@@ -118,7 +121,6 @@ object GeocodingCache {
     }
 
     fun put(context: Context, query: String, displayName: String, latitude: Double, longitude: Double) {
-        val cache = ensureLoaded(context)
         val item = CachedLocation(
             query = query.trim(),
             displayName = displayName.trim(),
@@ -126,8 +128,22 @@ object GeocodingCache {
             longitude = longitude,
             timestamp = System.currentTimeMillis()
         )
-        cache[item.displayName] = item
-        saveToFile(context, cache.values.toList())
+        synchronized(lock) {
+            val cache = ensureLoaded(context)
+            cache[item.displayName] = item
+            saveToFile(context, cache.values.toList())
+        }
+    }
+
+    fun putAll(context: Context, items: List<CachedLocation>) {
+        if (items.isEmpty()) return
+        synchronized(lock) {
+            val cache = ensureLoaded(context)
+            for (item in items) {
+                cache[item.displayName] = item
+            }
+            saveToFile(context, cache.values.toList())
+        }
     }
 
     suspend fun searchOnline(context: Context, query: String): List<CachedLocation> = withContext(Dispatchers.IO) {
@@ -168,9 +184,11 @@ object GeocodingCache {
                     line = parts.joinToString(" ")
                 }
                 if (line.isNotEmpty()) {
-                    put(context, q, line, addr.latitude, addr.longitude)
-                    CachedLocation(q, line, addr.latitude, addr.longitude)
+                    CachedLocation(q, line, addr.latitude, addr.longitude, System.currentTimeMillis())
                 } else null
+            }
+            if (parsed.isNotEmpty()) {
+                putAll(context, parsed)
             }
             parsed
         } catch (_: Exception) {

@@ -50,7 +50,7 @@ object BackupManager {
 
     suspend fun saveBackupToUri(context: Context, destinationUri: Uri, jsonContent: String): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            context.contentResolver.openOutputStream(destinationUri)?.use { out ->
+            context.contentResolver.openOutputStream(destinationUri, "wt")?.use { out ->
                 out.write(jsonContent.toByteArray(Charsets.UTF_8))
                 out.flush()
             } ?: throw IllegalStateException("출력 스트림을 생성할 수 없습니다")

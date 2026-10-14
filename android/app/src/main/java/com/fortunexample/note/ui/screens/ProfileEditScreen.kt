@@ -192,31 +192,73 @@ fun ProfileEditScreen(
                 )
             )
 
+            var validationError by remember { mutableStateOf<String?>(null) }
+
+            if (validationError != null) {
+                Text(
+                    text = validationError ?: "",
+                    color = AccentWarning,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
 
             // 저장 버튼
             Button(
                 onClick = {
-                    val y = yearStr.toIntOrNull() ?: 2000
-                    val m = (monthStr.toIntOrNull() ?: 1).coerceIn(1, 12)
-                    val d = (dayStr.toIntOrNull() ?: 1).coerceIn(1, 31)
-                    val h = (hourStr.toIntOrNull() ?: 0).coerceIn(0, 23)
-                    val min = (minuteStr.toIntOrNull() ?: 0).coerceIn(0, 59)
-
-                    if (name.trim().isNotEmpty()) {
-                        onSave(
-                            name.trim(),
-                            isMale,
-                            y,
-                            m,
-                            d,
-                            h,
-                            min,
-                            latitude,
-                            longitude,
-                            notes.trim()
-                        )
+                    if (name.trim().isEmpty()) {
+                        validationError = "이름을 입력해 주세요."
+                        return@Button
                     }
+                    val y = yearStr.toIntOrNull()
+                    val m = monthStr.toIntOrNull()
+                    val d = dayStr.toIntOrNull()
+                    val h = hourStr.toIntOrNull()
+                    val min = minuteStr.toIntOrNull()
+
+                    if (y == null || y !in -4000..3000) {
+                        validationError = "올바른 연도를 입력해 주세요 (-4000~3000)."
+                        return@Button
+                    }
+                    if (m == null || m !in 1..12) {
+                        validationError = "올바른 월을 입력해 주세요 (1~12)."
+                        return@Button
+                    }
+                    if (d == null || d !in 1..31) {
+                        validationError = "올바른 일을 입력해 주세요 (1~31)."
+                        return@Button
+                    }
+                    if (h == null || h !in 0..23) {
+                        validationError = "올바른 시를 입력해 주세요 (0~23)."
+                        return@Button
+                    }
+                    if (min == null || min !in 0..59) {
+                        validationError = "올바른 분을 입력해 주세요 (0~59)."
+                        return@Button
+                    }
+                    try {
+                        java.time.LocalDate.of(y, m, d)
+                    } catch (_: Exception) {
+                        validationError = "존재하지 않는 날짜입니다."
+                        return@Button
+                    }
+
+                    validationError = null
+                    onSave(
+                        name.trim(),
+                        isMale,
+                        y,
+                        m,
+                        d,
+                        h,
+                        min,
+                        latitude,
+                        longitude,
+                        notes.trim()
+                    )
                 },
                 modifier = Modifier
                     .fillMaxWidth()

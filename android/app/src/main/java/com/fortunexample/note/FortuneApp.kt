@@ -13,6 +13,8 @@ class FortuneApp : Application() {
             private set
     }
 
+    private var currentClient: FortuneClient? = null
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -23,7 +25,9 @@ class FortuneApp : Application() {
 
     fun reloadRepository() {
         val dbFile = getDbFile()
+        currentClient?.close()
         val client = FortuneClient(dbFile.absolutePath)
+        currentClient = client
         repository = FortuneRepository(client)
     }
 }
