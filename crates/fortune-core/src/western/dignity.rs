@@ -122,6 +122,7 @@ pub fn triplicity_rulers(sign_index: u8) -> (ClassicalPlanet, ClassicalPlanet) {
 }
 
 /// Egyptian Terms: (Max degree, Planet) for each of the 12 signs.
+/// Corrected standard Egyptian bounds from Hellenistic tradition.
 pub fn egyptian_term(sign_index: u8, degree_in_sign: f64) -> ClassicalPlanet {
     let terms: &[(f64, ClassicalPlanet)] = match sign_index % 12 {
         0 => &[ // Aries
@@ -131,11 +132,11 @@ pub fn egyptian_term(sign_index: u8, degree_in_sign: f64) -> ClassicalPlanet {
             (25.0, ClassicalPlanet::Mars),
             (30.0, ClassicalPlanet::Saturn),
         ],
-        1 => &[ // Taurus
+        1 => &[ // Taurus (standard Egyptian: Ven 8, Mer 14, Jup 22, Sat 27, Mars 30)
             (8.0, ClassicalPlanet::Venus),
-            (15.0, ClassicalPlanet::Mercury),
+            (14.0, ClassicalPlanet::Mercury),
             (22.0, ClassicalPlanet::Jupiter),
-            (26.0, ClassicalPlanet::Saturn),
+            (27.0, ClassicalPlanet::Saturn),
             (30.0, ClassicalPlanet::Mars),
         ],
         2 => &[ // Gemini
@@ -166,7 +167,105 @@ pub fn egyptian_term(sign_index: u8, degree_in_sign: f64) -> ClassicalPlanet {
             (28.0, ClassicalPlanet::Mars),
             (30.0, ClassicalPlanet::Saturn),
         ],
-        6 => &[ // Libra
+        6 => &[ // Libra (standard Egyptian: Sat 6, Mer 14, Ven 21, Jup 28, Mars 30)
+            (6.0, ClassicalPlanet::Saturn),
+            (14.0, ClassicalPlanet::Mercury),
+            (21.0, ClassicalPlanet::Venus),
+            (28.0, ClassicalPlanet::Jupiter),
+            (30.0, ClassicalPlanet::Mars),
+        ],
+        7 => &[ // Scorpio
+            (7.0, ClassicalPlanet::Mars),
+            (11.0, ClassicalPlanet::Venus),
+            (19.0, ClassicalPlanet::Mercury),
+            (24.0, ClassicalPlanet::Jupiter),
+            (30.0, ClassicalPlanet::Saturn),
+        ],
+        8 => &[ // Sagittarius
+            (12.0, ClassicalPlanet::Jupiter),
+            (17.0, ClassicalPlanet::Venus),
+            (21.0, ClassicalPlanet::Mercury),
+            (26.0, ClassicalPlanet::Saturn),
+            (30.0, ClassicalPlanet::Mars),
+        ],
+        9 => &[ // Capricorn
+            (7.0, ClassicalPlanet::Mercury),
+            (14.0, ClassicalPlanet::Jupiter),
+            (22.0, ClassicalPlanet::Venus),
+            (26.0, ClassicalPlanet::Saturn),
+            (30.0, ClassicalPlanet::Mars),
+        ],
+        10 => &[ // Aquarius
+            (7.0, ClassicalPlanet::Mercury),
+            (13.0, ClassicalPlanet::Venus),
+            (20.0, ClassicalPlanet::Jupiter),
+            (25.0, ClassicalPlanet::Mars),
+            (30.0, ClassicalPlanet::Saturn),
+        ],
+        _ => &[ // Pisces
+            (12.0, ClassicalPlanet::Venus),
+            (16.0, ClassicalPlanet::Jupiter),
+            (19.0, ClassicalPlanet::Mercury),
+            (28.0, ClassicalPlanet::Mars),
+            (30.0, ClassicalPlanet::Saturn),
+        ],
+    };
+
+    for &(limit, planet) in terms {
+        if degree_in_sign < limit {
+            return planet;
+        }
+    }
+    ClassicalPlanet::Saturn
+}
+
+/// Ptolemaic Terms: (Max degree, Planet) for each of the 12 signs according to Claudius Ptolemy (Tetrabiblos)
+/// and William Lilly (Christian Astrology, 1647, p. 104).
+pub fn ptolemaic_term(sign_index: u8, degree_in_sign: f64) -> ClassicalPlanet {
+    let terms: &[(f64, ClassicalPlanet)] = match sign_index % 12 {
+        0 => &[ // Aries
+            (6.0, ClassicalPlanet::Jupiter),
+            (12.0, ClassicalPlanet::Venus),
+            (20.0, ClassicalPlanet::Mercury),
+            (25.0, ClassicalPlanet::Mars),
+            (30.0, ClassicalPlanet::Saturn),
+        ],
+        1 => &[ // Taurus
+            (8.0, ClassicalPlanet::Venus),
+            (14.0, ClassicalPlanet::Mercury),
+            (22.0, ClassicalPlanet::Jupiter),
+            (27.0, ClassicalPlanet::Saturn),
+            (30.0, ClassicalPlanet::Mars),
+        ],
+        2 => &[ // Gemini
+            (6.0, ClassicalPlanet::Mercury),
+            (12.0, ClassicalPlanet::Jupiter),
+            (17.0, ClassicalPlanet::Venus),
+            (24.0, ClassicalPlanet::Mars),
+            (30.0, ClassicalPlanet::Saturn),
+        ],
+        3 => &[ // Cancer
+            (7.0, ClassicalPlanet::Mars),
+            (13.0, ClassicalPlanet::Venus),
+            (19.0, ClassicalPlanet::Mercury),
+            (26.0, ClassicalPlanet::Jupiter),
+            (30.0, ClassicalPlanet::Saturn),
+        ],
+        4 => &[ // Leo
+            (6.0, ClassicalPlanet::Jupiter),
+            (11.0, ClassicalPlanet::Venus),
+            (18.0, ClassicalPlanet::Saturn),
+            (24.0, ClassicalPlanet::Mercury),
+            (30.0, ClassicalPlanet::Mars),
+        ],
+        5 => &[ // Virgo
+            (7.0, ClassicalPlanet::Mercury),
+            (17.0, ClassicalPlanet::Venus),
+            (21.0, ClassicalPlanet::Jupiter),
+            (28.0, ClassicalPlanet::Mars),
+            (30.0, ClassicalPlanet::Saturn),
+        ],
+        6 => &[ // Libra (Ptolemy / Lilly CA p. 104: Sat 6, Ven 14, Jup 21, Mer 28, Mars 30)
             (6.0, ClassicalPlanet::Saturn),
             (14.0, ClassicalPlanet::Venus),
             (21.0, ClassicalPlanet::Jupiter),
@@ -255,7 +354,7 @@ pub fn evaluate_essential_dignities(
     let exaltation = EXALTATIONS.iter().find(|(s, _, _)| *s == sign_index).map(|(_, p, _)| *p);
     let (day_trip, night_trip) = triplicity_rulers(sign_index);
     let triplicity = if is_day_chart { day_trip } else { night_trip };
-    let term = egyptian_term(sign_index, degree_in_sign);
+    let term = ptolemaic_term(sign_index, degree_in_sign);
     let face = chaldean_face(sign_index, degree_in_sign);
 
     EssentialDignities {
@@ -315,8 +414,10 @@ pub fn calculate_planet_dignity(
     let is_in_detriment = DOMICILE_RULERS[opp_sign as usize] == planet;
     let is_in_fall = EXALTATIONS.iter().find(|(s, _, _)| *s == opp_sign).map(|(_, p, _)| *p) == Some(planet);
 
+    // In classical astrology (Lilly CA p. 112), a planet is Peregrine when it has NO essential dignity
+    // (no domicile, exaltation, triplicity, term, nor face), even if it is in detriment or fall.
     let has_any_dignity = is_in_domicile || is_in_exaltation || is_in_triplicity || is_in_term || is_in_face;
-    let is_peregrine = !has_any_dignity && !is_in_detriment && !is_in_fall;
+    let is_peregrine = !has_any_dignity;
 
     let mut essential_score = 0;
     if is_in_domicile { essential_score += 5; }
@@ -438,5 +539,63 @@ pub fn calculate_planet_dignity(
         accidental_score,
         total_lilly_score,
         accidental_factors: factors,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_egyptian_vs_ptolemaic_terms() {
+        // Taurus (sign_index 1):
+        // 14.5° Taurus:
+        // Egyptian: Jupiter (14-22°)
+        assert_eq!(egyptian_term(1, 14.5), ClassicalPlanet::Jupiter);
+        // Ptolemaic: Jupiter (14-22°)
+        assert_eq!(ptolemaic_term(1, 14.5), ClassicalPlanet::Jupiter);
+
+        // 26.5° Taurus:
+        // Egyptian: Saturn (22-27°)
+        assert_eq!(egyptian_term(1, 26.5), ClassicalPlanet::Saturn);
+        // Ptolemaic: Saturn (22-27°)
+        assert_eq!(ptolemaic_term(1, 26.5), ClassicalPlanet::Saturn);
+
+        // Libra (sign_index 6):
+        // 10.0° Libra:
+        // Egyptian: Mercury (6-14°)
+        assert_eq!(egyptian_term(6, 10.0), ClassicalPlanet::Mercury);
+        // Ptolemaic / Lilly CA p. 104: Venus (6-14°)
+        assert_eq!(ptolemaic_term(6, 10.0), ClassicalPlanet::Venus);
+
+        // 18.0° Libra:
+        // Egyptian: Venus (14-21°)
+        assert_eq!(egyptian_term(6, 18.0), ClassicalPlanet::Venus);
+        // Ptolemaic / Lilly CA p. 104: Jupiter (14-21°)
+        assert_eq!(ptolemaic_term(6, 18.0), ClassicalPlanet::Jupiter);
+    }
+
+    #[test]
+    fn test_peregrine_in_detriment_and_fall() {
+        // Mars in Taurus 2° (32.0°):
+        // Domicile: Venus, Exaltation: Moon (3°), Triplicity: Venus/Moon, Term: Venus (0-8°), Face: Mercury (0-10°)
+        // Mars has no dignity in Taurus 2°.
+        // Taurus is detriment for Mars (opposite Scorpio).
+        // Under classical astrology rules, Mars is BOTH in detriment (-5) AND peregrine (-5).
+        let report = calculate_planet_dignity(
+            ClassicalPlanet::Mars,
+            32.0, // 2° Taurus
+            0.5,
+            7, // 7th house
+            90.0,
+            true, // day chart
+            120.0,
+            300.0,
+        );
+
+        assert!(report.is_in_detriment);
+        assert!(report.is_peregrine, "Planet in detriment with no dignities must be marked peregrine");
+        // Essential score: Detriment (-5) + Peregrine (-5) = -10
+        assert_eq!(report.essential_score, -10);
     }
 }

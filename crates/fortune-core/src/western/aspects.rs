@@ -89,8 +89,9 @@ pub fn calculate_traditional_aspects(
                         (name2, name1, lon2, lon1, speed2, speed1)
                     };
 
-                    // Compute future angle distance in small time step (0.001 day ~ 86.4s) to evaluate instantaneous approach
-                    let dt = 0.001;
+                    // Compute instantaneous approach rate with infinitesimal step (dt = 1e-6 day ~ 0.0864s)
+                    // to prevent finite difference overshooting at tiny orbs
+                    let dt = 1e-6;
                     let future_f_lon = (f_lon + f_speed * dt).rem_euclid(360.0);
                     let future_s_lon = (s_lon + s_speed * dt).rem_euclid(360.0);
                     let future_diff = (future_f_lon - future_s_lon).abs().rem_euclid(360.0);
@@ -98,11 +99,17 @@ pub fn calculate_traditional_aspects(
                     let future_orb = (future_shortest - target_angle).abs();
 
                     let approach_rate = (orb - future_orb) / dt; // deg/day
-                    let is_applying = approach_rate > 1e-6;
-                    let is_partile = orb <= 1.0;
+                    let is_applying = approach_rate > 1e-5;
+
+                    // In traditional astrology (Lilly CA p. 106), an aspect is partile when
+                    // the planets are in the same integer degree of their respective signs (e.g. 10° Aries and 10° Leo),
+                    // or within 1.0 degree orb.
+                    let deg1_int = (lon1.rem_euclid(30.0)).floor() as u32;
+                    let deg2_int = (lon2.rem_euclid(30.0)).floor() as u32;
+                    let is_partile = deg1_int == deg2_int || orb <= 1.0;
 
                     // Degrees to perfection: distance the applying (faster) planet travels until perfection
-                    let degrees_to_perfection = if is_applying && approach_rate > 1e-6 {
+                    let degrees_to_perfection = if is_applying && approach_rate > 1e-5 {
                         let time_to_perfection = orb / approach_rate; // days
                         f_speed.abs() * time_to_perfection
                     } else {
@@ -177,6 +184,36 @@ mod tests {
         assert_eq!(aspects_sep.len(), 1);
         assert!(!aspects_sep[0].is_applying, "Moon must be separating from Sun");
         assert_eq!(aspects_sep[0].degrees_to_perfection, 0.0);
+    }
+
+    #[test]
+    fn test_tiny_orb_applying_no_overshoot() {
+        // Moon at 9.9999° Aries applying to Sun at 10.0000° Aries (orb 0.0001°)
+        // In the old implementation with dt = 0.001 day, 0.001 day moved Moon by 0.012°, overshooting by 0.0119° and misclassifying as separating.
+        let planets = [
+            ("Moon", 9.9999, 13.0),
+            ("Sun", 10.0000, 1.0),
+        ];
+        let aspects = calculate_traditional_aspects(&planets);
+        assert_eq!(aspects.len(), 1);
+        let asp = &aspects[0];
+        assert!(asp.is_applying, "Moon must be correctly classified as applying even with infinitesimal orb");
+        assert!(asp.is_partile);
+    }
+
+    #[test]
+    fn test_partile_integer_degree_aspect() {
+        // Mars at 15.8° Aries and Jupiter at 15.1° Leo (orb 0.7°):
+        // Both are in the 15th degree (integer degree 15), thus partile
+        let planets = [
+            ("Mars", 15.8, 0.6),
+            ("Jupiter", 135.1, 0.1),
+        ];
+        let aspects = calculate_traditional_aspects(&planets);
+        assert_eq!(aspects.len(), 1);
+        let asp = &aspects[0];
+        assert_eq!(asp.aspect_type, "Trine");
+        assert!(asp.is_partile, "Same integer degree in sign must be partile");
     }
 }
 

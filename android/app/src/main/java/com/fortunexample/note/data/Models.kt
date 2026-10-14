@@ -373,7 +373,8 @@ data class HellenisticPlanetConditionData(
     val is_in_exaltation: Boolean,
     val is_in_fall: Boolean,
     val is_ruler_of_asc: Boolean,
-    val condition_label: String
+    val condition_label: String,
+    val bound_ruler: String = ""
 )
 
 @Serializable

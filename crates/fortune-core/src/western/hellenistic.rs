@@ -27,6 +27,8 @@ pub struct HellenisticPlanetCondition {
     pub is_in_fall: bool,
     pub is_ruler_of_asc: bool,
     pub condition_label: String, // "Domicile", "Exaltation", "Fall", or "Peregrine"
+    #[serde(default)]
+    pub bound_ruler: String,
 }
 
 /// Independent angle points in Hellenistic Whole Sign framework.
@@ -124,6 +126,8 @@ pub fn calculate_hellenistic_data(
                 "Peregrine".to_string()
             };
 
+            let bound_ruler = super::dignity::egyptian_term(sign_index, sign_degree).name().to_string();
+
             planet_conditions.push(HellenisticPlanetCondition {
                 name: name.to_string(),
                 longitude: lon,
@@ -135,6 +139,7 @@ pub fn calculate_hellenistic_data(
                 is_in_fall,
                 is_ruler_of_asc,
                 condition_label,
+                bound_ruler,
             });
         }
     }

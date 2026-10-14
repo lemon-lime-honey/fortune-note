@@ -73,15 +73,14 @@ pub fn calculate_prenatal_syzygy_with_coords(
             // Converged
             let (y, m, d_frac) = jd_to_calendar(cur_jd);
             let day = d_frac.floor() as u32;
-            let day_rem = (d_frac - day as f64) * 24.0;
-            let hour = day_rem.floor() as u32;
-            let hour_rem = (day_rem - hour as f64) * 60.0;
-            let minute = hour_rem.floor() as u32;
-            let second = ((hour_rem - minute as f64) * 60.0).round() as u32;
+            let total_sec = ((d_frac - day as f64) * 86400.0).round() as u32;
+            let hour = (total_sec / 3600) % 24;
+            let minute = (total_sec % 3600) / 60;
+            let second = total_sec % 60;
 
             let exact_datetime_utc = format!(
                 "{:04}-{:02}-{:02} {:02}:{:02}:{:02} UTC",
-                y, m, day, hour, minute, second.min(59)
+                y, m, day, hour, minute, second
             );
 
             // In traditional astrology, the SAN degree is taken from the Moon's longitude
@@ -120,4 +119,21 @@ pub fn calculate_prenatal_syzygy(birth_jd: f64) -> Result<PrenatalSyzygy, String
     let birth_moon_lon = normalize_degrees(moon_pos.ecliptic.longitude.to_degrees());
 
     calculate_prenatal_syzygy_with_coords(birth_jd, birth_sun_lon, birth_moon_lon)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use vedaksha::ephem::julian::calendar_to_jd;
+
+    #[test]
+    fn test_prenatal_syzygy_calculation() {
+        // May 15, 1990, 12:00 UTC
+        let birth_jd = calendar_to_jd(1990, 5, 15.5);
+        let syzygy = calculate_prenatal_syzygy(birth_jd).expect("Syzygy calculation should succeed");
+
+        assert!(syzygy.syzygy_type == "New Moon" || syzygy.syzygy_type == "Full Moon");
+        assert!(syzygy.exact_jd_ut1 < birth_jd, "Prenatal syzygy must occur before birth");
+        assert!(syzygy.exact_datetime_utc.ends_with("UTC"));
+    }
 }
