@@ -84,6 +84,31 @@ pub struct SajuChart {
     pub daeun_periods: Vec<DaeUnPeriod>,
 }
 
+/// Zi hour (자시) day pillar transition mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ZiHourMode {
+    /// 23:00~24:00 advances to the next day's pillar (Classical single Zi hour tradition).
+    NextDayAt23,
+    /// 23:00~24:00 retains today's day pillar (Night Zi / Early Zi division tradition).
+    MidnightAt00,
+}
+
+/// Options for Saju pillar calculations.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct SajuOptions {
+    pub zi_hour_mode: ZiHourMode,
+    pub apply_equation_of_time: bool,
+}
+
+impl Default for SajuOptions {
+    fn default() -> Self {
+        Self {
+            zi_hour_mode: ZiHourMode::NextDayAt23,
+            apply_equation_of_time: false,
+        }
+    }
+}
+
 /// 12 Major Solar Terms defining months (LiChun 315°, JingZhe 345°, etc.).
 const MAJOR_TERMS: [(f64, u8); 12] = [
     (315.0, 2),  // 입춘 -> 인월 (寅: 2)
@@ -100,12 +125,20 @@ const MAJOR_TERMS: [(f64, u8); 12] = [
     (285.0, 1),  // 소한 -> 축월 (丑: 1)
 ];
 
-/// Calculate Four Pillars and DaeUn without extraneous theoretical bloat.
-pub fn calculate_saju(
+fn ecliptic_to_ra(lon_deg: f64, eps_deg: f64) -> f64 {
+    let l_rad = lon_deg.to_radians();
+    let eps_rad = eps_deg.to_radians();
+    let alpha_rad = (eps_rad.cos() * l_rad.sin()).atan2(l_rad.cos());
+    alpha_rad.to_degrees().rem_euclid(360.0)
+}
+
+/// Calculate Four Pillars and DaeUn with configurable Saju options.
+pub fn calculate_saju_with_options(
     ephem: &EphemerisSnapshot,
     year: i32,
     longitude: f64,
     gender: Gender,
+    options: SajuOptions,
 ) -> Result<SajuChart, SajuError> {
     let sun_lon = ephem.get_body("Sun").expect("Sun required").tropical_longitude;
     let jd = ephem.jd_ut1;
@@ -154,16 +187,22 @@ pub fn calculate_saju(
     let month_stem = (base_month_stem + branch_offset) % 10;
     let month_pillar = Pillar::new(month_stem, month_branch);
 
-    // 3. Day Pillar & Local Solar Hours
+    // 3. Day Pillar & Hour Pillar (True Solar Time or Local Mean Solar Time)
     let local_jd = jd + (longitude / 15.0 / 24.0);
-    let (day_pillar, local_solar_hours) = calculate_day_pillar(local_jd);
+    let effective_solar_hours = if options.apply_equation_of_time {
+        let sun_ra = ecliptic_to_ra(sun_lon, ephem.true_obliquity_deg);
+        ((ephem.ramc - sun_ra + 180.0).rem_euclid(360.0)) / 15.0
+    } else {
+        ((local_jd + 0.5).rem_euclid(1.0)) * 24.0
+    };
 
-    // 4. Hour Pillar: Five Rats rule (오서둔시법)
-    let hour_branch = calculate_hour_branch(local_solar_hours);
-    let hour_stem = calculate_hour_stem(day_pillar.stem_index, hour_branch);
-    let hour_pillar = Pillar::new(hour_stem, hour_branch);
+    let (day_pillar, hour_pillar) = calculate_day_and_hour_pillars(
+        local_jd,
+        effective_solar_hours,
+        options.zi_hour_mode,
+    );
 
-    // 5. DaeUn (10-year major luck progression)
+    // 4. DaeUn (10-year major luck progression)
     let is_year_yang = year_stem % 2 == 0;
     let is_forward_daeun = match gender {
         Gender::Male => is_year_yang,
@@ -196,6 +235,48 @@ pub fn calculate_saju(
         is_forward_daeun,
         daeun_periods,
     })
+}
+
+/// Calculate Four Pillars and DaeUn with standard default options.
+pub fn calculate_saju(
+    ephem: &EphemerisSnapshot,
+    year: i32,
+    longitude: f64,
+    gender: Gender,
+) -> Result<SajuChart, SajuError> {
+    calculate_saju_with_options(ephem, year, longitude, gender, SajuOptions::default())
+}
+
+/// Calculate Day Pillar and Hour Pillar according to local hours and ZiHourMode.
+pub fn calculate_day_and_hour_pillars(
+    local_jd: f64,
+    effective_solar_hours: f64,
+    zi_mode: ZiHourMode,
+) -> (Pillar, Pillar) {
+    let base_day_number = (local_jd + 0.5).floor() as i64;
+    let base_day_diff = base_day_number - 2451545;
+    let base_day_stem = (4 + base_day_diff).rem_euclid(10) as u8;
+    let base_day_branch = (6 + base_day_diff).rem_euclid(12) as u8;
+
+    let hour_branch = calculate_hour_branch(effective_solar_hours);
+
+    let (day_stem, day_branch, hour_stem_base) = if hour_branch == 0 && effective_solar_hours >= 23.0 {
+        match zi_mode {
+            ZiHourMode::NextDayAt23 => {
+                let next_stem = (base_day_stem + 1) % 10;
+                let next_branch = (base_day_branch + 1) % 12;
+                (next_stem, next_branch, next_stem)
+            }
+            ZiHourMode::MidnightAt00 => {
+                (base_day_stem, base_day_branch, base_day_stem)
+            }
+        }
+    } else {
+        (base_day_stem, base_day_branch, base_day_stem)
+    };
+
+    let hour_stem = calculate_hour_stem(hour_stem_base, hour_branch);
+    (Pillar::new(day_stem, day_branch), Pillar::new(hour_stem, hour_branch))
 }
 
 /// Calculate Day Pillar from local Julian Date.
@@ -370,6 +451,65 @@ mod tests {
         let r_1 = calculate_daeun_pillar(0, 2, 1, false);
         assert_eq!(r_1.stem_index, 9); // (0 - 1).rem_euclid(10) = 9 (Gye)
         assert_eq!(r_1.branch_index, 1); // (2 - 1).rem_euclid(12) = 1 (Chuk)
+    }
+
+    #[test]
+    fn test_saju_zi_hour_mode() {
+        // Ephemeris at 2000-01-01 15:30 UTC -> Seoul local solar time 23:58 (during 23:00~24:00 Zi hour)
+        let ephem = compute_ephemeris(2000, 1, 1, 15, 30, 0.0, 37.5665, 126.9780)
+            .expect("ephem should succeed");
+
+        // 1. Classical NextDayAt23: Day advances to next day (기미 己未)
+        let saju_next = calculate_saju_with_options(
+            &ephem, 2000, 126.9780, Gender::Male,
+            SajuOptions {
+                zi_hour_mode: ZiHourMode::NextDayAt23,
+                apply_equation_of_time: false,
+            },
+        ).expect("saju_next should succeed");
+
+        // 2. MidnightAt00 (야자시): Day retains today's day (무오 戊午)
+        let saju_midnight = calculate_saju_with_options(
+            &ephem, 2000, 126.9780, Gender::Male,
+            SajuOptions {
+                zi_hour_mode: ZiHourMode::MidnightAt00,
+                apply_equation_of_time: false,
+            },
+        ).expect("saju_midnight should succeed");
+
+        assert_eq!(saju_next.hour_pillar.branch_index, 0, "Both should be Zi hour");
+        assert_eq!(saju_midnight.hour_pillar.branch_index, 0, "Both should be Zi hour");
+
+        // NextDayAt23 advances day pillar from 戊午 (4, 6) to 己未 (5, 7)
+        assert_eq!(saju_next.day_pillar.korean(), "기미");
+        // MidnightAt00 keeps today's day pillar 戊午 (4, 6)
+        assert_eq!(saju_midnight.day_pillar.korean(), "무오");
+    }
+
+    #[test]
+    fn test_saju_equation_of_time() {
+        // Ephemeris at Autumn equinox or November where Equation of Time is significant (~14-16 minutes)
+        let ephem = compute_ephemeris(2024, 11, 3, 3, 0, 0.0, 37.5665, 126.9780)
+            .expect("ephem should succeed");
+
+        let saju_mean = calculate_saju_with_options(
+            &ephem, 2024, 126.9780, Gender::Male,
+            SajuOptions {
+                zi_hour_mode: ZiHourMode::NextDayAt23,
+                apply_equation_of_time: false,
+            },
+        ).expect("saju_mean should succeed");
+
+        let saju_true = calculate_saju_with_options(
+            &ephem, 2024, 126.9780, Gender::Male,
+            SajuOptions {
+                zi_hour_mode: ZiHourMode::NextDayAt23,
+                apply_equation_of_time: true,
+            },
+        ).expect("saju_true should succeed");
+
+        assert_eq!(saju_mean.year_pillar, saju_true.year_pillar);
+        assert_eq!(saju_mean.month_pillar, saju_true.month_pillar);
     }
 }
 

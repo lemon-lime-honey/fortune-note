@@ -39,10 +39,21 @@ pub struct TimezoneResolution {
     pub utc_offset_hours: f64,
 }
 
+use std::sync::OnceLock;
+
+static FINDER: OnceLock<Result<utz::Finder, String>> = OnceLock::new();
+
+fn get_finder() -> Result<&'static utz::Finder, TimezoneError> {
+    let res = FINDER.get_or_init(|| utz::Finder::new().map_err(|e| format!("{:?}", e)));
+    match res {
+        Ok(f) => Ok(f),
+        Err(e) => Err(TimezoneError::FinderInitFailed(e.clone())),
+    }
+}
+
 /// Look up the IANA timezone ID for the given latitude and longitude.
 pub fn lookup_timezone_id(latitude: f64, longitude: f64) -> Result<String, TimezoneError> {
-    let finder = utz::Finder::new()
-        .map_err(|e| TimezoneError::FinderInitFailed(format!("{:?}", e)))?;
+    let finder = get_finder()?;
 
     let pos = utz::Position {
         lat: latitude,
@@ -63,7 +74,7 @@ pub fn lookup_timezone_id(latitude: f64, longitude: f64) -> Result<String, Timez
 fn normalize_timezone(tz_id: &str, latitude: f64, longitude: f64) -> String {
     if tz_id == "Asia/Tokyo"
         && (33.0..=38.7).contains(&latitude)
-        && (124.5..=131.5).contains(&longitude)
+        && (124.5..=132.0).contains(&longitude)
     {
         return "Asia/Seoul".to_string();
     }
@@ -148,6 +159,10 @@ mod tests {
     fn test_lookup_seoul_timezone() {
         let tz = lookup_timezone_id(37.5665, 126.9780).expect("Seoul lookup should succeed");
         assert_eq!(tz, "Asia/Seoul");
+
+        // Dokdo (37.2429, 131.8670) should correctly resolve to Asia/Seoul
+        let tz_dokdo = lookup_timezone_id(37.2429, 131.8670).expect("Dokdo lookup should succeed");
+        assert_eq!(tz_dokdo, "Asia/Seoul");
     }
 
     #[test]
