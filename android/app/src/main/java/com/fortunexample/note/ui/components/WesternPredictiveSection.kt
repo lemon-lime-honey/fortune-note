@@ -23,12 +23,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fortunexample.note.data.PredictiveSuiteData
 import com.fortunexample.note.data.ProfileDto
+import com.fortunexample.note.data.findHouseNumber
+import com.fortunexample.note.data.getZodiacSignName
 import com.fortunexample.note.ui.theme.*
-
-private val ZODIAC_NAMES = listOf(
-    "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
-    "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"
-)
 
 private fun formatWesternBodyName(rawName: String): String {
     return rawName
@@ -38,27 +35,12 @@ private fun formatWesternBodyName(rawName: String): String {
 
 private fun getZodiacSign(lon: Double): String {
     val idx = ((lon % 360.0 + 360.0) % 360.0 / 30.0).toInt() % 12
-    return ZODIAC_NAMES.getOrElse(idx) { "" }
+    return getZodiacSignName(idx)
 }
 
 private fun getSignDegree(lon: Double): Double {
     val normalized = (lon % 360.0 + 360.0) % 360.0
     return normalized % 30.0
-}
-
-private fun findHouseNumber(lon: Double, cusps: List<Double>): Int {
-    if (cusps.size < 12) return 1
-    val normalizedLon = (lon % 360.0 + 360.0) % 360.0
-    for (i in 0 until 12) {
-        val start = (cusps[i] % 360.0 + 360.0) % 360.0
-        val end = (cusps[(i + 1) % 12] % 360.0 + 360.0) % 360.0
-        if (start < end) {
-            if (normalizedLon >= start && normalizedLon < end) return i + 1
-        } else {
-            if (normalizedLon >= start || normalizedLon < end) return i + 1
-        }
-    }
-    return 1
 }
 
 @Composable
@@ -428,23 +410,41 @@ private fun SecondaryProgressionCard(data: PredictiveSuiteData) {
 @Composable
 private fun PlanetaryReturnsCard(data: PredictiveSuiteData) {
     val sr = data.solar_return
-    var selectedPlanetIdx by remember { mutableStateOf(0) }
+    var selectedPlanetIdx by remember { mutableIntStateOf(0) }
+    var selectedOccurrenceIdx by remember(selectedPlanetIdx, data.target_year) { mutableIntStateOf(0) }
     val planetOptions = listOf("Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn")
 
-    if (sr == null) {
+    if (sr == null && data.planetary_returns.isEmpty()) {
         Text("Planetary return data unavailable.", color = TextSecondary, fontSize = 12.sp)
         return
     }
 
-    val ascSign = getZodiacSign(sr.ascendant)
-    val ascDeg = getSignDegree(sr.ascendant)
-    val mcSign = getZodiacSign(sr.midheaven)
-    val mcDeg = getSignDegree(sr.midheaven)
+    val selectedPlanetName = planetOptions[selectedPlanetIdx]
+    val matchingReturns = if (selectedPlanetIdx == 0) {
+        emptyList()
+    } else {
+        data.planetary_returns.filter { it.return_body.equals(selectedPlanetName, ignoreCase = true) }
+    }
 
-    val classicalPlanets = sr.planets.filter { 
+    val safeOccIdx = if (matchingReturns.isEmpty()) 0 else selectedOccurrenceIdx.coerceIn(0, matchingReturns.lastIndex)
+    val activePlanetaryReturn = matchingReturns.getOrNull(safeOccIdx)
+
+    val activeDateUtc = if (selectedPlanetIdx == 0) sr?.return_date_utc else activePlanetaryReturn?.return_date_utc
+    val activeAsc = if (selectedPlanetIdx == 0) sr?.ascendant else activePlanetaryReturn?.ascendant
+    val activeMc = if (selectedPlanetIdx == 0) sr?.midheaven else activePlanetaryReturn?.midheaven
+    val activeCusps = if (selectedPlanetIdx == 0) sr?.house_cusps.orEmpty() else activePlanetaryReturn?.house_cusps.orEmpty()
+    val activePlanets = if (selectedPlanetIdx == 0) sr?.planets.orEmpty() else activePlanetaryReturn?.return_planets.orEmpty()
+    val activeNatalAspects = if (selectedPlanetIdx == 0) sr?.natal_aspects.orEmpty() else activePlanetaryReturn?.natal_aspects.orEmpty()
+
+    val ascSign = activeAsc?.let { getZodiacSign(it) } ?: ""
+    val ascDeg = activeAsc?.let { getSignDegree(it) } ?: 0.0
+    val mcSign = activeMc?.let { getZodiacSign(it) } ?: ""
+    val mcDeg = activeMc?.let { getSignDegree(it) } ?: 0.0
+
+    val classicalPlanets = activePlanets.filter { 
         it.name != "Rahu" && it.name != "Ketu" && it.name != "North Node" && it.name != "South Node" 
     }
-    val lunarNodes = sr.planets.filter { 
+    val lunarNodes = activePlanets.filter { 
         it.name == "Rahu" || it.name == "Ketu" || it.name == "North Node" || it.name == "South Node" 
     }
 
@@ -458,34 +458,46 @@ private fun PlanetaryReturnsCard(data: PredictiveSuiteData) {
             Text("Planetary Returns", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = TextPrimary)
             SectionCopyButton(title = "Planetary Returns") {
                 val sb = StringBuilder()
-                sb.appendLine("[Planetary Returns (${planetOptions[selectedPlanetIdx]}) - ${sr.return_year}년]")
-                sb.appendLine("• Return Moment: ${sr.return_date_utc}")
-                sb.appendLine("• ASC: ${String.format("%.2f°", ascDeg)} $ascSign (Abs: ${String.format("%.2f°", sr.ascendant)})")
-                sb.appendLine("• MC: ${String.format("%.2f°", mcDeg)} $mcSign (Abs: ${String.format("%.2f°", sr.midheaven)})")
-                if (sr.house_cusps.isNotEmpty()) {
-                    sb.appendLine("• House Cusps:")
-                    sr.house_cusps.forEachIndexed { idx, c ->
-                        val s = getZodiacSign(c)
-                        val d = getSignDegree(c)
-                        sb.appendLine("  - H${idx + 1}: ${String.format("%.2f°", d)} $s")
+                sb.appendLine("[Planetary Returns ($selectedPlanetName) - ${data.target_year}년]")
+                if (activeDateUtc == null || activeAsc == null || activeMc == null) {
+                    sb.appendLine("• No $selectedPlanetName Return occurs in ${data.target_year}.")
+                } else {
+                    sb.appendLine("• Return Moment: $activeDateUtc")
+                    sb.appendLine("• ASC: ${String.format("%.2f°", ascDeg)} $ascSign (Abs: ${String.format("%.2f°", activeAsc)})")
+                    sb.appendLine("• MC: ${String.format("%.2f°", mcDeg)} $mcSign (Abs: ${String.format("%.2f°", activeMc)})")
+                    if (activeCusps.isNotEmpty()) {
+                        sb.appendLine("• House Cusps:")
+                        activeCusps.forEachIndexed { idx, c ->
+                            val s = getZodiacSign(c)
+                            val d = getSignDegree(c)
+                            sb.appendLine("  - H${idx + 1}: ${String.format("%.2f°", d)} $s")
+                        }
                     }
-                }
-                if (classicalPlanets.isNotEmpty()) {
-                    sb.appendLine("• Return Planetary Placements:")
-                    classicalPlanets.forEach { p ->
-                        val rx = if (p.is_retrograde) " [Rx]" else ""
-                        val s = getZodiacSign(p.progressed_longitude)
-                        val h = if (sr.house_cusps.isNotEmpty()) "House ${findHouseNumber(p.progressed_longitude, sr.house_cusps)}" else ""
-                        sb.appendLine("  - ${p.name}$rx: ${String.format("%.2f°", p.sign_degree)} $s · $h")
+                    if (classicalPlanets.isNotEmpty()) {
+                        sb.appendLine("• Return Planetary Placements:")
+                        classicalPlanets.forEach { p ->
+                            val rx = if (p.is_retrograde) " [Rx]" else ""
+                            val s = getZodiacSign(p.progressed_longitude)
+                            val h = if (activeCusps.isNotEmpty()) "House ${findHouseNumber(p.progressed_longitude, activeCusps)}" else ""
+                            sb.appendLine("  - ${p.name}$rx: ${String.format("%.2f°", p.sign_degree)} $s · $h")
+                        }
                     }
-                }
-                if (lunarNodes.isNotEmpty()) {
-                    sb.appendLine("• Return Lunar Nodes:")
-                    lunarNodes.forEach { n ->
-                        val displayName = formatWesternBodyName(n.name)
-                        val s = getZodiacSign(n.progressed_longitude)
-                        val h = if (sr.house_cusps.isNotEmpty()) "House ${findHouseNumber(n.progressed_longitude, sr.house_cusps)}" else ""
-                        sb.appendLine("  - $displayName: ${String.format("%.2f°", n.sign_degree)} $s · $h")
+                    if (lunarNodes.isNotEmpty()) {
+                        sb.appendLine("• Return Lunar Nodes:")
+                        lunarNodes.forEach { n ->
+                            val displayName = formatWesternBodyName(n.name)
+                            val s = getZodiacSign(n.progressed_longitude)
+                            val h = if (activeCusps.isNotEmpty()) "House ${findHouseNumber(n.progressed_longitude, activeCusps)}" else ""
+                            sb.appendLine("  - $displayName: ${String.format("%.2f°", n.sign_degree)} $s · $h")
+                        }
+                    }
+                    if (activeNatalAspects.isNotEmpty()) {
+                        sb.appendLine("• Return to Natal Contacts (Orb <= 2°):")
+                        activeNatalAspects.forEach { asp ->
+                            val retName = formatWesternBodyName(asp.return_point)
+                            val natName = formatWesternBodyName(asp.natal_point)
+                            sb.appendLine("  - Ret $retName · Nat $natName : ${asp.aspect_type} (Orb ${String.format("%.2f°", asp.orb)})")
+                        }
                     }
                 }
                 sb.toString().trimEnd()
@@ -528,7 +540,47 @@ private fun PlanetaryReturnsCard(data: PredictiveSuiteData) {
             }
         }
 
-        if (selectedPlanetIdx != 0) {
+        // 한 해에 여러 번 회귀하는 경우(예: 달 회귀 12~13회) 회차 선택 칩 표시
+        if (selectedPlanetIdx != 0 && matchingReturns.size > 1) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                matchingReturns.forEachIndexed { occIdx, retItem ->
+                    val shortDate = retItem.return_date_utc.take(10)
+                    FilterChip(
+                        selected = safeOccIdx == occIdx,
+                        onClick = { selectedOccurrenceIdx = occIdx },
+                        label = {
+                            Text(
+                                text = "#${occIdx + 1} ($shortDate)",
+                                fontSize = 11.sp,
+                                fontWeight = if (safeOccIdx == occIdx) FontWeight.Bold else FontWeight.Normal
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = AccentPrimary,
+                            selectedLabelColor = BackgroundWhite,
+                            containerColor = SurfaceLight,
+                            labelColor = TextSecondary
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = safeOccIdx == occIdx,
+                            borderColor = BorderColor,
+                            selectedBorderColor = AccentPrimary
+                        )
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        if (activeDateUtc == null || activeAsc == null || activeMc == null) {
             Surface(
                 color = SurfaceLight,
                 shape = RoundedCornerShape(6.dp),
@@ -536,19 +588,18 @@ private fun PlanetaryReturnsCard(data: PredictiveSuiteData) {
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
             ) {
                 Text(
-                    text = "${planetOptions[selectedPlanetIdx]} Return is currently in development. Solar Return chart is displayed.",
+                    text = "No exact $selectedPlanetName Return occurs during ${data.target_year}.",
                     color = TextSecondary,
-                    fontSize = 11.sp,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
                 )
             }
+            return@Column
         }
-
-        Spacer(modifier = Modifier.height(6.dp))
 
         // 중복 Return Year 라벨 제거하고 정확한 회귀 시각만 표시
         Text(
-            text = "Exact Return Moment: ${sr.return_date_utc}",
+            text = "Exact Return Moment: $activeDateUtc",
             color = TextSecondary,
             fontSize = 12.sp
         )
@@ -575,12 +626,12 @@ private fun PlanetaryReturnsCard(data: PredictiveSuiteData) {
         }
 
         // Return House Cusps (1~12)
-        if (sr.house_cusps.isNotEmpty()) {
+        if (activeCusps.isNotEmpty()) {
             Spacer(modifier = Modifier.height(10.dp))
             Text("Return House Cusps", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = TextPrimary)
             Spacer(modifier = Modifier.height(4.dp))
             Column(modifier = Modifier.fillMaxWidth()) {
-                val chunks = sr.house_cusps.chunked(2)
+                val chunks = activeCusps.chunked(2)
                 chunks.forEachIndexed { rowIdx, pair ->
                     Row(
                         modifier = Modifier
@@ -612,7 +663,7 @@ private fun PlanetaryReturnsCard(data: PredictiveSuiteData) {
             classicalPlanets.forEach { p ->
                 val rx = if (p.is_retrograde) " [Rx]" else ""
                 val signName = getZodiacSign(p.progressed_longitude)
-                val houseNum = if (sr.house_cusps.isNotEmpty()) findHouseNumber(p.progressed_longitude, sr.house_cusps) else null
+                val houseNum = if (activeCusps.isNotEmpty()) findHouseNumber(p.progressed_longitude, activeCusps) else null
 
                 Row(
                     modifier = Modifier
@@ -640,7 +691,7 @@ private fun PlanetaryReturnsCard(data: PredictiveSuiteData) {
             lunarNodes.forEach { n ->
                 val displayName = formatWesternBodyName(n.name)
                 val signName = getZodiacSign(n.progressed_longitude)
-                val houseNum = if (sr.house_cusps.isNotEmpty()) findHouseNumber(n.progressed_longitude, sr.house_cusps) else null
+                val houseNum = if (activeCusps.isNotEmpty()) findHouseNumber(n.progressed_longitude, activeCusps) else null
 
                 Row(
                     modifier = Modifier

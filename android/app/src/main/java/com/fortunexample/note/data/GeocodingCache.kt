@@ -120,21 +120,6 @@ object GeocodingCache {
         }.sortedByDescending { it.timestamp }
     }
 
-    fun put(context: Context, query: String, displayName: String, latitude: Double, longitude: Double) {
-        val item = CachedLocation(
-            query = query.trim(),
-            displayName = displayName.trim(),
-            latitude = latitude,
-            longitude = longitude,
-            timestamp = System.currentTimeMillis()
-        )
-        synchronized(lock) {
-            val cache = ensureLoaded(context)
-            cache[item.displayName] = item
-            saveToFile(context, cache.values.toList())
-        }
-    }
-
     fun putAll(context: Context, items: List<CachedLocation>) {
         if (items.isEmpty()) return
         synchronized(lock) {

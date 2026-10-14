@@ -21,11 +21,6 @@ import androidx.compose.ui.unit.sp
 import com.fortunexample.note.data.*
 import com.fortunexample.note.ui.theme.*
 
-private val ZODIAC_NAMES = listOf(
-    "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
-    "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"
-)
-
 private val VEDIC_SIGNS = listOf(
     "Mesha (Aries)", "Vrishabha (Taurus)", "Mithuna (Gemini)", "Karka (Cancer)",
     "Simha (Leo)", "Kanya (Virgo)", "Tula (Libra)", "Vrishchika (Scorpio)",
@@ -170,10 +165,10 @@ fun SelectiveCopyBottomSheet(
                         CopyCheckboxItem(label = "Placements & House Cusps (Planets, Nodes, Angles)", checked = incWesternPlanets, onCheckedChange = { incWesternPlanets = it })
                         CopyCheckboxItem(label = "Major Aspects", checked = incWesternAspects, onCheckedChange = { incWesternAspects = it })
                         CopyCheckboxItem(label = "Essential Dignities & Lilly Scores", checked = incWesternDignities, onCheckedChange = { incWesternDignities = it })
-                        CopyCheckboxItem(label = "Moon Condition (Phase, Applying)", checked = incWesternMoon, onCheckedChange = { incWesternMoon = it })
+                        CopyCheckboxItem(label = "Moon Condition (Phase)", checked = incWesternMoon, onCheckedChange = { incWesternMoon = it })
                         CopyCheckboxItem(label = "Planetary Hours", checked = incWesternHours, onCheckedChange = { incWesternHours = it })
                         CopyCheckboxItem(label = "Traditional Dynamic Aspects (Applying/Separating, Moiety)", checked = incWesternDynamicAspects, onCheckedChange = { incWesternDynamicAspects = it })
-                        CopyCheckboxItem(label = "Mutual Receptions & Besiegement", checked = incWesternReceptions, onCheckedChange = { incWesternReceptions = it })
+                        CopyCheckboxItem(label = "Mutual Receptions", checked = incWesternReceptions, onCheckedChange = { incWesternReceptions = it })
                         CopyCheckboxItem(label = "Fixed Star Conjunctions (Orb ≤ 1.5°)", checked = incWesternStars, onCheckedChange = { incWesternStars = it })
                         CopyCheckboxItem(label = "Arabic Parts & House Cusp Almutens", checked = incWesternParts, onCheckedChange = { incWesternParts = it })
                     }
@@ -318,8 +313,8 @@ private fun generateSelectiveMarkdown(
         1 -> {
             western?.let { w ->
                 if (incWesternPlanets) {
-                    val ascSign = ZODIAC_NAMES.getOrElse((w.ascendant / 30.0).toInt() % 12) { "" }
-                    val mcSign = ZODIAC_NAMES.getOrElse((w.midheaven / 30.0).toInt() % 12) { "" }
+                    val ascSign = getZodiacSignName((w.ascendant / 30.0).toInt())
+                    val mcSign = getZodiacSignName((w.midheaven / 30.0).toInt())
                     val isWholeSign = w.house_system?.lowercase() in listOf("wholesign", "whole_sign", "whole")
                     val mcHouseNum = if (w.house_cusps.isNotEmpty()) findHouseNumber(w.midheaven, w.house_cusps) else 10
                     val mcHouseDesc = if (isWholeSign) " [Located in House ${String.format("%02d", mcHouseNum)}]" else ""
@@ -334,7 +329,7 @@ private fun generateSelectiveMarkdown(
                             w.house_cusps.forEachIndexed { idx, cusp ->
                                 val hNum = idx + 1
                                 val signIdx = ((cusp / 30.0).toInt() % 12 + 12) % 12
-                                val signName = ZODIAC_NAMES.getOrElse(signIdx) { "" }
+                                val signName = getZodiacSignName(signIdx)
                                 val ruler = getZodiacSignRuler(signIdx)
                                 val mcTag = if (hNum == mcHouseNum) " [MC Location]" else ""
                                 sb.append("  * House ${String.format("%02d", hNum)}$mcTag: $signName (Ruler: $ruler)\n")
@@ -344,7 +339,7 @@ private fun generateSelectiveMarkdown(
                             w.house_cusps.forEachIndexed { idx, cusp ->
                                 val hNum = idx + 1
                                 val signIdx = ((cusp / 30.0).toInt() % 12 + 12) % 12
-                                val signName = ZODIAC_NAMES.getOrElse(signIdx) { "" }
+                                val signName = getZodiacSignName(signIdx)
                                 val signDeg = cusp % 30.0
                                 val tag = when (hNum) {
                                     1 -> " (ASC)"
@@ -359,14 +354,14 @@ private fun generateSelectiveMarkdown(
                     }
                     sb.append("- Planetary Placements:\n")
                     w.planets.forEach { p ->
-                        val sign = ZODIAC_NAMES.getOrElse(p.sign_index % 12) { "" }
+                        val sign = getZodiacSignName(p.sign_index)
                         val rx = if (p.is_retrograde) " [Rx]" else ""
                         val speedStr = String.format("%+.2f°/day", p.speed)
                         sb.append("  * ${p.name}: ${String.format("%.2f°", p.longitude)} ($sign) - House ${p.house_number}$rx (Speed: $speedStr)\n")
                     }
                     sb.append("- Lunar Nodes:\n")
                     w.nodes.forEach { n ->
-                        val sign = ZODIAC_NAMES.getOrElse(n.sign_index % 12) { "" }
+                        val sign = getZodiacSignName(n.sign_index)
                         sb.append("  * ${n.name}: ${String.format("%.2f°", n.longitude)} ($sign) - House ${n.house_number}\n")
                     }
                 }
@@ -382,16 +377,14 @@ private fun generateSelectiveMarkdown(
                     }
                 }
 
-                w.traditional?.let { trad ->
+                if (w.traditional != null) {
+                    val trad = w.traditional
                     sb.append("\n## 3. William Lilly Traditional Analysis\n")
                     if (incWesternHours) {
                         sb.append("- Planetary Hours: Day of ${trad.planetary_hours.day_ruler}, Hour of ${trad.planetary_hours.hour_ruler} (Hour ${trad.planetary_hours.hour_number}, ${if (trad.planetary_hours.is_day_hour) "Day" else "Night"})\n")
                     }
                     if (incWesternMoon) {
                         sb.append("- Moon Condition: Phase [${trad.moon_condition.lunar_phase_name}]\n")
-                        trad.moon_condition.next_applying_aspect?.let { next ->
-                            sb.append("  * Next Applying Aspect: $next\n")
-                        }
                     }
                     if (incWesternDignities) {
                         sb.append("- Essential Dignities & Lilly Scores:\n")
@@ -411,12 +404,13 @@ private fun generateSelectiveMarkdown(
                         }
                     }
                     if (incWesternReceptions) {
-                        sb.append("- Mutual Receptions & Perfections:\n")
-                        trad.mutual_receptions.forEach { r ->
-                            sb.append("  * ${r.planet1} - ${r.planet2}: ${r.reception_type} (${r.description})\n")
-                        }
-                        trad.perfection_report.besiegement.forEach { b ->
-                            sb.append("  * Besiegement: $b\n")
+                        sb.append("- Mutual Receptions:\n")
+                        if (trad.mutual_receptions.isEmpty()) {
+                            sb.append("  * No mutual receptions\n")
+                        } else {
+                            trad.mutual_receptions.forEach { r ->
+                                sb.append("  * ${r.planet1} - ${r.planet2}: ${r.reception_type} (${r.description})\n")
+                            }
                         }
                     }
                     if (incWesternStars) {
@@ -433,8 +427,60 @@ private fun generateSelectiveMarkdown(
                     if (incWesternParts) {
                         sb.append("- Arabic Parts (Hermetic Lots):\n")
                         trad.arabic_parts.forEach { p ->
-                            val sName = ZODIAC_NAMES.getOrElse(p.sign_index % 12) { "" }
+                            val sName = getZodiacSignName(p.sign_index)
                             sb.append("  * ${p.name}: ${String.format("%.2f°", p.longitude)} ($sName) - House ${p.house_number}\n")
+                        }
+                        if (trad.house_almutens.isNotEmpty()) {
+                            sb.append("- House Cusp Almutens:\n")
+                            trad.house_almutens.forEach { ha ->
+                                sb.append("  * House ${ha.house_number}: ${ha.almuten} (${ha.almuten_score} pts)\n")
+                            }
+                        }
+                    }
+                } else if (w.hellenistic != null) {
+                    val h = w.hellenistic
+                    sb.append("\n## 3. Hellenistic Traditional Analysis (Whole Sign)\n")
+                    val ascSign = getZodiacSignName(h.angles.ascendant_sign)
+                    val mcSign = getZodiacSignName(h.angles.midheaven_sign)
+                    val mcHouseStr = if (h.angles.is_mc_in_10th) "House 10 (Culmination)" else "House ${h.angles.midheaven_house} (Action Point)"
+                    sb.append("- Hellenistic Angles:\n")
+                    sb.append("  * Ascendant (ASC): ${String.format("%.2f°", h.angles.ascendant_degree)} $ascSign\n")
+                    sb.append("  * Midheaven (MC): ${String.format("%.2f°", h.angles.midheaven_degree)} $mcSign · $mcHouseStr\n")
+                    if (incWesternDignities) {
+                        sb.append("- Qualitative Dignities (States):\n")
+                        h.planet_conditions.forEach { pc ->
+                            val lordTag = if (pc.is_ruler_of_asc) " [Lord of ASC]" else ""
+                            sb.append("  * ${pc.name}: ${pc.condition_label} · House ${pc.house_number}$lordTag\n")
+                        }
+                    }
+                    if (incWesternDynamicAspects) {
+                        sb.append("- Sign-Based Aspects & Contacts:\n")
+                        if (h.aspects.isEmpty()) {
+                            sb.append("  * No sign-based aspects within orb\n")
+                        } else {
+                            h.aspects.forEach { a ->
+                                val app = if (a.is_applying) "Applying (${String.format("%.1f°", a.degrees_to_perfection)})" else "Separating"
+                                val part = if (a.is_partile) " [Partile]" else ""
+                                sb.append("  * ${a.planet1} ${a.aspect_type} ${a.planet2}: $app (Orb: ${String.format("%.2f°", a.orb)})$part\n")
+                            }
+                        }
+                    }
+                    if (incWesternStars) {
+                        sb.append("- Fixed Stars Conjunctions (Orb <= 1.5°):\n")
+                        if (h.fixed_star_conjunctions.isEmpty()) {
+                            sb.append("  * No major fixed star conjunctions within orb\n")
+                        } else {
+                            h.fixed_star_conjunctions.forEach { s ->
+                                val visTag = if (s.is_visible) " [Visible]" else " [Below Horizon]"
+                                sb.append("  * ${s.star_name} ☌ ${s.body_name} (Orb: ${String.format("%.2f°", s.orb)}, Nature: ${s.nature})$visTag: ${s.meaning}\n")
+                            }
+                        }
+                    }
+                    if (incWesternParts && h.lots.isNotEmpty()) {
+                        sb.append("- Hermetic Lots (Paulus Alexandrinus):\n")
+                        h.lots.forEach { lot ->
+                            val sName = getZodiacSignName(lot.sign_index)
+                            sb.append("  * ${lot.name}: ${String.format("%.2f°", lot.sign_degree)} ($sName) - House ${lot.house_number} (Ruler: ${lot.ruler})\n")
                         }
                     }
                 }

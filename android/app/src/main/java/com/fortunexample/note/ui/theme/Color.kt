@@ -24,3 +24,4 @@ val AstrologicalGreen = Color(0xFF15803D)// 클래식 포레스트 그린
 val VedicGreen = AstrologicalGreen       // 클래식 포레스트 그린
 val SajuSlate = Color(0xFF334155)        // 정갈한 다크 슬레이트
 val SajuAmber = SajuSlate                // 주황색 제거
+val AccentWarning = AstrologicalRed      // 경고/오류 텍스트 컬러

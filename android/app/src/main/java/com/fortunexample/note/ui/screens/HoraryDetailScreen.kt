@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fortunexample.note.data.FortuneChartOutput
 import com.fortunexample.note.data.HoraryDto
+import com.fortunexample.note.data.findHouseNumber
 import com.fortunexample.note.data.getZodiacSignName
 import com.fortunexample.note.data.getZodiacSignRuler
 import com.fortunexample.note.ui.components.VedicChartDiamond
@@ -377,19 +378,4 @@ fun HoraryDetailScreen(
             }
         }
     }
-}
-
-private fun findHouseNumber(lon: Double, cusps: List<Double>): Int {
-    if (cusps.size < 12) return 1
-    val normalizedLon = (lon % 360.0 + 360.0) % 360.0
-    for (i in 0 until 12) {
-        val start = (cusps[i] % 360.0 + 360.0) % 360.0
-        val end = (cusps[(i + 1) % 12] % 360.0 + 360.0) % 360.0
-        if (start < end) {
-            if (normalizedLon >= start && normalizedLon < end) return i + 1
-        } else {
-            if (normalizedLon >= start || normalizedLon < end) return i + 1
-        }
-    }
-    return 1
 }

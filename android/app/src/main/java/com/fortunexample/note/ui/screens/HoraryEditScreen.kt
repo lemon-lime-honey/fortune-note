@@ -22,6 +22,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fortunexample.note.data.HoraryDto
+import com.fortunexample.note.data.ProfileDto
 import com.fortunexample.note.ui.components.LocationPicker
 import com.fortunexample.note.ui.theme.*
 import java.util.Calendar
@@ -30,8 +31,9 @@ import java.util.Calendar
 @Composable
 fun HoraryEditScreen(
     initialHorary: HoraryDto? = null,
+    profiles: List<ProfileDto> = emptyList(),
     onBack: () -> Unit,
-    onSave: (title: String, category: String, questionText: String, y: Int, m: Int, d: Int, h: Int, min: Int, sec: Double, lat: Double, lon: Double) -> Unit
+    onSave: (title: String, category: String, questionText: String, y: Int, m: Int, d: Int, h: Int, min: Int, sec: Double, lat: Double, lon: Double, querentProfileId: String?, resultNotes: String) -> Unit
 ) {
     val context = LocalContext.current
     val isEditMode = initialHorary != null
@@ -39,6 +41,9 @@ fun HoraryEditScreen(
     var title by remember(initialHorary) { mutableStateOf(initialHorary?.title ?: "") }
     var category by remember(initialHorary) { mutableStateOf(initialHorary?.category ?: "Career") }
     var questionText by remember(initialHorary) { mutableStateOf(initialHorary?.question_text ?: "") }
+    var querentProfileId by remember(initialHorary) { mutableStateOf(initialHorary?.querent_profile_id) }
+    var resultNotes by remember(initialHorary) { mutableStateOf(initialHorary?.result_notes ?: "") }
+    var profileMenuExpanded by remember { mutableStateOf(false) }
 
     val cal = Calendar.getInstance()
     var yearStr by remember(initialHorary) { mutableStateOf(initialHorary?.query_year?.toString() ?: cal.get(Calendar.YEAR).toString()) }
@@ -142,12 +147,69 @@ fun HoraryEditScreen(
                 )
             )
 
+            // 질문자(Querent) 프로필 연결 선택기
+            val selectedProfileName = profiles.find { it.id == querentProfileId }?.name ?: "연결 안 함 (독립 호라리)"
+            ExposedDropdownMenuBox(
+                expanded = profileMenuExpanded,
+                onExpandedChange = { profileMenuExpanded = !profileMenuExpanded }
+            ) {
+                OutlinedTextField(
+                    value = selectedProfileName,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("질문자 프로필 연결 (선택)", color = TextSecondary) },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = profileMenuExpanded) },
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AccentPrimary,
+                        unfocusedBorderColor = BorderColor
+                    )
+                )
+                ExposedDropdownMenu(
+                    expanded = profileMenuExpanded,
+                    onDismissRequest = { profileMenuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("연결 안 함 (독립 호라리)") },
+                        onClick = {
+                            querentProfileId = null
+                            profileMenuExpanded = false
+                        }
+                    )
+                    profiles.forEach { prof ->
+                        DropdownMenuItem(
+                            text = { Text("${prof.name} (${prof.birth_year}-${String.format("%02d", prof.birth_month)}-${String.format("%02d", prof.birth_day)})") },
+                            onClick = {
+                                querentProfileId = prof.id
+                                profileMenuExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
             OutlinedTextField(
                 value = questionText,
                 onValueChange = { questionText = it },
                 label = { Text("질문 상세 본문", color = TextSecondary) },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3,
+                shape = RoundedCornerShape(10.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = AccentPrimary,
+                    unfocusedBorderColor = BorderColor
+                )
+            )
+
+            OutlinedTextField(
+                value = resultNotes,
+                onValueChange = { resultNotes = it },
+                label = { Text("판단 메모 및 실제 결과 기록 (선택)", color = TextSecondary) },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
                 shape = RoundedCornerShape(10.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = AccentPrimary,
@@ -290,7 +352,9 @@ fun HoraryEditScreen(
                         min,
                         sec,
                         latitude,
-                        longitude
+                        longitude,
+                        querentProfileId,
+                        resultNotes.trim()
                     )
                 },
                 modifier = Modifier

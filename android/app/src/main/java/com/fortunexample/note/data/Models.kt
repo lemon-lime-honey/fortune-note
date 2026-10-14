@@ -453,6 +453,16 @@ data class SecondaryProgressionData(
 )
 
 @Serializable
+data class ReturnAspectContactData(
+    val return_point: String,
+    val return_longitude: Double,
+    val natal_point: String,
+    val natal_longitude: Double,
+    val aspect_type: String,
+    val orb: Double
+)
+
+@Serializable
 data class SolarReturnData(
     val return_year: Int,
     val return_date_utc: String,
@@ -461,7 +471,25 @@ data class SolarReturnData(
     val ascendant: Double,
     val midheaven: Double,
     val house_cusps: List<Double> = emptyList(),
-    val planets: List<ProgressedBodyData> = emptyList()
+    val planets: List<ProgressedBodyData> = emptyList(),
+    val natal_aspects: List<ReturnAspectContactData> = emptyList()
+)
+
+@Serializable
+data class PlanetaryReturnData(
+    val target_year: Int,
+    val return_body: String,
+    val return_date_utc: String,
+    val exact_jd_ut1: Double,
+    val body_longitude: Double,
+    val is_retrograde: Boolean,
+    val speed: Double,
+    val ascendant: Double,
+    val midheaven: Double,
+    val house_cusps: List<Double> = emptyList(),
+    val return_planets: List<ProgressedBodyData> = emptyList(),
+    val natal_aspects: List<ReturnAspectContactData> = emptyList(),
+    val return_internal_aspects: List<PredictiveAspectData> = emptyList()
 )
 
 @Serializable
@@ -495,6 +523,7 @@ data class PredictiveSuiteData(
     val solar_arc: SolarArcResultData,
     val secondary_progression: SecondaryProgressionData? = null,
     val solar_return: SolarReturnData? = null,
+    val planetary_returns: List<PlanetaryReturnData> = emptyList(),
     val transits: List<TransitContactData> = emptyList(),
     val primary_directions: List<PrimaryDirectionContactData> = emptyList()
 )

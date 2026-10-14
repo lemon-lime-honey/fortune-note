@@ -186,6 +186,7 @@ fun DataManagementScreen(
                                 isProcessing = false
                             }
                         },
+                        enabled = !isProcessing,
                         colors = ButtonDefaults.buttonColors(containerColor = AccentPrimary),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.fillMaxWidth()
@@ -202,6 +203,7 @@ fun DataManagementScreen(
                         onClick = {
                             exportFileLauncher.launch(BackupManager.generateBackupFileName())
                         },
+                        enabled = !isProcessing,
                         shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
                         border = BorderStroke(1.dp, TextSecondary.copy(alpha = 0.5f)),
@@ -241,6 +243,7 @@ fun DataManagementScreen(
                         onClick = {
                             importFileLauncher.launch(arrayOf("application/json", "*/*"))
                         },
+                        enabled = !isProcessing,
                         colors = ButtonDefaults.buttonColors(containerColor = SajuSlate),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.fillMaxWidth()
@@ -351,6 +354,7 @@ fun DataManagementScreen(
                             isProcessing = false
                         }
                     },
+                    enabled = !isProcessing,
                     colors = ButtonDefaults.buttonColors(containerColor = AccentPrimary)
                 ) {
                     Text("복원 실행")

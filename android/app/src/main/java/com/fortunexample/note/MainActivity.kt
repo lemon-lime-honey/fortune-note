@@ -183,8 +183,9 @@ class MainActivity : ComponentActivity() {
 
                         HoraryEditScreen(
                             initialHorary = existingHorary,
+                            profiles = allProfiles,
                             onBack = { navController.popBackStack() },
-                            onSave = { title, category, text, y, m, d, h, min, sec, lat, lon ->
+                            onSave = { title, category, text, y, m, d, h, min, sec, lat, lon, querentProfileId, resultNotes ->
                                 scope.launch {
                                     if (editId != null) {
                                         FortuneApp.repository.updateHorary(
@@ -200,7 +201,9 @@ class MainActivity : ComponentActivity() {
                                                 query_minute = min,
                                                 query_second = sec,
                                                 latitude = lat,
-                                                longitude = lon
+                                                longitude = lon,
+                                                querent_profile_id = querentProfileId,
+                                                result_notes = resultNotes
                                             )
                                         ).onSuccess {
                                             refreshData()
@@ -221,7 +224,9 @@ class MainActivity : ComponentActivity() {
                                                 query_minute = min,
                                                 query_second = sec,
                                                 latitude = lat,
-                                                longitude = lon
+                                                longitude = lon,
+                                                querent_profile_id = querentProfileId,
+                                                result_notes = resultNotes
                                             )
                                         ).onSuccess {
                                             refreshData()

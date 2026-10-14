@@ -37,6 +37,8 @@ import com.fortunexample.note.data.ProfileDto
 import com.fortunexample.note.data.SajuCalculationOutputDto
 import com.fortunexample.note.data.VedicCalculationOutputDto
 import com.fortunexample.note.data.WesternCalculationOutputDto
+import com.fortunexample.note.data.findHouseNumber
+import com.fortunexample.note.data.getZodiacSignName
 import com.fortunexample.note.data.getZodiacSignRuler
 import com.fortunexample.note.ui.components.*
 import com.fortunexample.note.ui.theme.*
@@ -365,15 +367,15 @@ fun ProfileDetailScreen(
                                             onClick = {
                                                 val sb = StringBuilder()
                                                 sb.appendLine("[Western Tropical Chart - Planets & Points]")
-                                                sb.appendLine("Ascendant: ${String.format("%.2f°", westernChart.ascendant)} (${getSignName((westernChart.ascendant / 30.0).toInt() % 12)})")
-                                                sb.appendLine("Midheaven (MC): ${String.format("%.2f°", westernChart.midheaven)} (${getSignName((westernChart.midheaven / 30.0).toInt() % 12)})")
+                                                sb.appendLine("Ascendant: ${String.format("%.2f°", westernChart.ascendant)} (${getZodiacSignName((westernChart.ascendant / 30.0).toInt() % 12)})")
+                                                sb.appendLine("Midheaven (MC): ${String.format("%.2f°", westernChart.midheaven)} (${getZodiacSignName((westernChart.midheaven / 30.0).toInt() % 12)})")
                                                 westernChart.planets.forEach { p ->
                                                     val rx = if (p.is_retrograde) " [Rx]" else ""
                                                     val speedStr = String.format("%+.2f°/d", p.speed)
-                                                    sb.appendLine("• ${p.name}$rx: ${String.format("%.2f°", p.sign_degree)} ${getSignName(p.sign_index)} · House ${p.house_number} · $speedStr")
+                                                    sb.appendLine("• ${p.name}$rx: ${String.format("%.2f°", p.sign_degree)} ${getZodiacSignName(p.sign_index)} · House ${p.house_number} · $speedStr")
                                                 }
                                                 westernChart.nodes.forEach { n ->
-                                                    sb.appendLine("• ${n.name}: ${String.format("%.2f°", n.sign_degree)} ${getSignName(n.sign_index)} · House ${n.house_number}")
+                                                    sb.appendLine("• ${n.name}: ${String.format("%.2f°", n.sign_degree)} ${getZodiacSignName(n.sign_index)} · House ${n.house_number}")
                                                 }
                                                 clipboardManager.setText(AnnotatedString(sb.toString().trimEnd()))
                                                 Toast.makeText(context, "Planets & Points 복사 완료", Toast.LENGTH_SHORT).show()
@@ -403,7 +405,7 @@ fun ProfileDetailScreen(
                                     ) {
                                         Text(text = "Ascendant (ASC)", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                                         Text(
-                                            text = "${String.format("%.2f°", ascSignDeg)} ${getSignName(ascSignIdx)} · House 1",
+                                            text = "${String.format("%.2f°", ascSignDeg)} ${getZodiacSignName(ascSignIdx)} · House 1",
                                             color = AccentPrimary,
                                             fontWeight = FontWeight.Medium,
                                             fontSize = 13.sp
@@ -418,7 +420,7 @@ fun ProfileDetailScreen(
                                     ) {
                                         Text(text = "Midheaven (MC)", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                                         Text(
-                                            text = "${String.format("%.2f°", mcSignDeg)} ${getSignName(mcSignIdx)} · House $mcHouseNum",
+                                            text = "${String.format("%.2f°", mcSignDeg)} ${getZodiacSignName(mcSignIdx)} · House $mcHouseNum",
                                             color = AccentPrimary,
                                             fontWeight = FontWeight.Medium,
                                             fontSize = 13.sp
@@ -445,7 +447,7 @@ fun ProfileDetailScreen(
                                                 )
                                             }
                                             Text(
-                                                text = "${String.format("%.2f°", p.sign_degree)} ${getSignName(p.sign_index)} · House ${p.house_number}",
+                                                text = "${String.format("%.2f°", p.sign_degree)} ${getZodiacSignName(p.sign_index)} · House ${p.house_number}",
                                                 color = TextSecondary,
                                                 fontSize = 13.sp
                                             )
@@ -460,7 +462,7 @@ fun ProfileDetailScreen(
                                         ) {
                                             Text(text = n.name, color = TextPrimary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
                                             Text(
-                                                text = "${String.format("%.2f°", n.sign_degree)} ${getSignName(n.sign_index)} · House ${n.house_number}",
+                                                text = "${String.format("%.2f°", n.sign_degree)} ${getZodiacSignName(n.sign_index)} · House ${n.house_number}",
                                                 color = TextSecondary,
                                                 fontSize = 13.sp
                                             )
@@ -503,7 +505,7 @@ fun ProfileDetailScreen(
                                                     westernChart.house_cusps.forEachIndexed { idx, deg ->
                                                         val hNum = idx + 1
                                                         val signIdx = ((deg / 30.0).toInt() % 12 + 12) % 12
-                                                        val signName = getSignName(signIdx)
+                                                        val signName = getZodiacSignName(signIdx)
                                                         val ruler = getZodiacSignRuler(signIdx)
                                                         val signDeg = deg % 30.0
                                                         if (isWholeSign) {
@@ -545,7 +547,7 @@ fun ProfileDetailScreen(
                                                 val h1 = rowIdx * 2 + 1
                                                 val deg1 = pair[0]
                                                 val sIdx1 = ((deg1 / 30.0).toInt() % 12 + 12) % 12
-                                                val s1 = getSignName(sIdx1)
+                                                val s1 = getZodiacSignName(sIdx1)
                                                 val r1 = getZodiacSignRuler(sIdx1)
                                                 val d1 = deg1 % 30.0
                                                 val tag1 = if (!isWholeSign) {
@@ -569,7 +571,7 @@ fun ProfileDetailScreen(
                                                     val h2 = rowIdx * 2 + 2
                                                     val deg2 = pair[1]
                                                     val sIdx2 = ((deg2 / 30.0).toInt() % 12 + 12) % 12
-                                                    val s2 = getSignName(sIdx2)
+                                                    val s2 = getZodiacSignName(sIdx2)
                                                     val r2 = getZodiacSignRuler(sIdx2)
                                                     val d2 = deg2 % 30.0
                                                     val tag2 = if (!isWholeSign) {
@@ -782,7 +784,7 @@ fun ProfileDetailScreen(
                                     )
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = "Lagna: ${getSignName(vargaLagnaSign)}",
+                                        text = "Lagna: ${getZodiacSignName(vargaLagnaSign)}",
                                         color = TextSecondary,
                                         fontWeight = FontWeight.Medium,
                                         fontSize = 12.sp,
@@ -814,7 +816,7 @@ fun ProfileDetailScreen(
                                                     fontSize = 14.sp
                                                 )
                                                 Text(
-                                                    text = "House $houseNum · ${getSignName(signIdx)}",
+                                                    text = "House $houseNum · ${getZodiacSignName(signIdx)}",
                                                     color = TextSecondary,
                                                     fontSize = 13.sp,
                                                     fontWeight = FontWeight.Medium
@@ -1012,27 +1014,4 @@ private fun DomainErrorCard(
             }
         }
     }
-}
-
-private fun getSignName(index: Int): String {
-    val signs = listOf(
-        "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
-        "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"
-    )
-    return signs.getOrElse((index % 12 + 12) % 12) { "" }
-}
-
-private fun findHouseNumber(lon: Double, cusps: List<Double>): Int {
-    if (cusps.size < 12) return 1
-    val normalizedLon = (lon % 360.0 + 360.0) % 360.0
-    for (i in 0 until 12) {
-        val start = (cusps[i] % 360.0 + 360.0) % 360.0
-        val end = (cusps[(i + 1) % 12] % 360.0 + 360.0) % 360.0
-        if (start < end) {
-            if (normalizedLon >= start && normalizedLon < end) return i + 1
-        } else {
-            if (normalizedLon >= start || normalizedLon < end) return i + 1
-        }
-    }
-    return 1
 }
