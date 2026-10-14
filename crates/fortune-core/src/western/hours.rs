@@ -109,8 +109,11 @@ pub fn calculate_astronomical_planetary_hours(
         }
     };
 
-    // Calendar day of week: JD 0.0 was Monday (1). Sunday = 0, Monday = 1 ... Saturday = 6
-    let base_weekday = ((jd_ut1 + 1.5).floor() as i64).rem_euclid(7);
+    // Calendar day of week for local observer:
+    // Determine the local true solar noon JD by subtracting the hour angle from current UT1 JD.
+    // Julian Day integer dates roll over at noon, so local noon JD accurately reflects the local calendar day.
+    let local_noon_jd = jd_ut1 - (h / 360.0);
+    let base_weekday = ((local_noon_jd + 1.5).floor() as i64).rem_euclid(7);
     let astrological_weekday = (base_weekday + day_shift).rem_euclid(7) as u32;
 
     calculate_planetary_hours(
@@ -233,4 +236,52 @@ fn are_same_triplicity(p1: ClassicalPlanet, p2: ClassicalPlanet, sign: u8) -> bo
         _ => matches!(p, ClassicalPlanet::Mars | ClassicalPlanet::Moon | ClassicalPlanet::Venus),    // Water
     };
     in_triplicity(p1, triplicity) && in_triplicity(p2, triplicity)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ephemeris::compute_ephemeris;
+
+    #[test]
+    fn test_seoul_morning_and_predawn_day_ruler() {
+        // 2024-02-04 was Sunday in Seoul (KST).
+        // A: 2024-02-04 07:45 KST (just after sunrise): Sunday day ruler (Sun)
+        // 07:45 KST = 2024-02-03 22:45 UTC
+        let ephem_morning = compute_ephemeris(2024, 2, 3, 22, 45, 0.0, 37.5665, 126.9780)
+            .expect("ephemeris should succeed");
+        let sun_lon = ephem_morning.get_body("Sun").unwrap().tropical_longitude;
+
+        let rep_morning = calculate_astronomical_planetary_hours(
+            ephem_morning.jd_ut1,
+            37.5665,
+            ephem_morning.ramc,
+            sun_lon,
+            ephem_morning.true_obliquity_deg,
+            120.0,
+            2,
+            false,
+            false,
+        );
+        assert_eq!(rep_morning.day_ruler, "Sun", "After sunrise on Sunday must be Sun day");
+
+        // B: 2024-02-04 04:00 KST (predawn before sunrise): Previous astrological day ruler (Saturn)
+        // 04:00 KST = 2024-02-03 19:00 UTC
+        let ephem_predawn = compute_ephemeris(2024, 2, 3, 19, 0, 0.0, 37.5665, 126.9780)
+            .expect("ephemeris should succeed");
+        let sun_lon_pre = ephem_predawn.get_body("Sun").unwrap().tropical_longitude;
+
+        let rep_predawn = calculate_astronomical_planetary_hours(
+            ephem_predawn.jd_ut1,
+            37.5665,
+            ephem_predawn.ramc,
+            sun_lon_pre,
+            ephem_predawn.true_obliquity_deg,
+            120.0,
+            2,
+            false,
+            false,
+        );
+        assert_eq!(rep_predawn.day_ruler, "Saturn", "Before sunrise on Sunday must still be Saturday (Saturn)");
+    }
 }
