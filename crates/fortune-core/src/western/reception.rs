@@ -179,9 +179,8 @@ pub fn analyze_perfection_mechanisms(
                 None => continue,
             };
 
-            for k in 0..n {
+            for (k, &(p2_name, _, p2_speed)) in planets.iter().enumerate() {
                 if k == i || k == j { continue; }
-                let (p2_name, _, p2_speed) = planets[k];
                 if t_speed.abs() <= p2_speed.abs() { continue; }
 
                 // Find aspect between T and P2 where T is applying to P2
@@ -234,9 +233,8 @@ pub fn analyze_perfection_mechanisms(
                 None => continue,
             };
 
-            for k in (j + 1)..n {
+            for (k, &(p2_name, _, p2_speed)) in planets.iter().enumerate().skip(j + 1) {
                 if k == i { continue; }
-                let (p2_name, _, p2_speed) = planets[k];
                 if c_speed.abs() >= p2_speed.abs() { continue; }
 
                 // P2 must apply to C

@@ -293,9 +293,9 @@ pub fn find_astronomical_events(start_jd: f64, end_jd: f64) -> Vec<AstronomicalE
         let approx_days = diff_deg / 0.9856;
         let approx_jd = start_jd + approx_days;
 
-        if approx_jd >= start_jd - 5.0 && approx_jd <= end_jd + 5.0 {
-            if let Ok((jd, res, iters)) = find_tropical_solar_ingress(target_deg, approx_jd) {
-                if jd >= start_jd && jd <= end_jd {
+        if approx_jd >= start_jd - 5.0 && approx_jd <= end_jd + 5.0
+            && let Ok((jd, res, iters)) = find_tropical_solar_ingress(target_deg, approx_jd)
+                && jd >= start_jd && jd <= end_jd {
                     events.push(AstronomicalEvent {
                         category: EventCategory::TropicalSolarIngress,
                         relevance: MundaneRelevance::Reference,
@@ -307,8 +307,6 @@ pub fn find_astronomical_events(start_jd: f64, end_jd: f64) -> Vec<AstronomicalE
                         note: Some("Tropical Seasonal Reference Marker".to_string()),
                     });
                 }
-            }
-        }
     }
 
     // B. Sidereal Surya Sankranti
@@ -480,8 +478,8 @@ pub fn find_astronomical_events(start_jd: f64, end_jd: f64) -> Vec<AstronomicalE
                 let is_retro_start = prev_speed > 0.0;
                 let approx_station = t + bracket_step * 0.5;
 
-                if let Ok((jd, res, iters)) = find_station(body, approx_station) {
-                    if jd >= start_jd && jd <= end_jd {
+                if let Ok((jd, res, iters)) = find_station(body, approx_station)
+                    && jd >= start_jd && jd <= end_jd {
                         let title = format!(
                             "{} Stationary {}",
                             name,
@@ -499,7 +497,6 @@ pub fn find_astronomical_events(start_jd: f64, end_jd: f64) -> Vec<AstronomicalE
                             note: Some("Planetary Motion Direction Shift".to_string()),
                         });
                     }
-                }
             }
 
             prev_speed = next_speed;
@@ -821,9 +818,8 @@ fn build_exported_event(
     let station_score = if matches!(event.category, EventCategory::PlanetaryStation) { 2 } else { 0 };
 
     let eclipse_score = match event.category {
-        EventCategory::NewMoon | EventCategory::FullMoon => {
-            if event.note.as_deref().unwrap_or("").contains("Eclipse") { 3 } else { 0 }
-        }
+        EventCategory::NewMoon | EventCategory::FullMoon
+            if event.note.as_deref().unwrap_or("").contains("Eclipse") => { 3 }
         _ => 0,
     };
 
@@ -1030,9 +1026,9 @@ fn generate_event_aspects_csv(payload: &MundaneExportPayload) -> String {
                 let dist = angular_distance(p1.abs_longitude, p2.abs_longitude);
 
                 let is_exact = dist < 1.0;
-                let is_tight = dist >= 1.0 && dist < 3.0;
-                let is_moderate = dist >= 3.0 && dist < 6.0;
-                let is_loose = dist >= 6.0 && dist <= 10.0;
+                let is_tight = (1.0..3.0).contains(&dist);
+                let is_moderate = (3.0..6.0).contains(&dist);
+                let is_loose = (6.0..=10.0).contains(&dist);
                 let is_opp = (dist - 180.0).abs() <= 6.0;
 
                 if is_exact || is_tight || is_moderate || is_loose || is_opp {
@@ -1117,11 +1113,11 @@ fn generate_period_summary_csv(payload: &MundaneExportPayload) -> String {
         }
 
         let mut signs_sorted: Vec<_> = sign_freq.into_iter().collect();
-        signs_sorted.sort_by(|a, b| b.1.cmp(&a.1));
+        signs_sorted.sort_by_key(|b| std::cmp::Reverse(b.1));
         let top_signs = signs_sorted.iter().take(2).map(|(s, _)| *s).collect::<Vec<_>>().join("/");
 
         let mut houses_sorted: Vec<_> = house_freq.into_iter().collect();
-        houses_sorted.sort_by(|a, b| b.1.cmp(&a.1));
+        houses_sorted.sort_by_key(|b| std::cmp::Reverse(b.1));
         let top_houses = houses_sorted.iter().take(2).map(|(h, _)| format!("H{}", h)).collect::<Vec<_>>().join("/");
 
         let notable = if m == "2027-02" {

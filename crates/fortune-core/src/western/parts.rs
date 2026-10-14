@@ -173,14 +173,14 @@ mod tests {
 
         let substance = parts_day.iter().find(|p| p.name == "Part of Substance").unwrap();
         // Substance: ASC (10) + Cusp2 (30) - Venus (45) = -5 -> 355
-        assert_eq!((substance.longitude - 355.0).abs() < 1e-6, true);
+        assert!((substance.longitude - 355.0).abs() < 1e-6);
 
         let sickness_day = parts_day.iter().find(|p| p.name == "Part of Sickness").unwrap();
         let sickness_night = parts_night.iter().find(|p| p.name == "Part of Sickness").unwrap();
         // Day sickness: ASC (10) + Mars (80) - Saturn (200) = -110 -> 250
         // Night sickness: ASC (10) + Saturn (200) - Mars (80) = 130
-        assert_eq!((sickness_day.longitude - 250.0).abs() < 1e-6, true);
-        assert_eq!((sickness_night.longitude - 130.0).abs() < 1e-6, true);
+        assert!((sickness_day.longitude - 250.0).abs() < 1e-6);
+        assert!((sickness_night.longitude - 130.0).abs() < 1e-6);
         assert_ne!(sickness_day.longitude, sickness_night.longitude);
     }
 }

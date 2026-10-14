@@ -96,7 +96,7 @@ pub fn calculate_annual_profection(
 
     let asc_sign = (natal_ascendant / 30.0).floor() as u8 % 12;
     let profected_sign_index = (asc_sign + shift_signs) % 12;
-    let profected_house = (shift_signs + 1) as u8;
+    let profected_house = shift_signs + 1;
     let profected_sign_name = ZODIAC_SIGNS[profected_sign_index as usize].to_string();
 
     let lord_of_the_year = DOMICILE_RULERS[profected_sign_index as usize].name().to_string();
@@ -329,13 +329,13 @@ pub fn calculate_secondary_progressions(
     let mut elongation = prog_moon_lon - prog_sun_lon;
     if elongation < 0.0 { elongation += 360.0; }
     let progressed_lunar_phase = match elongation {
-        e if e >= 337.5 || e < 22.5 => "Progressed New Moon",
-        e if e >= 22.5 && e < 67.5 => "Progressed Crescent",
-        e if e >= 67.5 && e < 112.5 => "Progressed First Quarter",
-        e if e >= 112.5 && e < 157.5 => "Progressed Gibbous",
-        e if e >= 157.5 && e < 202.5 => "Progressed Full Moon",
-        e if e >= 202.5 && e < 247.5 => "Progressed Disseminating",
-        e if e >= 247.5 && e < 292.5 => "Progressed Last Quarter",
+        e if !(22.5..337.5).contains(&e) => "Progressed New Moon",
+        e if (22.5..67.5).contains(&e) => "Progressed Crescent",
+        e if (67.5..112.5).contains(&e) => "Progressed First Quarter",
+        e if (112.5..157.5).contains(&e) => "Progressed Gibbous",
+        e if (157.5..202.5).contains(&e) => "Progressed Full Moon",
+        e if (202.5..247.5).contains(&e) => "Progressed Disseminating",
+        e if (247.5..292.5).contains(&e) => "Progressed Last Quarter",
         _ => "Progressed Balsamic",
     }.to_string();
 

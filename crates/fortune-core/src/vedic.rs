@@ -81,7 +81,7 @@ pub fn calculate_varga_sign_and_degree(sidereal_lon: f64, div: VargaDivision) ->
             //   1st half (0..15 deg): Cancer (3, Moon)
             //   2nd half (15..30 deg): Leo (4, Sun)
             let is_first_half = pos_in_sign < 15.0;
-            let is_odd_sign = sign_idx % 2 == 0;
+            let is_odd_sign = sign_idx.is_multiple_of(2);
             let sign = match (is_odd_sign, is_first_half) {
                 (true, true) => 4,   // Odd 1st half: Leo
                 (true, false) => 3,  // Odd 2nd half: Cancer
@@ -295,11 +295,10 @@ pub fn calculate_vedic(ephem: &EphemerisSnapshot, latitude: f64) -> VedicChart {
     let lagna_sidereal = normalize_degrees(house_result.asc - ephem.true_ayanamsha_deg);
     let lagna_sign = (lagna_sidereal / 30.0).floor() as u8;
 
-    let mut wholesign_bhavas = [0.0; 12];
-    for h in 0..12 {
+    let wholesign_bhavas = core::array::from_fn(|h| {
         let sign = (lagna_sign as usize + h) % 12;
-        wholesign_bhavas[h] = sign as f64 * 30.0;
-    }
+        sign as f64 * 30.0
+    });
 
     // 2. Map planets to sidereal signs and nakshatras
     let mut planets = Vec::with_capacity(ephem.bodies.len());

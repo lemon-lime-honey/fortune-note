@@ -543,10 +543,8 @@ mod tests {
         // Female formula: ASC + Saturn - Venus
         // They must differ unless Venus == Saturn
         assert_ne!(male_marriage.longitude, female_marriage.longitude);
-        assert_eq!(
-            (male_marriage.longitude + female_marriage.longitude - 2.0 * male_chart.ascendant).rem_euclid(360.0).abs() < 1e-6
-                || (360.0 - (male_marriage.longitude + female_marriage.longitude - 2.0 * male_chart.ascendant).rem_euclid(360.0)).abs() < 1e-6,
-            true,
+        assert!(
+            (male_marriage.longitude + female_marriage.longitude - 2.0 * male_chart.ascendant).rem_euclid(360.0).abs() < 1e-6 || (360.0 - (male_marriage.longitude + female_marriage.longitude - 2.0 * male_chart.ascendant).rem_euclid(360.0)).abs() < 1e-6,
             "Male and female marriage lots should be symmetric about the ascendant"
         );
     }

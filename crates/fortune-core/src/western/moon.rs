@@ -45,13 +45,13 @@ pub fn evaluate_moon_condition(
     let is_waxing = elongation < 180.0;
 
     let lunar_phase_name = match elongation {
-        e if e >= 337.5 || e < 22.5 => "New Moon",
-        e if e >= 22.5 && e < 67.5 => "Waxing Crescent",
-        e if e >= 67.5 && e < 112.5 => "First Quarter",
-        e if e >= 112.5 && e < 157.5 => "Waxing Gibbous",
-        e if e >= 157.5 && e < 202.5 => "Full Moon",
-        e if e >= 202.5 && e < 247.5 => "Waning Gibbous",
-        e if e >= 247.5 && e < 292.5 => "Third Quarter",
+        e if !(22.5..337.5).contains(&e) => "New Moon",
+        e if (22.5..67.5).contains(&e) => "Waxing Crescent",
+        e if (67.5..112.5).contains(&e) => "First Quarter",
+        e if (112.5..157.5).contains(&e) => "Waxing Gibbous",
+        e if (157.5..202.5).contains(&e) => "Full Moon",
+        e if (202.5..247.5).contains(&e) => "Waning Gibbous",
+        e if (247.5..292.5).contains(&e) => "Third Quarter",
         _ => "Waning Crescent",
     }.to_string();
 
@@ -115,7 +115,7 @@ pub fn evaluate_moon_condition(
                     let future_p_sign = ((future_p_lon / 30.0).floor() as u8) % 12;
                     if future_p_sign == p_sign_idx {
                         let desc = format!("{} to {} in {:.2}°", aspect_name(target), p_name, dist_moon_moves);
-                        if next_aspect.as_ref().map_or(true, |(d, _)| dist_moon_moves < *d) {
+                        if next_aspect.as_ref().is_none_or(|(d, _)| dist_moon_moves < *d) {
                             next_aspect = Some((dist_moon_moves, desc));
                         }
                     }

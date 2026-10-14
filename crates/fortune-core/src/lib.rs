@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 //! Core calculation engine for fortune-note.
 //!
 //! Provides a unified deterministic interface for:

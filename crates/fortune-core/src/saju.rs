@@ -203,7 +203,7 @@ pub fn calculate_saju_with_options(
     );
 
     // 4. DaeUn (10-year major luck progression)
-    let is_year_yang = year_stem % 2 == 0;
+    let is_year_yang = year_stem.is_multiple_of(2);
     let is_forward_daeun = match gender {
         Gender::Male => is_year_yang,
         Gender::Female => !is_year_yang,

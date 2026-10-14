@@ -209,7 +209,7 @@ mod tests {
             let h = (total_minutes / 60.0).floor() as u32;
             let min = (total_minutes % 60.0).round() as u32;
 
-            let diff_minutes = ((h as i32 * 60 + min as i32) - (exp_h as i32 * 60 + exp_min as i32)).abs();
+            let diff_minutes = ((h as i32 * 60 + min as i32) - (exp_h * 60 + exp_min)).abs();
 
             assert_eq!(y, exp_y);
             assert_eq!(m, exp_m);

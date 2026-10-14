@@ -504,16 +504,16 @@ pub fn calculate_planet_dignity(
     }
 
     // Joy of planets in houses
-    let is_joy = match (planet, house_number) {
-        (ClassicalPlanet::Mercury, 1) => true,
-        (ClassicalPlanet::Moon, 3) => true,
-        (ClassicalPlanet::Venus, 5) => true,
-        (ClassicalPlanet::Mars, 6) => true,
-        (ClassicalPlanet::Sun, 9) => true,
-        (ClassicalPlanet::Jupiter, 11) => true,
-        (ClassicalPlanet::Saturn, 12) => true,
-        _ => false,
-    };
+    let is_joy = matches!(
+        (planet, house_number),
+        (ClassicalPlanet::Mercury, 1)
+            | (ClassicalPlanet::Moon, 3)
+            | (ClassicalPlanet::Venus, 5)
+            | (ClassicalPlanet::Mars, 6)
+            | (ClassicalPlanet::Sun, 9)
+            | (ClassicalPlanet::Jupiter, 11)
+            | (ClassicalPlanet::Saturn, 12)
+    );
     if is_joy {
         accidental_score += 2;
         factors.push("Joy in House (+2)".into());
