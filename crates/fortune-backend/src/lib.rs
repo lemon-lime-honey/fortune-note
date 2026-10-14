@@ -25,5 +25,5 @@ pub use models::{
     BackupData, CreateHoraryParams, CreateProfileParams, HoraryQuestion, ImportSummary, Profile,
     UpdateHoraryParams, UpdateProfileParams,
 };
-pub use repository::{HoraryRepository, ProfileRepository};
+pub use repository::{HoraryRepository, HoraryRepositoryTrait, ProfileRepository, ProfileRepositoryTrait};
 pub use service::{FortuneBackendError, FortuneBackendService};

@@ -1,6 +1,24 @@
 use crate::models::{HoraryQuestion, Profile};
 use rusqlite::{params, Connection, Result};
 
+/// Trait defining the contract for Profile data access operations.
+pub trait ProfileRepositoryTrait {
+    fn insert(&self, conn: &Connection, profile: &Profile) -> Result<()>;
+    fn find_by_id(&self, conn: &Connection, id: &str) -> Result<Option<Profile>>;
+    fn list_all(&self, conn: &Connection, search: Option<&str>) -> Result<Vec<Profile>>;
+    fn update(&self, conn: &Connection, profile: &Profile) -> Result<bool>;
+    fn delete(&self, conn: &Connection, id: &str) -> Result<bool>;
+}
+
+/// Trait defining the contract for Horary data access operations.
+pub trait HoraryRepositoryTrait {
+    fn insert(&self, conn: &Connection, item: &HoraryQuestion) -> Result<()>;
+    fn find_by_id(&self, conn: &Connection, id: &str) -> Result<Option<HoraryQuestion>>;
+    fn list_all(&self, conn: &Connection, category: Option<&str>, querent_id: Option<&str>) -> Result<Vec<HoraryQuestion>>;
+    fn update(&self, conn: &Connection, item: &HoraryQuestion) -> Result<bool>;
+    fn delete(&self, conn: &Connection, id: &str) -> Result<bool>;
+}
+
 pub struct ProfileRepository;
 
 impl ProfileRepository {
@@ -360,6 +378,55 @@ impl HoraryRepository {
     pub fn delete(conn: &Connection, id: &str) -> Result<bool> {
         let rows = conn.execute("DELETE FROM horary_questions WHERE id = ?1", params![id])?;
         Ok(rows > 0)
+    }
+}
+
+impl ProfileRepositoryTrait for ProfileRepository {
+    fn insert(&self, conn: &Connection, profile: &Profile) -> Result<()> {
+        Self::insert(conn, profile)
+    }
+
+    fn find_by_id(&self, conn: &Connection, id: &str) -> Result<Option<Profile>> {
+        Self::find_by_id(conn, id)
+    }
+
+    fn list_all(&self, conn: &Connection, search: Option<&str>) -> Result<Vec<Profile>> {
+        Self::list_all(conn, search)
+    }
+
+    fn update(&self, conn: &Connection, profile: &Profile) -> Result<bool> {
+        Self::update(conn, profile)
+    }
+
+    fn delete(&self, conn: &Connection, id: &str) -> Result<bool> {
+        Self::delete(conn, id)
+    }
+}
+
+impl HoraryRepositoryTrait for HoraryRepository {
+    fn insert(&self, conn: &Connection, item: &HoraryQuestion) -> Result<()> {
+        Self::insert(conn, item)
+    }
+
+    fn find_by_id(&self, conn: &Connection, id: &str) -> Result<Option<HoraryQuestion>> {
+        Self::find_by_id(conn, id)
+    }
+
+    fn list_all(
+        &self,
+        conn: &Connection,
+        category: Option<&str>,
+        querent_id: Option<&str>,
+    ) -> Result<Vec<HoraryQuestion>> {
+        Self::list_all(conn, category, querent_id)
+    }
+
+    fn update(&self, conn: &Connection, item: &HoraryQuestion) -> Result<bool> {
+        Self::update(conn, item)
+    }
+
+    fn delete(&self, conn: &Connection, id: &str) -> Result<bool> {
+        Self::delete(conn, id)
     }
 }
 
