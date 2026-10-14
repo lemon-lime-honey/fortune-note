@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 //! Backend service and persistence layer for fortune-note.
 //!
 //! Provides:

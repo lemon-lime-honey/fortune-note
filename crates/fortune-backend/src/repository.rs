@@ -278,19 +278,17 @@ impl HoraryRepository {
         let mut conditions = Vec::new();
         let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
-        if let Some(cat) = category {
-            if !cat.trim().is_empty() {
+        if let Some(cat) = category
+            && !cat.trim().is_empty() {
                 conditions.push("category = ?");
                 params_vec.push(Box::new(cat.to_string()));
             }
-        }
 
-        if let Some(qid) = querent_id {
-            if !qid.trim().is_empty() {
+        if let Some(qid) = querent_id
+            && !qid.trim().is_empty() {
                 conditions.push("querent_profile_id = ?");
                 params_vec.push(Box::new(qid.to_string()));
             }
-        }
 
         let where_clause = if conditions.is_empty() {
             String::new()
