@@ -7,6 +7,11 @@ pub fn init_db(path: &str) -> Result<DbPool> {
     let conn = if path == ":memory:" {
         Connection::open_in_memory()?
     } else {
+        if let Some(parent) = std::path::Path::new(path).parent() {
+            if !parent.as_os_str().is_empty() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+        }
         Connection::open(path)?
     };
 

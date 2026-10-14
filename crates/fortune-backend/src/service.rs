@@ -1108,4 +1108,83 @@ mod tests {
             "Horary Part of Marriage must differ when querent is female vs default male"
         );
     }
+
+    #[test]
+    fn test_import_backup_rollback_on_failure() {
+        let service = FortuneBackendService::new(":memory:").expect("service init failed");
+
+        // 1. Initial valid profile
+        let original_profile = service
+            .create_profile(CreateProfileParams {
+                name: "보호되어야 할 인물".to_string(),
+                gender: "male".to_string(),
+                birth_year: 1985,
+                birth_month: 4,
+                birth_day: 12,
+                birth_hour: 8,
+                birth_minute: 0,
+                latitude: 37.5665,
+                longitude: 126.9780,
+                timezone_id: None,
+                notes: Some("원본 프로필".to_string()),
+            })
+            .expect("profile creation failed");
+
+        // 2. Craft corrupted backup data: horary references a non-existent querent profile ID
+        // Because PRAGMA foreign_keys = ON, inserting this question will trigger Foreign Key failure
+        let invalid_backup_json = serde_json::json!({
+            "app": "fortune-note",
+            "version": 1,
+            "exported_at": "2026-10-14T00:00:00Z",
+            "profiles": [
+                {
+                    "id": "new-p1",
+                    "name": "새로운 인물",
+                    "gender": "female",
+                    "birth_year": 1999,
+                    "birth_month": 1,
+                    "birth_day": 1,
+                    "birth_hour": 12,
+                    "birth_minute": 0,
+                    "latitude": 37.5,
+                    "longitude": 127.0,
+                    "timezone_id": "Asia/Seoul",
+                    "notes": "",
+                    "created_at": "2026-10-14T00:00:00Z",
+                    "updated_at": "2026-10-14T00:00:00Z"
+                }
+            ],
+            "horary_questions": [
+                {
+                    "id": "horary-invalid",
+                    "title": "외래키 오류 질문",
+                    "category": "career",
+                    "question_text": "오류 테스트",
+                    "query_year": 2026,
+                    "query_month": 1,
+                    "query_day": 1,
+                    "query_hour": 12,
+                    "query_minute": 0,
+                    "query_second": 0.0,
+                    "latitude": 37.5,
+                    "longitude": 127.0,
+                    "timezone_id": "Asia/Seoul",
+                    "querent_profile_id": "non-existent-profile-999", // Violates FOREIGN KEY
+                    "result_notes": "",
+                    "created_at": "2026-10-14T00:00:00Z",
+                    "updated_at": "2026-10-14T00:00:00Z"
+                }
+            ]
+        }).to_string();
+
+        // 3. Attempt import with replace_existing = true
+        let import_result = service.import_backup_json(&invalid_backup_json, true);
+        assert!(import_result.is_err(), "Importing with invalid foreign key must fail");
+
+        // 4. Verify that rollback preserved the original profile and didn't leave empty DB
+        let profiles_after = service.list_profiles(None).expect("list profiles failed");
+        assert_eq!(profiles_after.len(), 1, "Original profile must be preserved after rollback");
+        assert_eq!(profiles_after[0].id, original_profile.id);
+        assert_eq!(profiles_after[0].name, "보호되어야 할 인물");
+    }
 }
