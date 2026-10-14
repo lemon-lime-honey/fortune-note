@@ -757,7 +757,7 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_fortune_backend_fn_constructor_fortuneclient_new(`dbPath`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
-    external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_annual_profection(`ptr`: Long,`birthYear`: Int,`targetYear`: Int,`natalAscendant`: Double,`natalPlanetsJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_annual_profection(`ptr`: Long,`birthYear`: Int,`birthMonth`: Int,`birthDay`: Int,`targetYear`: Int,`targetMonth`: Int,`targetDay`: Int,`natalAscendant`: Double,`natalPlanetsJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_direct(`ptr`: Long,`year`: Int,`month`: Int,`day`: Int,`hour`: Int,`minute`: Int,`second`: Double,`latitude`: Double,`longitude`: Double,`isMale`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -937,7 +937,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_fortune_backend_checksum_func_fortune_backend_version() and 0xFFFF) != 53091) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_calculate_annual_profection() and 0xFFFF) != 25576) {
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_calculate_annual_profection() and 0xFFFF) != 15956) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_calculate_direct() and 0xFFFF) != 28359) {
@@ -1428,7 +1428,7 @@ public object FfiConverterString: FfiConverter<String, RustBuffer.ByValue> {
 
 public interface FortuneClientInterface {
     
-    fun `calculateAnnualProfection`(`birthYear`: kotlin.Int, `targetYear`: kotlin.Int, `natalAscendant`: kotlin.Double, `natalPlanetsJson`: kotlin.String): kotlin.String
+    fun `calculateAnnualProfection`(`birthYear`: kotlin.Int, `birthMonth`: kotlin.UInt, `birthDay`: kotlin.UInt, `targetYear`: kotlin.Int, `targetMonth`: kotlin.UInt, `targetDay`: kotlin.UInt, `natalAscendant`: kotlin.Double, `natalPlanetsJson`: kotlin.String): kotlin.String
     
     fun `calculateDirect`(`year`: kotlin.Int, `month`: kotlin.UInt, `day`: kotlin.UInt, `hour`: kotlin.UInt, `minute`: kotlin.UInt, `second`: kotlin.Double, `latitude`: kotlin.Double, `longitude`: kotlin.Double, `isMale`: kotlin.Boolean): kotlin.String
     
@@ -1598,7 +1598,7 @@ open class FortuneClient: Disposable, AutoCloseable, FortuneClientInterface
     }
 
     
-    @Throws(FortuneBackendFfiException::class)override fun `calculateAnnualProfection`(`birthYear`: kotlin.Int, `targetYear`: kotlin.Int, `natalAscendant`: kotlin.Double, `natalPlanetsJson`: kotlin.String): kotlin.String {
+    @Throws(FortuneBackendFfiException::class)override fun `calculateAnnualProfection`(`birthYear`: kotlin.Int, `birthMonth`: kotlin.UInt, `birthDay`: kotlin.UInt, `targetYear`: kotlin.Int, `targetMonth`: kotlin.UInt, `targetDay`: kotlin.UInt, `natalAscendant`: kotlin.Double, `natalPlanetsJson`: kotlin.String): kotlin.String {
             return FfiConverterString.lift(
     callWithHandle {
     uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
@@ -1606,7 +1606,11 @@ open class FortuneClient: Disposable, AutoCloseable, FortuneClientInterface
         it,
         
         FfiConverterInt.lower(`birthYear`),
+        FfiConverterUInt.lower(`birthMonth`),
+        FfiConverterUInt.lower(`birthDay`),
         FfiConverterInt.lower(`targetYear`),
+        FfiConverterUInt.lower(`targetMonth`),
+        FfiConverterUInt.lower(`targetDay`),
         FfiConverterDouble.lower(`natalAscendant`),
         FfiConverterString.lower(`natalPlanetsJson`),_status)
 }
