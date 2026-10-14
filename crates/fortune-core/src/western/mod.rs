@@ -177,12 +177,23 @@ pub const DEFAULT_MAJOR_ASPECTS: [(&str, f64, f64); 5] = [
     ("Opposition", 180.0, 8.0),
 ];
 
-/// Calculate Western astrology chart from an ephemeris snapshot and observer latitude.
+/// Calculate Western astrology chart from an ephemeris snapshot and observer latitude (Natal mode by default).
 pub fn calculate_western(
     ephem: &EphemerisSnapshot,
     latitude: f64,
     system: WesternHouseSystem,
     is_male: bool,
+) -> WesternChart {
+    calculate_western_with_mode(ephem, latitude, system, is_male, false)
+}
+
+/// Calculate Western astrology chart with explicit Natal (`is_horary = false`) or Horary (`is_horary = true`) mode.
+pub fn calculate_western_with_mode(
+    ephem: &EphemerisSnapshot,
+    latitude: f64,
+    system: WesternHouseSystem,
+    is_male: bool,
+    is_horary: bool,
 ) -> WesternChart {
     let house_result = compute_houses(
         ephem.ramc,
@@ -349,16 +360,20 @@ pub fn calculate_western(
             }
         }
 
-        // 3.2 Moon Condition
-        let moon_condition = moon::evaluate_moon_condition(
-            moon_lon,
-            moon_speed,
-            sun_lon,
-            &planet_tuples,
-        );
+        // 3.2 Moon Condition (Horary evaluates VOC, Via Combusta, and Next Applying Aspect; Natal evaluates only Lunar Phase)
+        let moon_condition = if is_horary {
+            moon::evaluate_moon_condition(
+                moon_lon,
+                moon_speed,
+                sun_lon,
+                &planet_tuples,
+            )
+        } else {
+            moon::evaluate_natal_moon_condition(moon_lon, sun_lon)
+        };
 
-        // 3.3 Planetary Hours & Radicality
-        let planetary_hours = hours::calculate_astronomical_planetary_hours(
+        // 3.3 Planetary Hours & Radicality (Radicality & Considerations populated only in Horary mode)
+        let planetary_hours = hours::calculate_astronomical_planetary_hours_with_mode(
             ephem.jd_ut1,
             latitude,
             ephem.ramc,
@@ -368,6 +383,7 @@ pub fn calculate_western(
             saturn_house,
             moon_condition.is_void_of_course,
             moon_condition.is_via_combusta,
+            is_horary,
         );
 
         // 3.4 Traditional Dynamic Aspects
@@ -379,9 +395,13 @@ pub fn calculate_western(
         antiscia_input.push(("Midheaven", midheaven));
         let antiscia = antiscia::calculate_antiscia_table(&antiscia_input);
 
-        // 3.6 Mutual Receptions & Perfection
+        // 3.6 Mutual Receptions & Perfection (Perfection mechanisms only in Horary mode)
         let mutual_receptions = reception::find_mutual_receptions(&planet_pos_tuples, is_day_chart);
-        let perfection = reception::analyze_perfection_mechanisms(&planet_tuples);
+        let perfection = if is_horary {
+            reception::analyze_perfection_mechanisms(&planet_tuples)
+        } else {
+            reception::PerfectionReport::default()
+        };
 
         // 3.7 House Cusp Dignities
         let cusp_dignities = almuten::calculate_house_cusp_dignities(&cusps, is_day_chart);

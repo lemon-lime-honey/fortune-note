@@ -114,7 +114,7 @@ pub fn find_mutual_receptions(
 }
 
 /// Perfection and Impediment report.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PerfectionReport {
     pub translation_of_light: Vec<String>,
     pub collection_of_light: Vec<String>,

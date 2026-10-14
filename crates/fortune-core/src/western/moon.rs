@@ -20,7 +20,41 @@ pub struct MoonCondition {
     pub next_applying_aspect: Option<String>,
 }
 
-/// Evaluates Moon's condition according to William Lilly.
+/// Evaluates Moon's phase and elongation for Natal charts without Horary-only VOC or Via Combusta flags.
+pub fn evaluate_natal_moon_condition(
+    moon_longitude: f64,
+    sun_longitude: f64,
+) -> MoonCondition {
+    let mut elongation = moon_longitude - sun_longitude;
+    if elongation < 0.0 {
+        elongation += 360.0;
+    }
+    let is_waxing = elongation < 180.0;
+
+    let lunar_phase_name = match elongation {
+        e if !(22.5..337.5).contains(&e) => "New Moon",
+        e if (22.5..67.5).contains(&e) => "Waxing Crescent",
+        e if (67.5..112.5).contains(&e) => "First Quarter",
+        e if (112.5..157.5).contains(&e) => "Waxing Gibbous",
+        e if (157.5..202.5).contains(&e) => "Full Moon",
+        e if (202.5..247.5).contains(&e) => "Waning Gibbous",
+        e if (247.5..292.5).contains(&e) => "Third Quarter",
+        _ => "Waning Crescent",
+    }
+    .to_string();
+
+    MoonCondition {
+        is_void_of_course: false,
+        is_via_combusta: false,
+        is_in_tincture_exception: false,
+        lunar_phase_name,
+        is_waxing,
+        elongation_deg: elongation,
+        next_applying_aspect: None,
+    }
+}
+
+/// Evaluates Moon's condition according to William Lilly (Horary mode).
 ///
 /// In Lilly: Moon is Void of Course when she has separated from a planet,
 /// and doth not during her stay in that sign apply to any other planet by major aspect.
@@ -39,21 +73,10 @@ pub fn evaluate_moon_condition(
     // Lilly exception: In Taurus(1), Cancer(3), Sagittarius(8), or Pisces(11), VOC "rarely hurts"
     let is_in_tincture_exception = matches!(sign_idx, 1 | 3 | 8 | 11);
 
-    // Lunar Phase & Elongation
-    let mut elongation = moon_longitude - sun_longitude;
-    if elongation < 0.0 { elongation += 360.0; }
-    let is_waxing = elongation < 180.0;
-
-    let lunar_phase_name = match elongation {
-        e if !(22.5..337.5).contains(&e) => "New Moon",
-        e if (22.5..67.5).contains(&e) => "Waxing Crescent",
-        e if (67.5..112.5).contains(&e) => "First Quarter",
-        e if (112.5..157.5).contains(&e) => "Waxing Gibbous",
-        e if (157.5..202.5).contains(&e) => "Full Moon",
-        e if (202.5..247.5).contains(&e) => "Waning Gibbous",
-        e if (247.5..292.5).contains(&e) => "Third Quarter",
-        _ => "Waning Crescent",
-    }.to_string();
+    let natal_base = evaluate_natal_moon_condition(moon_longitude, sun_longitude);
+    let elongation = natal_base.elongation_deg;
+    let is_waxing = natal_base.is_waxing;
+    let lunar_phase_name = natal_base.lunar_phase_name;
 
     // Check for applying major aspects (0°, 60°, 90°, 120°, 180°) before leaving the sign
     let aspect_angles = [0.0, 60.0, 90.0, 120.0, 180.0];

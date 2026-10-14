@@ -147,6 +147,8 @@ fn main() {
         gender,
         western_house_system: Some(house_system),
         timezone_id: None,
+        is_horary: false,
+        saju_options: Default::default(),
     };
 
     let output = match calculate_fortune_western(input) {
@@ -281,9 +283,6 @@ fn main() {
         // 5.2 Moon Condition
         println!("[5.2 Condition of the Moon]");
         println!("  Phase             : {} (Elongation: {:.2}°)", trad.moon_condition.lunar_phase_name, trad.moon_condition.elongation_deg);
-        if let Some(ref next_asp) = trad.moon_condition.next_applying_aspect {
-            println!("  Next Application  : {}", next_asp);
-        }
         println!();
 
         // 5.3 Prenatal Syzygy

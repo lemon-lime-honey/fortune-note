@@ -167,6 +167,8 @@ fn main() {
         gender,
         western_house_system: None,
         timezone_id: None,
+        is_horary: false,
+        saju_options: Default::default(),
     };
 
     let output = match calculate_fortune(input) {
@@ -313,21 +315,15 @@ fn main() {
     if let Some(ref trad) = output.western.traditional {
         println!("[3-B. William Lilly Traditional Analysis]");
         println!(
-            "  Planetary Hours : Day of {}, Hour of {} (Radicality: {} - {})",
+            "  Planetary Hours : Day of {}, Hour of {}",
             trad.planetary_hours.day_ruler,
-            trad.planetary_hours.hour_ruler,
-            if trad.planetary_hours.is_radical { "Radical" } else { "Non-radical" },
-            trad.planetary_hours.radicality_reason
+            trad.planetary_hours.hour_ruler
         );
         println!(
-            "  Moon Condition  : Phase [{}], VOC [{}], Via Combusta [{}]",
+            "  Moon Condition  : Phase [{}] (Elongation: {:.2}°)",
             trad.moon_condition.lunar_phase_name,
-            if trad.moon_condition.is_void_of_course { "Void of Course" } else { "None" },
-            if trad.moon_condition.is_via_combusta { "Via Combusta" } else { "None" }
+            trad.moon_condition.elongation_deg
         );
-        if let Some(ref next_asp) = trad.moon_condition.next_applying_aspect {
-            println!("    Next Applying Aspect: {}", next_asp);
-        }
         if let Some(ref san) = trad.prenatal_syzygy {
             println!(
                 "  Prenatal Syzygy : {} at {} (UTC: {})",

@@ -111,6 +111,8 @@ fn main() {
         gender: Gender::Male,
         western_house_system: Some(WesternHouseSystem::Regiomontanus),
         timezone_id: None,
+        is_horary: false,
+        saju_options: Default::default(),
     };
 
     let western = calculate_fortune_western(input).expect("Natal calculation failed");

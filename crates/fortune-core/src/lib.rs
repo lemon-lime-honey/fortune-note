@@ -17,15 +17,18 @@ pub mod western;
 use serde::{Deserialize, Serialize};
 
 pub use ephemeris::{compute_ephemeris, CelestialBody, EphemerisSnapshot};
-pub use saju::{calculate_saju, DaeUnPeriod, Gender, Pillar, SajuChart};
+pub use saju::{
+    calculate_saju, calculate_saju_with_options, DaeUnPeriod, Gender, Pillar, SajuChart,
+    SajuOptions, ZiHourMode,
+};
 pub use timezone::{lookup_timezone_id, resolve_local_to_utc, resolve_with_timezone, TimezoneResolution};
 pub use vedic::{
     calculate_varga_sign, calculate_varga_sign_and_degree, calculate_vedic, DashaPeriodInfo,
     VargaChart, VargaDivision, VargaPlacement, VedicChart, VedicPlanet,
 };
 pub use western::{
-    calculate_western, WesternAspect, WesternChart, WesternHouseSystem, WesternNode, WesternPlanet,
-    WesternTraditionalData,
+    calculate_western, calculate_western_with_mode, WesternAspect, WesternChart,
+    WesternHouseSystem, WesternNode, WesternPlanet, WesternTraditionalData,
 };
 
 /// Unified input structure for fortune calculation.
@@ -46,6 +49,10 @@ pub struct FortuneCalculationInput {
     pub western_house_system: Option<WesternHouseSystem>,
     #[serde(default)]
     pub timezone_id: Option<String>,
+    #[serde(default)]
+    pub is_horary: bool,
+    #[serde(default)]
+    pub saju_options: SajuOptions,
 }
 
 /// Decoupled Saju calculation output.
@@ -141,8 +148,14 @@ pub fn calculate_fortune_saju(
     input: FortuneCalculationInput,
 ) -> Result<SajuCalculationOutput, String> {
     let (tz_res, ephem) = resolve_fortune_context(&input)?;
-    let saju = calculate_saju(&ephem, input.year, input.longitude, input.gender)
-        .map_err(|e| format!("Saju error: {}", e))?;
+    let saju = calculate_saju_with_options(
+        &ephem,
+        input.year,
+        input.longitude,
+        input.gender,
+        input.saju_options,
+    )
+    .map_err(|e| format!("Saju error: {}", e))?;
 
     Ok(SajuCalculationOutput {
         timezone_id: tz_res.timezone_id,
@@ -158,7 +171,7 @@ pub fn calculate_fortune_western(
     let (tz_res, ephem) = resolve_fortune_context(&input)?;
     let house_sys = input.western_house_system.unwrap_or_default();
     let is_male = input.gender == Gender::Male;
-    let western = calculate_western(&ephem, input.latitude, house_sys, is_male);
+    let western = calculate_western_with_mode(&ephem, input.latitude, house_sys, is_male, input.is_horary);
 
     Ok(WesternCalculationOutput {
         timezone_id: tz_res.timezone_id,
@@ -189,10 +202,16 @@ pub fn calculate_fortune(
     let (tz_res, ephem) = resolve_fortune_context(&input)?;
     let house_sys = input.western_house_system.unwrap_or_default();
     let is_male = input.gender == Gender::Male;
-    let western = calculate_western(&ephem, input.latitude, house_sys, is_male);
+    let western = calculate_western_with_mode(&ephem, input.latitude, house_sys, is_male, input.is_horary);
     let vedic = calculate_vedic(&ephem, input.latitude);
-    let saju = calculate_saju(&ephem, input.year, input.longitude, input.gender)
-        .map_err(|e| format!("Saju error: {}", e))?;
+    let saju = calculate_saju_with_options(
+        &ephem,
+        input.year,
+        input.longitude,
+        input.gender,
+        input.saju_options,
+    )
+    .map_err(|e| format!("Saju error: {}", e))?;
 
     Ok(FortuneCalculationOutput {
         timezone_id: tz_res.timezone_id,
@@ -232,6 +251,8 @@ mod tests {
             gender: Gender::Male,
             western_house_system: None,
             timezone_id: None,
+            is_horary: false,
+            saju_options: Default::default(),
         };
 
         let output = calculate_fortune(input).expect("calculation should succeed");
@@ -262,6 +283,8 @@ mod tests {
             gender: Gender::Male,
             western_house_system: None,
             timezone_id: Some("Asia/Seoul".to_string()),
+            is_horary: false,
+            saju_options: Default::default(),
         };
 
         let output = calculate_fortune_saju(input).expect("saju calculation should succeed");
@@ -284,6 +307,8 @@ mod tests {
             gender: Gender::Male,
             western_house_system: None,
             timezone_id: Some("Asia/Seoul".to_string()),
+            is_horary: false,
+            saju_options: Default::default(),
         };
 
         let w_out = calculate_fortune_western(input.clone()).expect("western should succeed");
@@ -307,6 +332,8 @@ mod tests {
             gender: Gender::Male,
             western_house_system: None,
             timezone_id: Some("Asia/Seoul".to_string()),
+            is_horary: false,
+            saju_options: Default::default(),
         };
         let male_out = calculate_fortune_western(male_input.clone()).expect("male western should succeed");
 
@@ -323,5 +350,41 @@ mod tests {
             male_marriage.longitude, female_marriage.longitude,
             "Male and female Part of Marriage must have different longitudes"
         );
+    }
+
+    #[test]
+    fn test_natal_excludes_horary_fields() {
+        let natal_input = FortuneCalculationInput {
+            year: 1995,
+            month: 10,
+            day: 25,
+            hour: 14,
+            minute: 30,
+            second: 0.0,
+            latitude: 37.5665,
+            longitude: 126.9780,
+            gender: Gender::Male,
+            western_house_system: None,
+            timezone_id: Some("Asia/Seoul".to_string()),
+            is_horary: false,
+            saju_options: Default::default(),
+        };
+        let natal_out = calculate_fortune_western(natal_input.clone()).expect("natal western should succeed");
+        let natal_trad = natal_out.western.traditional.expect("traditional data should be present");
+        assert!(!natal_trad.moon_condition.is_void_of_course);
+        assert!(!natal_trad.moon_condition.is_via_combusta);
+        assert!(natal_trad.moon_condition.next_applying_aspect.is_none());
+        assert!(natal_trad.planetary_hours.radicality_reason.is_empty());
+        assert!(natal_trad.planetary_hours.considerations.is_empty());
+        assert!(natal_trad.perfection.translation_of_light.is_empty());
+        assert!(natal_trad.perfection.collection_of_light.is_empty());
+        assert!(natal_trad.perfection.besiegement.is_empty());
+
+        let mut horary_input = natal_input;
+        horary_input.is_horary = true;
+        let horary_out = calculate_fortune_western(horary_input).expect("horary western should succeed");
+        let horary_trad = horary_out.western.traditional.expect("traditional data should be present");
+        assert!(!horary_trad.planetary_hours.radicality_reason.is_empty());
+        assert!(!horary_trad.planetary_hours.considerations.is_empty());
     }
 }

@@ -166,6 +166,9 @@ fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput, is
                 if trad.moon_condition.is_void_of_course { "Void of Course" } else { "None" },
                 if trad.moon_condition.is_via_combusta { "Via Combusta (15° Lib - 15° Sco)" } else { "None" },
             ));
+            if let Some(ref next_asp) = trad.moon_condition.next_applying_aspect {
+                out.push_str(&format!("  * Next Applying Aspect: {}\n", next_asp));
+            }
         } else {
             out.push_str(&format!(
                 "- Planetary Hours: Day of {}, Hour of {} (Hour {}, {})\n",
@@ -178,9 +181,6 @@ fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput, is
                 "- Moon Condition: Phase [{}]\n",
                 trad.moon_condition.lunar_phase_name,
             ));
-        }
-        if let Some(ref next_asp) = trad.moon_condition.next_applying_aspect {
-            out.push_str(&format!("  * Next Applying Aspect: {}\n", next_asp));
         }
         if let Some(ref san) = trad.prenatal_syzygy {
             let sign_name = ZODIAC_SIGNS[san.sign_index as usize % 12];

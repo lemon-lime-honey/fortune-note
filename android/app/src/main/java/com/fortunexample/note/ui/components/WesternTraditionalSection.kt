@@ -23,12 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fortunexample.note.data.HellenisticData
 import com.fortunexample.note.data.WesternTraditionalData
+import com.fortunexample.note.data.getZodiacSignName
 import com.fortunexample.note.ui.theme.*
-
-private val ZODIAC_NAMES = listOf(
-    "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
-    "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"
-)
 
 @Composable
 private fun SectionCopyButton(
@@ -192,9 +188,9 @@ fun WesternTraditionalSection(
                         if (isHorary) {
                             if (traditional.moon_condition.is_void_of_course) sb.appendLine("• Void of Course: Yes")
                             if (traditional.moon_condition.is_via_combusta) sb.appendLine("• Via Combusta: Yes")
-                        }
-                        traditional.moon_condition.next_applying_aspect?.let {
-                            sb.appendLine("• Next Applying Aspect: $it")
+                            traditional.moon_condition.next_applying_aspect?.let {
+                                sb.appendLine("• Next Applying Aspect: $it")
+                            }
                         }
                         sb.toString().trimEnd()
                     }
@@ -250,13 +246,15 @@ fun WesternTraditionalSection(
                     }
                 }
 
-                traditional.moon_condition.next_applying_aspect?.let { nextAsp ->
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Next Applying Aspect: $nextAsp",
-                        color = TextSecondary,
-                        fontSize = 13.sp
-                    )
+                if (isHorary) {
+                    traditional.moon_condition.next_applying_aspect?.let { nextAsp ->
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Next Applying Aspect: $nextAsp",
+                            color = TextSecondary,
+                            fontSize = 13.sp
+                        )
+                    }
                 }
             }
         }
@@ -547,7 +545,7 @@ fun WesternTraditionalSection(
                         sb.appendLine("[Arabic Parts & Almutens]")
                         sb.appendLine("Arabic Parts (Lots):")
                         traditional.arabic_parts.forEach { p ->
-                            val s = ZODIAC_NAMES.getOrElse(p.sign_index % 12) { "" }
+                            val s = getZodiacSignName(p.sign_index)
                             sb.appendLine("• ${p.name}: ${String.format("%.2f°", p.longitude)} ($s) · House ${p.house_number}")
                         }
                         sb.appendLine("House Cusp Almutens:")
@@ -562,7 +560,7 @@ fun WesternTraditionalSection(
                     Column(modifier = Modifier.padding(top = 10.dp)) {
                         Text("Arabic Parts (Lots):", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
                         traditional.arabic_parts.forEach { part ->
-                            val sign = ZODIAC_NAMES.getOrElse(part.sign_index % 12) { "" }
+                            val sign = getZodiacSignName(part.sign_index)
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -629,8 +627,8 @@ private fun HellenisticSectionContent(h: HellenisticData) {
                 ) {
                     Text("Angles & Planetary Action Points", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
                     SectionCopyButton(title = "Hellenistic Angles") {
-                        val ascSign = ZODIAC_NAMES.getOrElse(h.angles.ascendant_sign % 12) { "" }
-                        val mcSign = ZODIAC_NAMES.getOrElse(h.angles.midheaven_sign % 12) { "" }
+                        val ascSign = getZodiacSignName(h.angles.ascendant_sign)
+                        val mcSign = getZodiacSignName(h.angles.midheaven_sign)
                         val mcHouseStr = if (h.angles.is_mc_in_10th) "House 10 (Culmination)" else "House ${h.angles.midheaven_house} (Action Point)"
                         """
                         [Hellenistic Angles]
@@ -640,8 +638,8 @@ private fun HellenisticSectionContent(h: HellenisticData) {
                     }
                 }
                 Spacer(modifier = Modifier.height(10.dp))
-                val ascSign = ZODIAC_NAMES.getOrElse(h.angles.ascendant_sign % 12) { "" }
-                val mcSign = ZODIAC_NAMES.getOrElse(h.angles.midheaven_sign % 12) { "" }
+                val ascSign = getZodiacSignName(h.angles.ascendant_sign)
+                val mcSign = getZodiacSignName(h.angles.midheaven_sign)
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Ascendant (ASC)", fontSize = 13.sp, color = TextPrimary, fontWeight = FontWeight.Medium)
@@ -757,7 +755,7 @@ private fun HellenisticSectionContent(h: HellenisticData) {
                             val sb = StringBuilder()
                             sb.appendLine("[Hermetic Lots]")
                             h.lots.forEach { lot ->
-                                val sign = ZODIAC_NAMES.getOrElse(lot.sign_index % 12) { "" }
+                                val sign = getZodiacSignName(lot.sign_index)
                                 sb.appendLine("• ${lot.name}: ${String.format("%.2f°", lot.sign_degree)} $sign · House ${lot.house_number} · Ruler: ${lot.ruler}")
                             }
                             sb.toString().trimEnd()
@@ -765,7 +763,7 @@ private fun HellenisticSectionContent(h: HellenisticData) {
                     }
                     Spacer(modifier = Modifier.height(10.dp))
                     h.lots.forEach { lot ->
-                        val sign = ZODIAC_NAMES.getOrElse(lot.sign_index % 12) { "" }
+                        val sign = getZodiacSignName(lot.sign_index)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()

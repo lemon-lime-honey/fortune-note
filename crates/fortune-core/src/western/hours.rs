@@ -51,6 +51,33 @@ pub fn calculate_astronomical_planetary_hours(
     is_moon_voc: bool,
     is_moon_via_combusta: bool,
 ) -> PlanetaryHoursReport {
+    calculate_astronomical_planetary_hours_with_mode(
+        jd_ut1,
+        latitude,
+        ramc,
+        sun_longitude,
+        obliquity_deg,
+        asc_longitude,
+        saturn_house,
+        is_moon_voc,
+        is_moon_via_combusta,
+        true,
+    )
+}
+
+/// Compute day ruler and hour ruler, optionally including Horary radicality and Considerations Before Judgment.
+pub fn calculate_astronomical_planetary_hours_with_mode(
+    jd_ut1: f64,
+    latitude: f64,
+    ramc: f64,
+    sun_longitude: f64,
+    obliquity_deg: f64,
+    asc_longitude: f64,
+    saturn_house: u8,
+    is_moon_voc: bool,
+    is_moon_via_combusta: bool,
+    is_horary: bool,
+) -> PlanetaryHoursReport {
     let sun_lon_rad = sun_longitude.to_radians();
     let eps_rad = obliquity_deg.to_radians();
     let lat_rad = latitude.to_radians();
@@ -116,7 +143,7 @@ pub fn calculate_astronomical_planetary_hours(
     let base_weekday = ((local_noon_jd + 1.5).floor() as i64).rem_euclid(7);
     let astrological_weekday = (base_weekday + day_shift).rem_euclid(7) as u32;
 
-    calculate_planetary_hours(
+    let mut report = calculate_planetary_hours(
         astrological_weekday,
         is_daytime,
         fraction,
@@ -124,7 +151,15 @@ pub fn calculate_astronomical_planetary_hours(
         saturn_house,
         is_moon_voc,
         is_moon_via_combusta,
-    )
+    );
+
+    if !is_horary {
+        report.is_radical = false;
+        report.radicality_reason.clear();
+        report.considerations.clear();
+    }
+
+    report
 }
 
 /// Compute day ruler and hour ruler for a given local time, weekday, and day/night fraction.
