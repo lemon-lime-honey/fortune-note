@@ -296,7 +296,6 @@ pub fn calculate_western(
     let moon_lon = moon_opt.map_or(0.0, |b| b.tropical_longitude);
     let moon_speed = moon_opt.map_or(13.176, |b| b.speed);
 
-    let sun_house = determine_house(sun_lon, &cusps);
     // True astronomical day/night sect based on the eastern horizon (ASC) and western horizon (DSC = ASC + 180°).
     // Above the horizon spans from DSC (180°) counter-clockwise to ASC (360°/0°).
     let is_day_chart = (sun_lon - ascendant).rem_euclid(360.0) >= 180.0;
