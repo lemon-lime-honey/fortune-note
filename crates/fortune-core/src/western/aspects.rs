@@ -15,8 +15,112 @@ pub struct TraditionalAspect {
     pub orb: f64,
     pub max_allowed_orb: f64,
     pub is_applying: bool,
-    pub is_partile: bool, // within 1 degree
+    pub is_partile: bool, // same integer degree in sign (Lilly CA p. 106)
     pub degrees_to_perfection: f64,
+    #[serde(default)]
+    pub will_perfect_in_sign: bool,
+}
+
+/// Analytical kinematic evaluation of an aspect between two moving bodies.
+#[derive(Debug, Clone, Copy)]
+pub struct AspectKinematics {
+    pub is_applying: bool,
+    pub approach_rate: f64,
+    pub time_to_perfection: f64,
+    pub elapsed_since_separation: f64,
+    pub degrees_to_perfection: f64,
+    pub will_perfect_in_sign: bool,
+}
+
+/// Analytically evaluate whether two bodies are applying (approaching) or separating
+/// relative to `target_angle` (0, 60, 90, 120, 180) without finite-difference overshooting.
+pub fn evaluate_aspect_kinematics(
+    lon1: f64,
+    speed1: f64,
+    lon2: f64,
+    speed2: f64,
+    target_angle: f64,
+) -> AspectKinematics {
+    let d_lon = (lon1 - lon2).rem_euclid(360.0);
+    let rel_speed = speed1 - speed2;
+
+    // Determine which branch of target_angle (+target_angle or 360 - target_angle) is closest
+    let signed_err = if target_angle == 0.0 {
+        if d_lon <= 180.0 { d_lon } else { d_lon - 360.0 }
+    } else if (target_angle - 180.0).abs() < 1e-9 {
+        d_lon - 180.0
+    } else {
+        let mut e_pos = (d_lon - target_angle + 540.0).rem_euclid(360.0) - 180.0;
+        let mut e_neg = (d_lon - (360.0 - target_angle) + 540.0).rem_euclid(360.0) - 180.0;
+        if e_pos == -180.0 { e_pos = 180.0; }
+        if e_neg == -180.0 { e_neg = 180.0; }
+        if e_pos.abs() <= e_neg.abs() { e_pos } else { e_neg }
+    };
+
+    // d(|e|)/dt = sign(e) * (speed1 - speed2)
+    // Therefore approach_rate = -d(|e|)/dt:
+    let approach_rate = if signed_err > 1e-12 {
+        -rel_speed
+    } else if signed_err < -1e-12 {
+        rel_speed
+    } else {
+        0.0
+    };
+
+    let is_applying = approach_rate > 1e-9;
+
+    if is_applying {
+        let t_perf = signed_err.abs() / approach_rate;
+        let deg_to_perf = speed1.abs() * t_perf;
+
+        let sign1_now = ((lon1.rem_euclid(360.0) / 30.0).floor() as u8) % 12;
+        let sign2_now = ((lon2.rem_euclid(360.0) / 30.0).floor() as u8) % 12;
+
+        let lon1_perf = (lon1 + speed1 * t_perf).rem_euclid(360.0);
+        let lon2_perf = (lon2 + speed2 * t_perf).rem_euclid(360.0);
+        let sign1_perf = ((lon1_perf / 30.0).floor() as u8) % 12;
+        let sign2_perf = ((lon2_perf / 30.0).floor() as u8) % 12;
+
+        let will_perfect_in_sign = sign1_now == sign1_perf
+            && sign2_now == sign2_perf
+            && is_valid_sign_aspect(sign1_perf, sign2_perf, target_angle);
+
+        AspectKinematics {
+            is_applying: true,
+            approach_rate,
+            time_to_perfection: t_perf,
+            elapsed_since_separation: f64::INFINITY,
+            degrees_to_perfection: deg_to_perf,
+            will_perfect_in_sign,
+        }
+    } else {
+        let sep_rate = (-approach_rate).max(0.0);
+        let elapsed_sep = if sep_rate > 1e-9 {
+            signed_err.abs() / sep_rate
+        } else {
+            f64::INFINITY
+        };
+
+        AspectKinematics {
+            is_applying: false,
+            approach_rate,
+            time_to_perfection: f64::INFINITY,
+            elapsed_since_separation: elapsed_sep,
+            degrees_to_perfection: 0.0,
+            will_perfect_in_sign: false,
+        }
+    }
+}
+
+/// Convenience helper returning whether two bodies are analytically applying toward `target_angle`.
+pub fn is_aspect_applying(
+    lon1: f64,
+    speed1: f64,
+    lon2: f64,
+    speed2: f64,
+    target_angle: f64,
+) -> bool {
+    evaluate_aspect_kinematics(lon1, speed1, lon2, speed2, target_angle).is_applying
 }
 
 /// Check if two zodiac sign indices (0..12) form a valid traditional sign configuration for an aspect.
@@ -82,51 +186,36 @@ pub fn calculate_traditional_aspects(
 
                 let orb = (shortest - target_angle).abs();
                 if orb <= max_orb {
-                    // Determine which planet is faster
-                    let (faster_name, slower_name, f_lon, s_lon, f_speed, s_speed) = if speed1.abs() >= speed2.abs() {
-                        (name1, name2, lon1, lon2, speed1, speed2)
-                    } else {
-                        (name2, name1, lon2, lon1, speed2, speed1)
-                    };
+                    // In classical astrology (Lilly CA p. 107), the lighter planet (faster mean motion
+                    // in Chaldean order) applies to or separates from the heavier planet.
+                    let (lighter_name, heavier_name, l_lon, h_lon, l_speed, h_speed) =
+                        if p1.chaldean_speed_rank() <= p2.chaldean_speed_rank() {
+                            (name1, name2, lon1, lon2, speed1, speed2)
+                        } else {
+                            (name2, name1, lon2, lon1, speed2, speed1)
+                        };
 
-                    // Compute instantaneous approach rate with infinitesimal step (dt = 1e-6 day ~ 0.0864s)
-                    // to prevent finite difference overshooting at tiny orbs
-                    let dt = 1e-6;
-                    let future_f_lon = (f_lon + f_speed * dt).rem_euclid(360.0);
-                    let future_s_lon = (s_lon + s_speed * dt).rem_euclid(360.0);
-                    let future_diff = (future_f_lon - future_s_lon).abs().rem_euclid(360.0);
-                    let future_shortest = if future_diff > 180.0 { 360.0 - future_diff } else { future_diff };
-                    let future_orb = (future_shortest - target_angle).abs();
+                    let kin = evaluate_aspect_kinematics(l_lon, l_speed, h_lon, h_speed, target_angle);
 
-                    let approach_rate = (orb - future_orb) / dt; // deg/day
-                    let is_applying = approach_rate > 1e-5;
-
-                    // In traditional astrology (Lilly CA p. 106), an aspect is partile when
-                    // the planets are in the same integer degree of their respective signs (e.g. 10° Aries and 10° Leo),
-                    // or within 1.0 degree orb.
+                    // In traditional astrology (Lilly CA p. 106), an aspect is partile strictly when
+                    // the planets are in the same integer degree of their respective signs
+                    // (e.g. 10° Aries and 10° Leo). Different integer degrees within moiety orb are platic.
                     let deg1_int = (lon1.rem_euclid(30.0)).floor() as u32;
                     let deg2_int = (lon2.rem_euclid(30.0)).floor() as u32;
-                    let is_partile = deg1_int == deg2_int || orb <= 1.0;
-
-                    // Degrees to perfection: distance the applying (faster) planet travels until perfection
-                    let degrees_to_perfection = if is_applying && approach_rate > 1e-5 {
-                        let time_to_perfection = orb / approach_rate; // days
-                        f_speed.abs() * time_to_perfection
-                    } else {
-                        0.0
-                    };
+                    let is_partile = deg1_int == deg2_int;
 
                     results.push(TraditionalAspect {
-                        planet1: faster_name.to_string(),
-                        planet2: slower_name.to_string(),
+                        planet1: lighter_name.to_string(),
+                        planet2: heavier_name.to_string(),
                         aspect_type: aspect_name.to_string(),
                         exact_angle: target_angle,
                         actual_angle: shortest,
                         orb,
                         max_allowed_orb: max_orb,
-                        is_applying,
+                        is_applying: kin.is_applying,
                         is_partile,
-                        degrees_to_perfection,
+                        degrees_to_perfection: kin.degrees_to_perfection,
+                        will_perfect_in_sign: kin.will_perfect_in_sign,
                     });
                 }
             }
@@ -189,7 +278,6 @@ mod tests {
     #[test]
     fn test_tiny_orb_applying_no_overshoot() {
         // Moon at 9.9999° Aries applying to Sun at 10.0000° Aries (orb 0.0001°)
-        // In the old implementation with dt = 0.001 day, 0.001 day moved Moon by 0.012°, overshooting by 0.0119° and misclassifying as separating.
         let planets = [
             ("Moon", 9.9999, 13.0),
             ("Sun", 10.0000, 1.0),
@@ -198,7 +286,9 @@ mod tests {
         assert_eq!(aspects.len(), 1);
         let asp = &aspects[0];
         assert!(asp.is_applying, "Moon must be correctly classified as applying even with infinitesimal orb");
-        assert!(asp.is_partile);
+        // 9.9999° is in integer degree 9, whereas 10.0000° is in integer degree 10 -> Platic, not Partile
+        assert!(!asp.is_partile, "Different integer degrees (9°59' vs 10°00') are platic, not partile");
+        assert!(asp.will_perfect_in_sign);
     }
 
     #[test]
@@ -214,6 +304,45 @@ mod tests {
         let asp = &aspects[0];
         assert_eq!(asp.aspect_type, "Trine");
         assert!(asp.is_partile, "Same integer degree in sign must be partile");
+
+        // Different integer degrees within 1.0° orb (15.8° Aries vs 16.2° Leo, orb 0.4°):
+        // Must be platic (is_partile == false)
+        let planets_platic = [
+            ("Mars", 15.8, 0.6),
+            ("Jupiter", 136.2, 0.1),
+        ];
+        let aspects_platic = calculate_traditional_aspects(&planets_platic);
+        assert_eq!(aspects_platic.len(), 1);
+        assert!(!aspects_platic[0].is_partile, "15°50' and 16°12' are in different integer degrees and thus platic");
+    }
+
+    #[test]
+    fn test_chaldean_order_and_sign_exit_refranation() {
+        // Stationary Mercury (speed 0.01°/d at 29.5° Aries) and Sun (speed 1.0°/d at 28.0° Aries)
+        // Even though Sun has higher instantaneous speed, Mercury is the lighter planet in Chaldean order
+        let planets = [
+            ("Sun", 28.0, 1.0),
+            ("Mercury", 29.5, 0.1),
+        ];
+        let aspects = calculate_traditional_aspects(&planets);
+        assert_eq!(aspects.len(), 1);
+        let asp = &aspects[0];
+        assert_eq!(asp.planet1, "Mercury", "Lighter planet (Mercury) must be planet1");
+        assert_eq!(asp.planet2, "Sun", "Heavier planet (Sun) must be planet2");
+        assert!(asp.is_applying, "Sun catching up to slow Mercury is applying");
+        // Gap is 1.5°, rel_speed is 0.9°/d -> t = 1.6667 d -> Mercury moves 29.5 + 0.1667 = 29.6667° (still in Aries)
+        assert!(asp.will_perfect_in_sign);
+
+        // Refranation case: Mercury at 29.5° Aries (speed 0.5°/d), Sun at 27.0° Aries (speed 1.0°/d)
+        // Gap is 2.5°, rel_speed = 0.5°/d -> t = 5.0 d -> Mercury reaches 32.0° (Taurus 2°) before perfection!
+        let planets_refran = [
+            ("Sun", 27.0, 1.0),
+            ("Mercury", 29.5, 0.5),
+        ];
+        let aspects_refran = calculate_traditional_aspects(&planets_refran);
+        assert_eq!(aspects_refran.len(), 1);
+        assert!(aspects_refran[0].is_applying);
+        assert!(!aspects_refran[0].will_perfect_in_sign, "Aspect must be marked as not perfecting in sign (Refranation)");
     }
 }
 

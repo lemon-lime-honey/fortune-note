@@ -267,13 +267,13 @@ pub fn calculate_western_with_mode(
             for (name, target, max_orb) in aspect_defs {
                 let orb = (shortest - target).abs();
                 if orb <= max_orb {
-                    let dt = 0.001;
-                    let future_p1 = (p1.longitude + p1.speed * dt).rem_euclid(360.0);
-                    let future_p2 = (p2.longitude + p2.speed * dt).rem_euclid(360.0);
-                    let future_diff = (future_p1 - future_p2).abs().rem_euclid(360.0);
-                    let future_shortest = if future_diff > 180.0 { 360.0 - future_diff } else { future_diff };
-                    let future_orb = (future_shortest - target).abs();
-                    let is_applying = future_orb < orb - 1e-9;
+                    let is_applying = aspects::is_aspect_applying(
+                        p1.longitude,
+                        p1.speed,
+                        p2.longitude,
+                        p2.speed,
+                        target,
+                    );
 
                     aspects.push(WesternAspect {
                         planet1: p1.name.clone(),

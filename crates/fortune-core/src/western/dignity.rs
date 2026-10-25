@@ -78,6 +78,20 @@ impl ClassicalPlanet {
             Self::Saturn => 4.5,   // Full: 9°
         }
     }
+
+    /// Traditional Chaldean speed order (0 = Moon fastest/lightest .. 6 = Saturn slowest/heaviest).
+    /// In classical astrology (Lilly CA p. 107), lighter planets apply to heavier planets.
+    pub fn chaldean_speed_rank(self) -> u8 {
+        match self {
+            Self::Moon => 0,
+            Self::Mercury => 1,
+            Self::Venus => 2,
+            Self::Sun => 3,
+            Self::Mars => 4,
+            Self::Jupiter => 5,
+            Self::Saturn => 6,
+        }
+    }
 }
 
 /// Domicile rulers for 12 zodiac signs (0 = Aries .. 11 = Pisces).
