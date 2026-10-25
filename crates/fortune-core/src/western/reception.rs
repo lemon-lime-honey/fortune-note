@@ -9,7 +9,7 @@
 //! - Besiegement between the infortunes Mars and Saturn (Lilly CA p. 113)
 
 use serde::{Deserialize, Serialize};
-use super::aspects::calculate_traditional_aspects;
+use super::aspects::{calculate_traditional_aspects, evaluate_aspect_kinematics};
 use super::dignity::{ClassicalPlanet, EssentialDignities, evaluate_essential_dignities};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -159,93 +159,105 @@ pub fn analyze_perfection_mechanisms(
     let n = planets.len();
 
     // 1. Translation of Light (Lilly CA p. 110)
-    // Fast planet T separates from P1 and immediately applies to P2.
-    // P1 and P2 do not have an active applying aspect between them.
+    // Lighter/faster planet T separates from P1 (its most recent separating aspect)
+    // and immediately applies to P2 (its next perfecting applying aspect in sign),
+    // while P1 and P2 do not have an active applying aspect between them.
     for i in 0..n {
-        let (t_name, _, t_speed) = planets[i];
+        let (t_name, t_lon, t_speed) = planets[i];
+        let Some(t_cp) = ClassicalPlanet::from_name(t_name) else { continue };
 
-        for j in 0..n {
+        // Find the most recent separating aspect of T from a heavier planet P1
+        let mut last_sep: Option<(&str, &str, f64)> = None; // (p1_name, aspect_type, elapsed_time)
+        // Find the immediate next perfecting aspect of T to a heavier planet P2
+        let mut next_app: Option<(&str, &str, f64)> = None; // (p2_name, aspect_type, time_to_perfection)
+
+        for (j, &(p_name, p_lon, p_speed)) in planets.iter().enumerate() {
             if i == j { continue; }
-            let (p1_name, _, p1_speed) = planets[j];
-            if t_speed.abs() <= p1_speed.abs() { continue; }
+            let Some(p_cp) = ClassicalPlanet::from_name(p_name) else { continue };
 
-            // Find aspect between T and P1 where T is separating from P1
-            let asp_t_p1 = aspects.iter().find(|a| {
-                ((a.planet1 == t_name && a.planet2 == p1_name) || (a.planet1 == p1_name && a.planet2 == t_name))
-                    && !a.is_applying
-            });
-            let asp_t_p1 = match asp_t_p1 {
-                Some(a) => a,
-                None => continue,
-            };
+            // T must be lighter (faster in Chaldean order) or faster in instantaneous speed
+            if t_cp.chaldean_speed_rank() > p_cp.chaldean_speed_rank() && t_speed.abs() <= p_speed.abs() {
+                continue;
+            }
 
-            for (k, &(p2_name, _, p2_speed)) in planets.iter().enumerate() {
-                if k == i || k == j { continue; }
-                if t_speed.abs() <= p2_speed.abs() { continue; }
-
-                // Find aspect between T and P2 where T is applying to P2
-                let asp_t_p2 = aspects.iter().find(|a| {
-                    ((a.planet1 == t_name && a.planet2 == p2_name) || (a.planet1 == p2_name && a.planet2 == t_name))
-                        && a.is_applying
-                });
-                let asp_t_p2 = match asp_t_p2 {
-                    Some(a) => a,
-                    None => continue,
-                };
-
-                // Ensure P1 and P2 do not have an active applying aspect directly
-                let p1_p2_applying = aspects.iter().any(|a| {
-                    ((a.planet1 == p1_name && a.planet2 == p2_name) || (a.planet1 == p2_name && a.planet2 == p1_name))
-                        && a.is_applying
-                });
-
-                if !p1_p2_applying {
-                    let desc = format!(
-                        "{} (speed {:+.2}°/d) translates light from {} (separating {}) to {} (applying {})",
-                        t_name, t_speed, p1_name, asp_t_p1.aspect_type, p2_name, asp_t_p2.aspect_type
-                    );
-                    if !translation.contains(&desc) {
-                        translation.push(desc);
+            for a in aspects.iter().filter(|a| {
+                (a.planet1 == t_name && a.planet2 == p_name) || (a.planet1 == p_name && a.planet2 == t_name)
+            }) {
+                let kin = evaluate_aspect_kinematics(t_lon, t_speed, p_lon, p_speed, a.exact_angle);
+                if !a.is_applying {
+                    if kin.elapsed_since_separation.is_finite()
+                        && last_sep.as_ref().is_none_or(|&(_, _, best_t)| kin.elapsed_since_separation < best_t)
+                    {
+                        last_sep = Some((p_name, a.aspect_type.as_str(), kin.elapsed_since_separation));
                     }
+                } else if a.will_perfect_in_sign
+                    && kin.time_to_perfection.is_finite()
+                    && next_app.as_ref().is_none_or(|&(_, _, best_t)| kin.time_to_perfection < best_t)
+                {
+                    next_app = Some((p_name, a.aspect_type.as_str(), kin.time_to_perfection));
+                }
+            }
+        }
+
+        if let (Some((p1_name, sep_asp, _)), Some((p2_name, app_asp, _))) = (last_sep, next_app)
+            && p1_name != p2_name
+        {
+            let p1_p2_applying = aspects.iter().any(|a| {
+                ((a.planet1 == p1_name && a.planet2 == p2_name)
+                    || (a.planet1 == p2_name && a.planet2 == p1_name))
+                    && a.is_applying
+            });
+
+            if !p1_p2_applying {
+                let desc = format!(
+                    "{} (speed {:+.2}°/d) translates light from {} (separating {}) to {} (applying {})",
+                    t_name, t_speed, p1_name, sep_asp, p2_name, app_asp
+                );
+                if !translation.contains(&desc) {
+                    translation.push(desc);
                 }
             }
         }
     }
 
     // 2. Collection of Light (Lilly CA p. 110)
-    // Slower heavier planet C collects light from both P1 and P2 (both P1 and P2 apply to C).
+    // Heavier slower planet C collects light from both P1 and P2 (both P1 and P2 apply to C
+    // and perfect their aspects before exiting their signs).
     // P1 and P2 do not apply directly to each other.
     for i in 0..n {
         let (c_name, _, c_speed) = planets[i];
+        let Some(c_cp) = ClassicalPlanet::from_name(c_name) else { continue };
 
         for j in 0..n {
             if i == j { continue; }
             let (p1_name, _, p1_speed) = planets[j];
-            if c_speed.abs() >= p1_speed.abs() { continue; }
+            let Some(p1_cp) = ClassicalPlanet::from_name(p1_name) else { continue };
+            if c_cp.chaldean_speed_rank() <= p1_cp.chaldean_speed_rank() && c_speed.abs() >= p1_speed.abs() {
+                continue;
+            }
 
-            // P1 must apply to C
+            // P1 must apply to C and perfect in sign
             let asp_p1_c = aspects.iter().find(|a| {
                 ((a.planet1 == p1_name && a.planet2 == c_name) || (a.planet1 == c_name && a.planet2 == p1_name))
                     && a.is_applying
+                    && a.will_perfect_in_sign
             });
-            let asp_p1_c = match asp_p1_c {
-                Some(a) => a,
-                None => continue,
-            };
+            let Some(asp_p1_c) = asp_p1_c else { continue };
 
             for (k, &(p2_name, _, p2_speed)) in planets.iter().enumerate().skip(j + 1) {
                 if k == i { continue; }
-                if c_speed.abs() >= p2_speed.abs() { continue; }
+                let Some(p2_cp) = ClassicalPlanet::from_name(p2_name) else { continue };
+                if c_cp.chaldean_speed_rank() <= p2_cp.chaldean_speed_rank() && c_speed.abs() >= p2_speed.abs() {
+                    continue;
+                }
 
-                // P2 must apply to C
+                // P2 must apply to C and perfect in sign
                 let asp_p2_c = aspects.iter().find(|a| {
                     ((a.planet1 == p2_name && a.planet2 == c_name) || (a.planet1 == c_name && a.planet2 == p2_name))
                         && a.is_applying
+                        && a.will_perfect_in_sign
                 });
-                let asp_p2_c = match asp_p2_c {
-                    Some(a) => a,
-                    None => continue,
-                };
+                let Some(asp_p2_c) = asp_p2_c else { continue };
 
                 // P1 and P2 do not apply directly to each other
                 let p1_p2_applying = aspects.iter().any(|a| {
