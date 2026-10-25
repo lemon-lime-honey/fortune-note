@@ -156,7 +156,7 @@ pub fn calculate_hellenistic_data(
     let jupiter_lon = planet_pos_tuples.iter().find(|(n, _)| *n == "Jupiter").map_or(0.0, |(_, l)| *l);
     let saturn_lon = planet_pos_tuples.iter().find(|(n, _)| *n == "Saturn").map_or(0.0, |(_, l)| *l);
 
-    let all_lots = parts::calculate_arabic_parts(
+    let lots = parts::calculate_hellenistic_lots(
         ascendant,
         sun_lon,
         moon_lon,
@@ -169,9 +169,6 @@ pub fn calculate_hellenistic_data(
         is_day_chart,
         is_male,
     );
-
-    // Filter to the 7 authentic Hermetic Lots + Part of Marriage / Substance
-    let lots = all_lots;
 
     // 3. Sign-based Aspects with Degree Contacts
     let aspects = aspects::calculate_traditional_aspects(planet_tuples);

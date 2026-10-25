@@ -20,8 +20,14 @@ pub struct AntiscionPoint {
 pub fn calculate_antiscion(longitude: f64) -> (f64, f64) {
     // Solstice axis reflection: 0° Cancer (90°) <-> 0° Gemini (60°) reflection
     // Formula: (180.0 - longitude) mod 360.0
-    let antiscion = (180.0 - longitude).rem_euclid(360.0);
-    let contra_antiscion = (antiscion + 180.0).rem_euclid(360.0);
+    let mut antiscion = (180.0 - longitude).rem_euclid(360.0);
+    if antiscion >= 360.0 {
+        antiscion = 0.0;
+    }
+    let mut contra_antiscion = (antiscion + 180.0).rem_euclid(360.0);
+    if contra_antiscion >= 360.0 {
+        contra_antiscion = 0.0;
+    }
     (antiscion, contra_antiscion)
 }
 
@@ -30,13 +36,14 @@ pub fn calculate_antiscia_table(
     bodies: &[(&str, f64)],
 ) -> Vec<AntiscionPoint> {
     bodies.iter().map(|&(name, lon)| {
-        let (antiscion, contra) = calculate_antiscion(lon);
+        let norm_lon = lon.rem_euclid(360.0);
+        let (antiscion, contra) = calculate_antiscion(norm_lon);
         let sign_idx = (antiscion / 30.0).floor() as u8 % 12;
-        let deg = antiscion - (sign_idx as f64 * 30.0);
+        let deg = (antiscion - (sign_idx as f64 * 30.0)).clamp(0.0, 29.999999999);
 
         AntiscionPoint {
             body_name: name.to_string(),
-            true_longitude: lon,
+            true_longitude: norm_lon,
             antiscion_longitude: antiscion,
             antiscion_sign_index: sign_idx,
             antiscion_degree: deg,

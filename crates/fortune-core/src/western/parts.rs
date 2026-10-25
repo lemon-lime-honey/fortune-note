@@ -126,15 +126,73 @@ pub fn calculate_arabic_parts(
     parts
 }
 
+/// Calculate authentic Hellenistic Lots for Whole Sign charts
+/// (Paulus Alexandrinus Ch. 23 & Vettius Valens Anthologies II.19, II.38).
+///
+/// Unlike Quadrant Arabic Parts, Whole Sign Lot of Substance uses the Whole Sign
+/// 2nd house reference point `(ascendant + 30.0) % 360.0` (measuring from the ruler
+/// of the 2nd sign to the 2nd Whole Sign house offset from ASC) rather than a 0° dummy cusp.
+pub fn calculate_hellenistic_lots(
+    ascendant: f64,
+    sun_lon: f64,
+    moon_lon: f64,
+    mercury_lon: f64,
+    venus_lon: f64,
+    mars_lon: f64,
+    jupiter_lon: f64,
+    saturn_lon: f64,
+    cusps: &[f64; 12],
+    is_day_chart: bool,
+    is_male: bool,
+) -> Vec<ArabicPart> {
+    let mut lots = calculate_arabic_parts(
+        ascendant,
+        sun_lon,
+        moon_lon,
+        mercury_lon,
+        venus_lon,
+        mars_lon,
+        jupiter_lon,
+        saturn_lon,
+        cusps,
+        is_day_chart,
+        is_male,
+    );
+
+    // Replace Part of Substance with authentic Whole Sign Lot of Substance / Abundance:
+    // 2nd sign from Ascendant's sign:
+    let asc_sign = ((ascendant.rem_euclid(360.0) / 30.0).floor() as usize) % 12;
+    let second_sign = (asc_sign + 1) % 12;
+    let ruler_second_planet = DOMICILE_RULERS[second_sign];
+    let ruler_second_lon = match ruler_second_planet {
+        super::dignity::ClassicalPlanet::Sun => sun_lon,
+        super::dignity::ClassicalPlanet::Moon => moon_lon,
+        super::dignity::ClassicalPlanet::Mercury => mercury_lon,
+        super::dignity::ClassicalPlanet::Venus => venus_lon,
+        super::dignity::ClassicalPlanet::Mars => mars_lon,
+        super::dignity::ClassicalPlanet::Jupiter => jupiter_lon,
+        super::dignity::ClassicalPlanet::Saturn => saturn_lon,
+    };
+    let second_house_point = (ascendant + 30.0).rem_euclid(360.0);
+    let ws_substance_lon = (ascendant + second_house_point - ruler_second_lon).rem_euclid(360.0);
+
+    if let Some(sub) = lots.iter_mut().find(|p| p.name == "Part of Substance") {
+        *sub = create_part("Part of Substance", ws_substance_lon, cusps);
+    }
+
+    lots
+}
+
 fn create_part(name: &str, lon: f64, cusps: &[f64; 12]) -> ArabicPart {
-    let sign_index = (lon / 30.0).floor() as u8 % 12;
-    let sign_degree = lon - (sign_index as f64 * 30.0);
+    let norm_lon = lon.rem_euclid(360.0);
+    let sign_index = (norm_lon / 30.0).floor() as u8 % 12;
+    let sign_degree = (norm_lon - (sign_index as f64 * 30.0)).clamp(0.0, 29.999999999);
     let ruler = DOMICILE_RULERS[sign_index as usize].name().to_string();
-    let house_number = super::determine_house(lon, cusps);
+    let house_number = super::determine_house(norm_lon, cusps);
 
     ArabicPart {
         name: name.to_string(),
-        longitude: lon,
+        longitude: norm_lon,
         sign_index,
         sign_degree,
         house_number,
