@@ -23,8 +23,10 @@ pub use saju::{
 };
 pub use timezone::{lookup_timezone_id, resolve_local_to_utc, resolve_with_timezone, TimezoneResolution};
 pub use vedic::{
-    calculate_varga_sign, calculate_varga_sign_and_degree, calculate_vedic, DashaPeriodInfo,
-    VargaChart, VargaDivision, VargaPlacement, VedicChart, VedicPlanet,
+    calculate_varga_sign, calculate_varga_sign_and_degree, calculate_vedic,
+    BhinnaAshtakavargaRow, DashaPeriodInfo, VargaChart, VargaDivision, VargaPlacement,
+    VedicArudhaPada, VedicAshtakavarga, VedicChart, VedicDrishtiInfo, VedicKarakaInfo,
+    VedicPanchanga, VedicPlanet,
 };
 pub use western::{
     calculate_western, calculate_western_with_mode, WesternAspect, WesternChart,
@@ -265,7 +267,7 @@ mod tests {
         assert_eq!(output.western.planets.len(), 7);
         assert_eq!(output.western.nodes.len(), 2);
         assert_eq!(output.vedic.planets.len(), 9);
-        assert_eq!(output.vedic.vargas.len(), 11);
+        assert_eq!(output.vedic.vargas.len(), 19);
         assert_eq!(output.saju.daeun_periods.len(), 10);
     }
 
@@ -315,7 +317,7 @@ mod tests {
         assert_eq!(w_out.western.planets.len(), 7);
 
         let v_out = calculate_fortune_vedic(input).expect("vedic should succeed");
-        assert_eq!(v_out.vedic.vargas.len(), 11);
+        assert_eq!(v_out.vedic.vargas.len(), 19);
     }
 
     #[test]
