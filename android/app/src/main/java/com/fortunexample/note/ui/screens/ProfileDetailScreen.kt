@@ -169,7 +169,15 @@ fun ProfileDetailScreen(
         "D9" to "Navamsha (D9)",
         "D10" to "Dashamsha (D10)",
         "D11" to "Rudramsha (D11)",
-        "D12" to "Dwadashamsha (D12)"
+        "D12" to "Dwadashamsha (D12)",
+        "D16" to "Shodashamsha (D16)",
+        "D20" to "Vimshamsha (D20)",
+        "D24" to "Chaturvimshamsha (D24)",
+        "D27" to "Saptavimshamsha (D27)",
+        "D30" to "Trimshamsha (D30)",
+        "D40" to "Khavedamsha (D40)",
+        "D45" to "Akshavedamsha (D45)",
+        "D60" to "Shashtiamsha (D60)"
     )
 
     Scaffold(
@@ -179,7 +187,7 @@ fun ProfileDetailScreen(
                     Column {
                         Text(profile.name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary)
                         Text(
-                            text = "${profile.birth_year}-${String.format("%02d", profile.birth_month)}-${String.format("%02d", profile.birth_day)} ${String.format("%02d:%02d", profile.birth_hour, profile.birth_minute)} · ${if (profile.gender == "male") "남성" else "여성"}",
+                            text = "${profile.birth_year}-${String.format("%02d", profile.birth_month)}-${String.format("%02d", profile.birth_day)} ${String.format("%02d:%02d:%02d", profile.birth_hour, profile.birth_minute, profile.birth_second.toInt())} · ${if (profile.gender == "male") "남성" else "여성"}",
                             fontSize = 12.sp,
                             color = TextSecondary
                         )
@@ -795,6 +803,8 @@ fun ProfileDetailScreen(
 
                                     vedicChart.planets.forEach { p ->
                                         val rx = if (p.is_retrograde) " [Rx]" else ""
+                                        val comb = if (p.combustion != "None" && p.combustion.isNotEmpty()) " [${p.combustion}]" else ""
+                                        val dig = if (p.dignity.isNotEmpty()) " · ${p.dignity}" else ""
                                         val pPlacement = activeVarga?.placements?.find { it.planet_name == p.name }
                                         val houseNum = pPlacement?.house ?: (((p.sign_index - vargaLagnaSign + 12) % 12) + 1)
                                         val signIdx = pPlacement?.sign_index ?: p.sign_index
@@ -810,13 +820,13 @@ fun ProfileDetailScreen(
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
                                                 Text(
-                                                    text = "${p.name}$rx",
+                                                    text = "${p.name}$rx$comb",
                                                     color = TextPrimary,
                                                     fontWeight = FontWeight.SemiBold,
                                                     fontSize = 14.sp
                                                 )
                                                 Text(
-                                                    text = "House $houseNum · ${getZodiacSignName(signIdx)}",
+                                                    text = "House $houseNum · ${getZodiacSignName(signIdx)}${if (selectedVarga == "D1") dig else ""}",
                                                     color = TextSecondary,
                                                     fontSize = 13.sp,
                                                     fontWeight = FontWeight.Medium
@@ -862,6 +872,196 @@ fun ProfileDetailScreen(
                             }
 
                             Spacer(modifier = Modifier.height(16.dp))
+
+                            // Panchanga (5 Limbs of Time) 카드
+                            if (vedicChart.panchanga.tithi_name.isNotEmpty()) {
+                                val pan = vedicChart.panchanga
+                                Card(
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
+                                    border = BorderStroke(1.dp, BorderColor),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Text("Panchanga (5 Limbs of Time)", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text("Tithi", color = TextSecondary, fontSize = 13.sp)
+                                            Text("${pan.tithi_name} (#${pan.tithi_number}, ${pan.paksha})", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                        }
+                                        HorizontalDivider(color = BorderColor.copy(alpha = 0.4f))
+                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text("Vara", color = TextSecondary, fontSize = 13.sp)
+                                            Text("${pan.vara_name} · ${pan.vara_lord}", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                        }
+                                        HorizontalDivider(color = BorderColor.copy(alpha = 0.4f))
+                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text("Nakshatra", color = TextSecondary, fontSize = 13.sp)
+                                            Text("${pan.nakshatra_name} (Pada ${pan.nakshatra_pada}) · ${pan.nakshatra_lord}", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                        }
+                                        HorizontalDivider(color = BorderColor.copy(alpha = 0.4f))
+                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text("Yoga / Karana", color = TextSecondary, fontSize = 13.sp)
+                                            Text("${pan.yoga_name} / ${pan.karana_name}", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(16.dp))
+                            }
+
+                            // Jaimini Chara Karakas (8-Karaka Scheme) 카드
+                            if (vedicChart.chara_karakas.isNotEmpty()) {
+                                Card(
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
+                                    border = BorderStroke(1.dp, BorderColor),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        Text("Jaimini Chara Karakas (8 Karakas)", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        vedicChart.chara_karakas.forEachIndexed { idx, ck ->
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(ck.karaka, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                                Text(
+                                                    "${ck.planet} (${String.format(java.util.Locale.US, "%.2f°", ck.effective_degree)})",
+                                                    color = CelestialBlue,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                            }
+                                            if (idx < vedicChart.chara_karakas.size - 1) {
+                                                HorizontalDivider(color = BorderColor.copy(alpha = 0.4f))
+                                            }
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(16.dp))
+                            }
+
+                            // Arudha Padas (A1..A12) 카드
+                            if (vedicChart.arudha_padas.isNotEmpty()) {
+                                Card(
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
+                                    border = BorderStroke(1.dp, BorderColor),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        Text("Arudha Padas (AL ~ UL)", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        val padaPairs = vedicChart.arudha_padas.chunked(2)
+                                        padaPairs.forEachIndexed { rIdx, pair ->
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                pair.forEach { ap ->
+                                                    val isKeyPada = ap.code == "AL" || ap.code == "UL"
+                                                    Text(
+                                                        text = "${ap.code}: ${getZodiacSignName(ap.sign_index)} (H${ap.house_from_lagna})",
+                                                        fontSize = 12.sp,
+                                                        color = if (isKeyPada) AccentPrimary else TextPrimary,
+                                                        fontWeight = if (isKeyPada) FontWeight.Bold else FontWeight.Normal,
+                                                        modifier = Modifier.weight(1f)
+                                                    )
+                                                }
+                                            }
+                                            if (rIdx < padaPairs.size - 1) {
+                                                HorizontalDivider(color = BorderColor.copy(alpha = 0.4f))
+                                            }
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(16.dp))
+                            }
+
+                            // Graha Drishti (Planetary Aspects) 카드
+                            val activeDrishti = vedicChart.drishti.filter { it.aspected_planets.isNotEmpty() }
+                            if (activeDrishti.isNotEmpty()) {
+                                Card(
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
+                                    border = BorderStroke(1.dp, BorderColor),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        Text("Graha Drishti (Full Aspects)", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        activeDrishti.forEachIndexed { idx, d ->
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "${d.from_planet} (H${d.from_house}) · ${d.aspect_offset}th",
+                                                    color = TextPrimary,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                                Text(
+                                                    text = "H${d.target_house} (${getZodiacSignName(d.target_sign)}): ${d.aspected_planets.joinToString(", ")}",
+                                                    color = TextSecondary,
+                                                    fontSize = 12.sp
+                                                )
+                                            }
+                                            if (idx < activeDrishti.size - 1) {
+                                                HorizontalDivider(color = BorderColor.copy(alpha = 0.4f))
+                                            }
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(16.dp))
+                            }
+
+                            // Ashtakavarga (Sarvashtakavarga & Bhinna Totals) 카드
+                            if (vedicChart.ashtakavarga.total_bindus > 0) {
+                                Card(
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
+                                    border = BorderStroke(1.dp, BorderColor),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text("Sarvashtakavarga (SAV)", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                            Text("Total ${vedicChart.ashtakavarga.total_bindus} Bindus", color = CelestialBlue, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        val savChunks = vedicChart.ashtakavarga.sarva.mapIndexed { idx, pts -> idx to pts }.chunked(3)
+                                        savChunks.forEachIndexed { rIdx, row ->
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                row.forEach { (sIdx, pts) ->
+                                                    val isStrong = pts >= 28
+                                                    Text(
+                                                        text = "${getZodiacSignName(sIdx).take(3)}: $pts",
+                                                        fontSize = 12.sp,
+                                                        color = if (isStrong) AccentPrimary else TextSecondary,
+                                                        fontWeight = if (isStrong) FontWeight.Bold else FontWeight.Normal,
+                                                        modifier = Modifier.weight(1f)
+                                                    )
+                                                }
+                                            }
+                                            if (rIdx < savChunks.size - 1) {
+                                                HorizontalDivider(color = BorderColor.copy(alpha = 0.4f))
+                                            }
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(16.dp))
+                            }
 
                             // 빔쇼타리 다샤 아코디언 UI (안타르다샤 확장, Mahadasha 접두어 제거, YYYY.MM.DD 환산)
                             Card(

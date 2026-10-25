@@ -96,7 +96,7 @@ class MainActivity : ComponentActivity() {
                         ProfileEditScreen(
                             initialProfile = existingProfile,
                             onBack = { navController.popBackStack() },
-                            onSave = { name, isMale, y, m, d, h, min, lat, lon, notes ->
+                            onSave = { name, isMale, y, m, d, h, min, sec, lat, lon, notes ->
                                 scope.launch {
                                     if (editId != null) {
                                         FortuneApp.repository.updateProfile(
@@ -109,6 +109,7 @@ class MainActivity : ComponentActivity() {
                                                 birth_day = d,
                                                 birth_hour = h,
                                                 birth_minute = min,
+                                                birth_second = sec,
                                                 latitude = lat,
                                                 longitude = lon,
                                                 notes = notes
@@ -129,6 +130,7 @@ class MainActivity : ComponentActivity() {
                                                 birth_day = d,
                                                 birth_hour = h,
                                                 birth_minute = min,
+                                                birth_second = sec,
                                                 latitude = lat,
                                                 longitude = lon,
                                                 notes = notes

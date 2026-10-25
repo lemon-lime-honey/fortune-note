@@ -12,6 +12,7 @@ data class ProfileDto(
     val birth_day: Int,
     val birth_hour: Int,
     val birth_minute: Int,
+    val birth_second: Double = 0.0,
     val latitude: Double,
     val longitude: Double,
     val timezone_id: String,
@@ -29,6 +30,7 @@ data class CreateProfileRequest(
     val birth_day: Int,
     val birth_hour: Int,
     val birth_minute: Int,
+    val birth_second: Double = 0.0,
     val latitude: Double,
     val longitude: Double,
     val timezone_id: String? = null,
@@ -44,6 +46,7 @@ data class UpdateProfileRequest(
     val birth_day: Int,
     val birth_hour: Int,
     val birth_minute: Int,
+    val birth_second: Double = 0.0,
     val latitude: Double,
     val longitude: Double,
     val timezone_id: String? = null,
@@ -537,7 +540,66 @@ data class VedicPlanetData(
     val nakshatra_name: String,
     val nakshatra_pada: Int,
     val is_retrograde: Boolean,
-    val latitude: Double = 0.0
+    val latitude: Double = 0.0,
+    val house: Int = 1,
+    val dignity: String = "",
+    val combustion: String = "None"
+)
+
+@Serializable
+data class VedicKarakaData(
+    val karaka: String,
+    val planet: String,
+    val effective_degree: Double
+)
+
+@Serializable
+data class VedicDrishtiData(
+    val from_planet: String,
+    val from_sign: Int,
+    val from_house: Int,
+    val aspect_offset: Int,
+    val target_sign: Int,
+    val target_house: Int,
+    val aspected_planets: List<String> = emptyList()
+)
+
+@Serializable
+data class VedicArudhaPadaData(
+    val bhava: Int,
+    val code: String,
+    val name: String,
+    val sign_index: Int,
+    val sign_name: String,
+    val house_from_lagna: Int
+)
+
+@Serializable
+data class BhinnaAshtakavargaRowData(
+    val planet: String,
+    val bindus: List<Int> = emptyList(),
+    val total: Int = 0
+)
+
+@Serializable
+data class VedicAshtakavargaData(
+    val bhinna: List<BhinnaAshtakavargaRowData> = emptyList(),
+    val sarva: List<Int> = emptyList(),
+    val total_bindus: Int = 0
+)
+
+@Serializable
+data class VedicPanchangaData(
+    val tithi_name: String = "",
+    val tithi_number: Int = 1,
+    val paksha: String = "",
+    val vara_name: String = "",
+    val vara_lord: String = "",
+    val nakshatra_name: String = "",
+    val nakshatra_pada: Int = 1,
+    val nakshatra_lord: String = "",
+    val yoga_name: String = "",
+    val karana_name: String = ""
 )
 
 @Serializable
@@ -589,7 +651,12 @@ data class VedicChartData(
     val wholesign_bhavas: List<Double>,
     val planets: List<VedicPlanetData>,
     val vargas: Map<String, VargaChartData>,
-    val vimshottari_dashas: List<DashaPeriodData>
+    val vimshottari_dashas: List<DashaPeriodData>,
+    val chara_karakas: List<VedicKarakaData> = emptyList(),
+    val drishti: List<VedicDrishtiData> = emptyList(),
+    val arudha_padas: List<VedicArudhaPadaData> = emptyList(),
+    val ashtakavarga: VedicAshtakavargaData = VedicAshtakavargaData(),
+    val panchanga: VedicPanchangaData = VedicPanchangaData()
 )
 
 @Serializable

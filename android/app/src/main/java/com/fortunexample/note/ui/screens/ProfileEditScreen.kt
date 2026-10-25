@@ -26,7 +26,7 @@ import com.fortunexample.note.ui.theme.*
 fun ProfileEditScreen(
     initialProfile: ProfileDto? = null,
     onBack: () -> Unit,
-    onSave: (name: String, isMale: Boolean, year: Int, month: Int, day: Int, hour: Int, minute: Int, lat: Double, lon: Double, notes: String) -> Unit
+    onSave: (name: String, isMale: Boolean, year: Int, month: Int, day: Int, hour: Int, minute: Int, second: Double, lat: Double, lon: Double, notes: String) -> Unit
 ) {
     var name by remember(initialProfile) { mutableStateOf(initialProfile?.name ?: "") }
     var isMale by remember(initialProfile) { mutableStateOf(initialProfile?.gender != "female") }
@@ -35,6 +35,7 @@ fun ProfileEditScreen(
     var dayStr by remember(initialProfile) { mutableStateOf(initialProfile?.birth_day?.toString() ?: "1") }
     var hourStr by remember(initialProfile) { mutableStateOf(initialProfile?.birth_hour?.toString() ?: "12") }
     var minuteStr by remember(initialProfile) { mutableStateOf(initialProfile?.birth_minute?.toString() ?: "0") }
+    var secondStr by remember(initialProfile) { mutableStateOf(initialProfile?.birth_second?.toInt()?.toString() ?: "0") }
     var latitude by remember(initialProfile) { mutableDoubleStateOf(initialProfile?.latitude ?: 37.5665) }
     var longitude by remember(initialProfile) { mutableDoubleStateOf(initialProfile?.longitude ?: 126.9780) }
     var notes by remember(initialProfile) { mutableStateOf(initialProfile?.notes ?: "") }
@@ -162,6 +163,14 @@ fun ProfileEditScreen(
                     value = minuteStr,
                     onValueChange = { minuteStr = it },
                     label = { Text("분") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                    modifier = Modifier.weight(1f),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = secondStr,
+                    onValueChange = { secondStr = it },
+                    label = { Text("초") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
                     modifier = Modifier.weight(1f),
                     singleLine = true
@@ -218,6 +227,7 @@ fun ProfileEditScreen(
                     val d = dayStr.toIntOrNull()
                     val h = hourStr.toIntOrNull()
                     val min = minuteStr.toIntOrNull()
+                    val sec = if (secondStr.isBlank()) 0.0 else secondStr.toDoubleOrNull()
 
                     if (y == null || y !in -4000..3000) {
                         validationError = "올바른 연도를 입력해 주세요 (-4000~3000)."
@@ -239,6 +249,10 @@ fun ProfileEditScreen(
                         validationError = "올바른 분을 입력해 주세요 (0~59)."
                         return@Button
                     }
+                    if (sec == null || sec < 0.0 || sec >= 60.0) {
+                        validationError = "올바른 초를 입력해 주세요 (0~59)."
+                        return@Button
+                    }
                     try {
                         java.time.LocalDate.of(y, m, d)
                     } catch (_: Exception) {
@@ -255,6 +269,7 @@ fun ProfileEditScreen(
                         d,
                         h,
                         min,
+                        sec,
                         latitude,
                         longitude,
                         notes.trim()

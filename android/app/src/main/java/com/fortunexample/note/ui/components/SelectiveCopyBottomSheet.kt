@@ -70,6 +70,7 @@ fun SelectiveCopyBottomSheet(
 
     // Vedic options
     var incVedicRasi by remember { mutableStateOf(true) }
+    var incVedicIndicators by remember { mutableStateOf(true) }
     var incVedicVargas by remember { mutableStateOf(true) }
     var incVedicDasha by remember { mutableStateOf(true) }
 
@@ -118,6 +119,7 @@ fun SelectiveCopyBottomSheet(
                     incWesternStars = true
                     incWesternParts = true
                     incVedicRasi = true
+                    incVedicIndicators = true
                     incVedicVargas = true
                     incVedicDasha = true
                 }) {
@@ -138,6 +140,7 @@ fun SelectiveCopyBottomSheet(
                     incWesternStars = false
                     incWesternParts = false
                     incVedicRasi = true
+                    incVedicIndicators = false
                     incVedicVargas = false
                     incVedicDasha = false
                 }) {
@@ -173,8 +176,9 @@ fun SelectiveCopyBottomSheet(
                         CopyCheckboxItem(label = "Arabic Parts & House Cusp Almutens", checked = incWesternParts, onCheckedChange = { incWesternParts = it })
                     }
                     2 -> {
-                        CopyCheckboxItem(label = "라그나 및 D1 라시 차트 배치", checked = incVedicRasi, onCheckedChange = { incVedicRasi = it })
-                        CopyCheckboxItem(label = "핵심 분점도 (Vargas: D9, D10 등 11개)", checked = incVedicVargas, onCheckedChange = { incVedicVargas = it })
+                        CopyCheckboxItem(label = "라그나 및 D1 라시 차트 배치 (품위/연소 포함)", checked = incVedicRasi, onCheckedChange = { incVedicRasi = it })
+                        CopyCheckboxItem(label = "베다 핵심 지표 (판창가, 카라카, 파다, 드리슈티, SAV)", checked = incVedicIndicators, onCheckedChange = { incVedicIndicators = it })
+                        CopyCheckboxItem(label = "19종 분점도 (Shodashavarga + D6, D8, D11)", checked = incVedicVargas, onCheckedChange = { incVedicVargas = it })
                         CopyCheckboxItem(label = "빔쇼타리 다샤 운로 (Mahadasha/Antardasha)", checked = incVedicDasha, onCheckedChange = { incVedicDasha = it })
                     }
                 }
@@ -205,6 +209,7 @@ fun SelectiveCopyBottomSheet(
                         incWesternStars = incWesternStars,
                         incWesternParts = incWesternParts,
                         incVedicRasi = incVedicRasi,
+                        incVedicIndicators = incVedicIndicators,
                         incVedicVargas = incVedicVargas,
                         incVedicDasha = incVedicDasha
                     )
@@ -270,6 +275,7 @@ private fun generateSelectiveMarkdown(
     incWesternStars: Boolean,
     incWesternParts: Boolean,
     incVedicRasi: Boolean,
+    incVedicIndicators: Boolean,
     incVedicVargas: Boolean,
     incVedicDasha: Boolean
 ): String {
@@ -285,7 +291,7 @@ private fun generateSelectiveMarkdown(
         sb.append("# $domainTitle: ${profile.name}\n\n")
         sb.append("## 1. 인물 기본 정보\n")
         sb.append("- 성별: ${if (profile.gender == "male") "남성" else "여성"}\n")
-        sb.append("- 출생 일시: ${profile.birth_year}-${String.format("%02d", profile.birth_month)}-${String.format("%02d", profile.birth_day)} ${String.format("%02d:%02d", profile.birth_hour, profile.birth_minute)} (현지 기준)\n")
+        sb.append("- 출생 일시: ${profile.birth_year}-${String.format("%02d", profile.birth_month)}-${String.format("%02d", profile.birth_day)} ${String.format("%02d:%02d:%02d", profile.birth_hour, profile.birth_minute, profile.birth_second.toInt())} (현지 기준)\n")
         sb.append("- 관측 위치: 위도 ${String.format("%.4f°", profile.latitude)}, 경도 ${String.format("%.4f°", profile.longitude)}\n")
         sb.append("- 시간대 보정: $timezoneId (UTC ${String.format("%+.1f시간", utcOffsetHours)})\n")
         if (profile.notes.isNotEmpty()) {
@@ -495,17 +501,54 @@ private fun generateSelectiveMarkdown(
                     v.planets.forEach { p ->
                         val sign = VEDIC_SIGNS.getOrElse(p.sign_index % 12) { "" }
                         val rx = if (p.is_retrograde) " [Rx]" else ""
-                        sb.append("  * ${p.name}: ${String.format("%.2f°", p.sidereal_longitude)} ($sign, ${p.nakshatra_name} Pada ${p.nakshatra_pada})$rx\n")
+                        val comb = if (p.combustion != "None" && p.combustion.isNotEmpty()) " [${p.combustion}]" else ""
+                        val dig = if (p.dignity.isNotEmpty()) ", Dignity: ${p.dignity}" else ""
+                        sb.append("  * ${p.name}: ${String.format("%.2f°", p.sidereal_longitude)} (H${p.house}, $sign, ${p.nakshatra_name} Pada ${p.nakshatra_pada}$dig)$rx$comb\n")
+                    }
+                }
+                if (incVedicIndicators) {
+                    sb.append("\n## 3. 베다 핵심 해석 지표 (Panchanga, Karakas, Padas, Drishti, Ashtakavarga)\n")
+                    val pan = v.panchanga
+                    if (pan.tithi_name.isNotEmpty()) {
+                        sb.append("- Panchanga:\n")
+                        sb.append("  * Tithi: ${pan.tithi_name} (#${pan.tithi_number}, ${pan.paksha})\n")
+                        sb.append("  * Vara: ${pan.vara_name} (Lord: ${pan.vara_lord})\n")
+                        sb.append("  * Nakshatra: ${pan.nakshatra_name} Pada ${pan.nakshatra_pada} (Lord: ${pan.nakshatra_lord})\n")
+                        sb.append("  * Yoga: ${pan.yoga_name} | Karana: ${pan.karana_name}\n")
+                    }
+                    if (v.chara_karakas.isNotEmpty()) {
+                        sb.append("- Jaimini Chara Karakas:\n")
+                        v.chara_karakas.forEach { ck ->
+                            sb.append("  * ${ck.karaka}: ${ck.planet} (${String.format("%.2f°", ck.effective_degree)})\n")
+                        }
+                    }
+                    if (v.arudha_padas.isNotEmpty()) {
+                        sb.append("- Arudha Padas:\n")
+                        v.arudha_padas.forEach { ap ->
+                            sb.append("  * ${ap.code} (${ap.name}): ${ap.sign_name} (H${ap.house_from_lagna})\n")
+                        }
+                    }
+                    val activeDrishti = v.drishti.filter { it.aspected_planets.isNotEmpty() }
+                    if (activeDrishti.isNotEmpty()) {
+                        sb.append("- Graha Drishti (Full Aspects):\n")
+                        activeDrishti.forEach { d ->
+                            val tSign = VEDIC_SIGNS.getOrElse(d.target_sign % 12) { "" }
+                            sb.append("  * ${d.from_planet} (H${d.from_house}) -> ${d.aspect_offset}th on H${d.target_house} ($tSign): ${d.aspected_planets.joinToString(", ")}\n")
+                        }
+                    }
+                    if (v.ashtakavarga.total_bindus > 0) {
+                        val savStr = v.ashtakavarga.sarva.mapIndexed { idx, pts -> "${VEDIC_SIGNS.getOrElse(idx) { "" }}: $pts" }.joinToString(", ")
+                        sb.append("- Sarvashtakavarga (Total ${v.ashtakavarga.total_bindus}): $savStr\n")
                     }
                 }
                 if (incVedicVargas) {
-                    sb.append("\n## 3. 분점도 (Vargas)\n")
+                    sb.append("\n## 4. 분점도 (Vargas)\n")
                     v.vargas.forEach { (key, chart) ->
                         val lSign = VEDIC_SIGNS.getOrElse(chart.lagna_sign % 12) { "" }
                         sb.append("- $key: Lagna $lSign\n")
                         val pl = chart.placements.map { p ->
                             val pSign = VEDIC_SIGNS.getOrElse(p.sign_index % 12) { "" }
-                            "${p.planet_name}: H${p.house} $pSign"
+                            "${p.planet_name}: H${p.house} $pSign ${String.format("%.1f°", p.sign_degree)}"
                         }
                         if (pl.isNotEmpty()) {
                             sb.append("  * ${pl.joinToString(", ")}\n")
@@ -513,7 +556,7 @@ private fun generateSelectiveMarkdown(
                     }
                 }
                 if (incVedicDasha) {
-                    sb.append("\n## 4. 빔쇼타리 다샤 운로 (Vimshottari Dasha)\n")
+                    sb.append("\n## 5. 빔쇼타리 다샤 운로 (Vimshottari Dasha)\n")
                     v.vimshottari_dashas.forEach { d ->
                         sb.append("- Mahadasha ${d.lord}: ${d.startDateFormatted} ~ ${d.endDateFormatted}\n")
                         d.sub_periods.forEach { sub ->

@@ -198,7 +198,7 @@ private fun ProfileCard(
             }
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "${profile.birth_year}-${String.format("%02d", profile.birth_month)}-${String.format("%02d", profile.birth_day)} ${String.format("%02d:%02d", profile.birth_hour, profile.birth_minute)}",
+                text = "${profile.birth_year}-${String.format("%02d", profile.birth_month)}-${String.format("%02d", profile.birth_day)} ${String.format("%02d:%02d:%02d", profile.birth_hour, profile.birth_minute, profile.birth_second.toInt())}",
                 color = TextSecondary,
                 fontSize = 14.sp
             )
