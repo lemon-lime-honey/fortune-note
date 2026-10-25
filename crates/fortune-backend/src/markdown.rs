@@ -420,6 +420,10 @@ fn append_vedic_details(out: &mut String, chart: &FortuneCalculationOutput, is_p
     let lagna_sign_idx = chart.vedic.lagna_sign as usize % 12;
     let lagna_label = if is_prashna { "Prashna Lagna" } else { "Lagna" };
     out.push_str(&format!(
+        "- Ayanamsha: {} ({:.4}°)\n",
+        chart.vedic.ayanamsha_name, chart.vedic.ayanamsha_deg
+    ));
+    out.push_str(&format!(
         "- {}: {:.2}° ({})\n",
         lagna_label, chart.vedic.lagna_sidereal, VEDIC_SIGNS[lagna_sign_idx]
     ));
@@ -463,7 +467,7 @@ fn append_vedic_details(out: &mut String, chart: &FortuneCalculationOutput, is_p
     }
 
     if !chart.vedic.chara_karakas.is_empty() {
-        out.push_str("- Jaimini Chara Karakas (8-Karaka Scheme):\n");
+        out.push_str("- Jaimini Chara Karakas (7-Karaka Scheme):\n");
         for ck in &chart.vedic.chara_karakas {
             out.push_str(&format!(
                 "  * {}: {} ({:.2}°)\n",
@@ -482,16 +486,21 @@ fn append_vedic_details(out: &mut String, chart: &FortuneCalculationOutput, is_p
         }
     }
 
-    let active_drishti: Vec<_> = chart
+    let notable_drishti: Vec<_> = chart
         .vedic
         .drishti
         .iter()
-        .filter(|d| !d.aspected_planets.is_empty())
+        .filter(|d| !d.aspected_planets.is_empty() || d.aspect_offset != 7)
         .collect();
-    if !active_drishti.is_empty() {
-        out.push_str("- Graha Drishti (Planetary Aspects on Planets):\n");
-        for d in active_drishti {
+    if !notable_drishti.is_empty() {
+        out.push_str("- Graha Drishti (Full Aspects incl. Special Bhava Aspects):\n");
+        for d in notable_drishti {
             let target_sign_name = VEDIC_SIGNS[d.target_sign as usize % 12];
+            let targets_str = if d.aspected_planets.is_empty() {
+                "Empty Bhava".to_string()
+            } else {
+                d.aspected_planets.join(", ")
+            };
             out.push_str(&format!(
                 "  * {} (H{}) -> {}th Drishti on H{} ({}): {}\n",
                 d.from_planet,
@@ -499,7 +508,7 @@ fn append_vedic_details(out: &mut String, chart: &FortuneCalculationOutput, is_p
                 d.aspect_offset,
                 d.target_house,
                 target_sign_name,
-                d.aspected_planets.join(", ")
+                targets_str
             ));
         }
     }
@@ -533,10 +542,17 @@ fn append_vedic_details(out: &mut String, chart: &FortuneCalculationOutput, is_p
         let mut placements_str = Vec::new();
         for p in &v.placements {
             let p_sign_name = VEDIC_SIGNS[p.sign_index as usize % 12];
-            placements_str.push(format!(
-                "{}: H{} {} {:.1}°",
-                p.planet_name, p.house, p_sign_name, p.sign_degree
-            ));
+            if *division == fortune_core::VargaDivision::D1 {
+                placements_str.push(format!(
+                    "{}: H{} {} {:.2}°",
+                    p.planet_name, p.house, p_sign_name, p.sign_degree
+                ));
+            } else {
+                placements_str.push(format!(
+                    "{}: H{} {}",
+                    p.planet_name, p.house, p_sign_name
+                ));
+            }
         }
         if !placements_str.is_empty() {
             out.push_str(&format!("    - Placements: {}\n", placements_str.join(", ")));

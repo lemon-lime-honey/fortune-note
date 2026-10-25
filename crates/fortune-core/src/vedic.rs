@@ -19,7 +19,6 @@ use vedaksha::vedic::ashtakavarga::{
 use vedaksha::vedic::combustion::{combustion_state, CombustionState};
 use vedaksha::vedic::dasha::vimshottari::{compute_vimshottari, DashaPeriod};
 use vedaksha::vedic::graha::Graha;
-use vedaksha::vedic::karaka::{compute_karakas, Karaka, KarakaInput, KarakaScheme};
 use vedaksha::vedic::nakshatra::Nakshatra;
 use vedaksha::vedic::panchanga::{compute_karana, compute_panchanga_yoga};
 
@@ -513,6 +512,14 @@ pub struct VedicChart {
     pub ashtakavarga: VedicAshtakavarga,
     #[serde(default)]
     pub panchanga: VedicPanchanga,
+    #[serde(default = "default_ayanamsha_name")]
+    pub ayanamsha_name: String,
+    #[serde(default)]
+    pub ayanamsha_deg: f64,
+}
+
+fn default_ayanamsha_name() -> String {
+    "True Lahiri (Chitra Paksha)".to_string()
 }
 
 fn parse_graha(name: &str) -> Option<Graha> {
@@ -766,16 +773,66 @@ fn compute_vedic_dignity(
     }
 }
 
-fn karaka_label(k: Karaka) -> &'static str {
-    match k {
-        Karaka::Atmakaraka => "Atmakaraka (AK)",
-        Karaka::Amatyakaraka => "Amatyakaraka (AmK)",
-        Karaka::Bhratrikaraka => "Bhratrikaraka (BK)",
-        Karaka::Matrikaraka => "Matrikaraka (MK)",
-        Karaka::Pitrikaraka => "Pitrikaraka (PiK)",
-        Karaka::Putrakaraka => "Putrakaraka (PK)",
-        Karaka::Gnatikaraka => "Gnatikaraka (GK)",
-        Karaka::Darakaraka => "Darakaraka (DK)",
+const SEVEN_KARAKA_LABELS: [&str; 7] = [
+    "Atmakaraka (AK)",
+    "Amatyakaraka (AmK)",
+    "Bhratrikaraka (BK)",
+    "Matrikaraka (MK)",
+    "Putrakaraka (PK)",
+    "Gnatikaraka (GK)",
+    "Darakaraka (DK)",
+];
+
+/// Resolves the effective Arudha lord of a Rasi (0..11), applying Jaimini co-lordship
+/// rules for Scorpio (`sign_index == 7`: Mars vs Ketu) and Aquarius (`sign_index == 10`: Saturn vs Rahu).
+fn arudha_sign_lord(
+    sign_index: u8,
+    planet_signs: &HashMap<Graha, u8>,
+    planet_lons: &HashMap<Graha, f64>,
+) -> Graha {
+    let rashi = sign_index % 12;
+    let (lord_a, lord_b) = match rashi {
+        7 => (Graha::Mars, Graha::Ketu),
+        10 => (Graha::Saturn, Graha::Rahu),
+        _ => return sign_lord(rashi),
+    };
+
+    let sign_a = planet_signs.get(&lord_a).copied().unwrap_or(rashi);
+    let sign_b = planet_signs.get(&lord_b).copied().unwrap_or(rashi);
+
+    // 1. If one lord is in the sign itself and the other is in a different sign,
+    // Jaimini Sutras (1.1.30-31) prefer the lord NOT in the sign itself so a non-zero step is taken.
+    if sign_a == rashi && sign_b != rashi {
+        return lord_b;
+    }
+    if sign_b == rashi && sign_a != rashi {
+        return lord_a;
+    }
+
+    // 2. Compare number of conjoined planets in each lord's sign (more conjoined grahas = stronger).
+    let count_a = planet_signs.values().filter(|&&s| s == sign_a).count();
+    let count_b = planet_signs.values().filter(|&&s| s == sign_b).count();
+    if count_a > count_b {
+        return lord_a;
+    }
+    if count_b > count_a {
+        return lord_b;
+    }
+
+    // 3. Tie-breaker: higher effective degree in sign (for Rahu/Ketu, 30.0 - degree_in_sign).
+    let eff_deg = |g: Graha| -> f64 {
+        let lon = planet_lons.get(&g).copied().unwrap_or(0.0);
+        let deg = normalize_degrees(lon) % 30.0;
+        if matches!(g, Graha::Rahu | Graha::Ketu) {
+            30.0 - deg
+        } else {
+            deg
+        }
+    };
+    if eff_deg(lord_a) >= eff_deg(lord_b) {
+        lord_a
+    } else {
+        lord_b
     }
 }
 
@@ -816,6 +873,7 @@ pub fn calculate_vedic(ephem: &EphemerisSnapshot, latitude: f64) -> VedicChart {
     // Pre-collect planet longitudes, signs, and retrograde states for dignity & combustion
     let mut sun_sidereal_lon = 0.0;
     let mut moon_sidereal_lon = 0.0;
+    let mut rahu_sidereal_lon = 0.0;
     let mut planet_signs: HashMap<Graha, u8> = HashMap::new();
     let mut planet_lons: HashMap<Graha, f64> = HashMap::new();
 
@@ -826,6 +884,8 @@ pub fn calculate_vedic(ephem: &EphemerisSnapshot, latitude: f64) -> VedicChart {
             sun_sidereal_lon = sid_lon;
         } else if b.name == "Moon" {
             moon_sidereal_lon = sid_lon;
+        } else if b.name == "Rahu" {
+            rahu_sidereal_lon = sid_lon;
         }
         if let Some(g) = parse_graha(&b.name) {
             planet_signs.insert(g, sign_idx);
@@ -872,14 +932,31 @@ pub fn calculate_vedic(ephem: &EphemerisSnapshot, latitude: f64) -> VedicChart {
         });
     }
 
-    // 3. Compute the 19 supported divisional charts
+    // 3. Compute the 19 supported divisional charts (with Rahu-Ketu 1-7 opposition enforced)
     let mut vargas = BTreeMap::new();
     for div in VargaDivision::ALL {
         let (v_lagna, _) = calculate_varga_sign_and_degree(lagna_sidereal, div);
+        let (rahu_v_sign, rahu_v_deg) = calculate_varga_sign_and_degree(rahu_sidereal_lon, div);
 
         let mut placements = Vec::with_capacity(planets.len());
         for p in &planets {
-            let (p_sign, p_degree) = calculate_varga_sign_and_degree(p.sidereal_longitude, div);
+            let (p_sign, p_degree) = if p.name == "Ketu" {
+                let opp_sign = match div {
+                    // In D2 Hora, only Cancer (3) and Leo (4) exist; Ketu occupies the opposite Hora from Rahu
+                    VargaDivision::D2 => {
+                        if rahu_v_sign == 4 {
+                            3
+                        } else {
+                            4
+                        }
+                    }
+                    // In all 12-sign divisional charts, Ketu is strictly 7th (opposite) from Rahu
+                    _ => (rahu_v_sign + 6) % 12,
+                };
+                (opp_sign, rahu_v_deg)
+            } else {
+                calculate_varga_sign_and_degree(p.sidereal_longitude, div)
+            };
             let house = ((p_sign as i16 - v_lagna as i16 + 12) % 12 + 1) as u8;
 
             placements.push(VargaPlacement {
@@ -908,35 +985,35 @@ pub fn calculate_vedic(ephem: &EphemerisSnapshot, latitude: f64) -> VedicChart {
         .map(DashaPeriodInfo::from)
         .collect();
 
-    // 5. Compute Jaimini 8 Chara Karakas
-    let karaka_input = KarakaInput {
-        sun: *planet_lons.get(&Graha::Sun).unwrap_or(&0.0),
-        moon: *planet_lons.get(&Graha::Moon).unwrap_or(&0.0),
-        mars: *planet_lons.get(&Graha::Mars).unwrap_or(&0.0),
-        mercury: *planet_lons.get(&Graha::Mercury).unwrap_or(&0.0),
-        jupiter: *planet_lons.get(&Graha::Jupiter).unwrap_or(&0.0),
-        venus: *planet_lons.get(&Graha::Venus).unwrap_or(&0.0),
-        saturn: *planet_lons.get(&Graha::Saturn).unwrap_or(&0.0),
-        rahu: planet_lons.get(&Graha::Rahu).copied(),
-        scheme: KarakaScheme::Eight,
-    };
-    let chara_karakas = compute_karakas(&karaka_input)
+    // 5. Compute Classical 7 Chara Karakas (Sun..Saturn sorted descending by sign_degree)
+    let mut seven_candidates: Vec<(&str, f64)> = planets
+        .iter()
+        .filter(|p| p.name != "Rahu" && p.name != "Ketu")
+        .map(|p| (p.name.as_str(), p.sign_degree))
+        .collect();
+    seven_candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    let chara_karakas = seven_candidates
         .into_iter()
-        .map(|a| VedicKarakaInfo {
-            karaka: karaka_label(a.karaka).to_string(),
-            planet: format!("{:?}", a.planet),
-            effective_degree: a.degrees_in_sign,
+        .zip(SEVEN_KARAKA_LABELS.iter())
+        .map(|((p_name, deg), &label)| VedicKarakaInfo {
+            karaka: label.to_string(),
+            planet: p_name.to_string(),
+            effective_degree: deg,
         })
         .collect();
 
-    // 6. Compute BPHS Full Graha Drishti (Ch. 26)
+    // 6. Compute BPHS Full Graha Drishti (Ch. 26: 7 Grahas + Rahu; headless Ketu excluded)
     let mut drishti = Vec::new();
     for p in &planets {
+        if p.name == "Ketu" {
+            continue;
+        }
         let offsets: &[u8] = match p.name.as_str() {
             "Mars" => &[4, 7, 8],
             "Jupiter" => &[5, 7, 9],
             "Saturn" => &[3, 7, 10],
-            "Rahu" | "Ketu" => &[5, 7, 9],
+            "Rahu" => &[5, 7, 9],
             _ => &[7],
         };
         for &offset in offsets {
@@ -960,11 +1037,11 @@ pub fn calculate_vedic(ephem: &EphemerisSnapshot, latitude: f64) -> VedicChart {
         }
     }
 
-    // 7. Compute 12 Arudha Padas (BPHS Ch. 29 with standard 10th-from-landed exception)
+    // 7. Compute 12 Arudha Padas (BPHS Ch. 29 with Scorpio/Aquarius co-lordship and 10th-from-landed exception)
     let mut arudha_padas = Vec::with_capacity(12);
     for bhava in 1..=12u8 {
         let bhava_rashi = (lagna_sign + bhava - 1) % 12;
-        let lord = sign_lord(bhava_rashi);
+        let lord = arudha_sign_lord(bhava_rashi, &planet_signs, &planet_lons);
         let lord_rashi = planet_signs.get(&lord).copied().unwrap_or(bhava_rashi);
         let pada_sign = arudha_pada(bhava_rashi, lord_rashi, ArudhaException::TenthFromLanded);
         let house_from_lagna = ((pada_sign as i16 - lagna_sign as i16 + 12) % 12 + 1) as u8;
@@ -1067,6 +1144,8 @@ pub fn calculate_vedic(ephem: &EphemerisSnapshot, latitude: f64) -> VedicChart {
         arudha_padas,
         ashtakavarga,
         panchanga,
+        ayanamsha_name: default_ayanamsha_name(),
+        ayanamsha_deg: ephem.true_ayanamsha_deg,
     }
 }
 
@@ -1082,12 +1161,25 @@ mod tests {
 
         let chart = calculate_vedic(&ephem, 28.6139);
 
-        // Verify all 19 supported Varga divisions
+        // Verify all 19 supported Varga divisions and Rahu-Ketu opposition in every varga
         assert_eq!(chart.vargas.len(), 19);
         for div in VargaDivision::ALL {
             let v_chart = chart.vargas.get(&div).expect("varga must exist");
             assert_eq!(v_chart.placements.len(), 9);
             assert!(v_chart.lagna_sign <= 11);
+
+            let rahu_p = v_chart.placements.iter().find(|p| p.planet_name == "Rahu").unwrap();
+            let ketu_p = v_chart.placements.iter().find(|p| p.planet_name == "Ketu").unwrap();
+            if div == VargaDivision::D2 {
+                assert_ne!(rahu_p.sign_index, ketu_p.sign_index, "D2 Rahu and Ketu must occupy opposite Horas");
+            } else {
+                assert_eq!(
+                    (rahu_p.sign_index + 6) % 12,
+                    ketu_p.sign_index,
+                    "Rahu and Ketu must be 180 deg (7th sign) apart in {:?}",
+                    div
+                );
+            }
         }
 
         // Verify Whole-sign Bhavas
@@ -1102,8 +1194,10 @@ mod tests {
             assert!(!p.nakshatra_name.is_empty());
         }
 
-        // Verify Classical Vedic indicators
-        assert_eq!(chart.chara_karakas.len(), 8);
+        // Verify Classical Vedic indicators (7-Karaka scheme, no Ketu in Drishti)
+        assert_eq!(chart.chara_karakas.len(), 7);
+        assert!(chart.chara_karakas.iter().all(|ck| ck.planet != "Rahu" && ck.planet != "Ketu"));
+        assert!(chart.drishti.iter().all(|d| d.from_planet != "Ketu"));
         assert_eq!(chart.arudha_padas.len(), 12);
         assert_eq!(chart.ashtakavarga.bhinna.len(), 7);
         assert_eq!(chart.ashtakavarga.total_bindus, 337);
@@ -1111,6 +1205,8 @@ mod tests {
         assert!((1..=30).contains(&chart.panchanga.tithi_number));
         assert!(!chart.panchanga.yoga_name.is_empty());
         assert!(!chart.panchanga.karana_name.is_empty());
+        assert_eq!(chart.ayanamsha_name, "True Lahiri (Chitra Paksha)");
+        assert!(chart.ayanamsha_deg > 20.0);
 
         // Verify Vimshottari Dasha periods continuity and Antardashas
         assert_eq!(chart.vimshottari_dashas.len(), 9);

@@ -311,9 +311,145 @@ pub fn calculate_western_with_mode(
     // Above the horizon spans from DSC (180°) counter-clockwise to ASC (360°/0°).
     let is_day_chart = (sun_lon - ascendant).rem_euclid(360.0) >= 180.0;
 
-    // 3. Traditional Domain Layer: Branch between Hellenistic (Whole Sign) and Lilly (Quadrant)
-    let (traditional, hellenistic) = if system == WesternHouseSystem::WholeSign {
-        let h_data = hellenistic::calculate_hellenistic_data(
+    // 3. Traditional Domain Layer: Always compute traditional data; additionally compute Hellenistic data when Whole Sign is selected
+    let saturn_house = ephem.bodies.iter()
+        .find(|b| b.name == "Saturn")
+        .map_or(1, |b| determine_house(b.tropical_longitude, &cusps));
+
+    let north_node_lon = ephem.bodies.iter().find(|b| b.name == "Rahu").map_or(0.0, |b| b.tropical_longitude);
+    let south_node_lon = ephem.bodies.iter().find(|b| b.name == "Ketu").map_or(180.0, |b| b.tropical_longitude);
+
+    let mercury_lon = ephem.bodies.iter().find(|b| b.name == "Mercury").map_or(0.0, |b| b.tropical_longitude);
+    let venus_lon = ephem.bodies.iter().find(|b| b.name == "Venus").map_or(0.0, |b| b.tropical_longitude);
+    let mars_lon = ephem.bodies.iter().find(|b| b.name == "Mars").map_or(0.0, |b| b.tropical_longitude);
+    let jupiter_lon = ephem.bodies.iter().find(|b| b.name == "Jupiter").map_or(0.0, |b| b.tropical_longitude);
+    let saturn_lon = ephem.bodies.iter().find(|b| b.name == "Saturn").map_or(0.0, |b| b.tropical_longitude);
+
+    // 3.1 Dignities
+    let mut planet_dignities = Vec::new();
+    for p in &planets {
+        if let Some(cp) = dignity::ClassicalPlanet::from_name(&p.name) {
+            planet_dignities.push(dignity::calculate_planet_dignity(
+                cp,
+                p.longitude,
+                p.speed,
+                p.house_number,
+                sun_lon,
+                is_day_chart,
+                north_node_lon,
+                south_node_lon,
+            ));
+        }
+    }
+
+    // 3.2 Moon Condition (Horary evaluates VOC, Via Combusta, and Next Applying Aspect; Natal evaluates only Lunar Phase)
+    let moon_condition = if is_horary {
+        moon::evaluate_moon_condition(
+            moon_lon,
+            moon_speed,
+            sun_lon,
+            &planet_tuples,
+        )
+    } else {
+        moon::evaluate_natal_moon_condition(moon_lon, sun_lon)
+    };
+
+    // 3.3 Planetary Hours & Radicality (Radicality & Considerations populated only in Horary mode)
+    let planetary_hours = hours::calculate_astronomical_planetary_hours_with_mode(
+        ephem.jd_ut1,
+        latitude,
+        ephem.ramc,
+        sun_lon,
+        ephem.true_obliquity_deg,
+        ascendant,
+        saturn_house,
+        moon_condition.is_void_of_course,
+        moon_condition.is_via_combusta,
+        is_horary,
+    );
+
+    // 3.4 Traditional Dynamic Aspects
+    let traditional_aspects = aspects::calculate_traditional_aspects(&planet_tuples);
+
+    // 3.5 Antiscia Table
+    let mut antiscia_input = planet_pos_tuples.clone();
+    antiscia_input.push(("Ascendant", ascendant));
+    antiscia_input.push(("Midheaven", midheaven));
+    let antiscia = antiscia::calculate_antiscia_table(&antiscia_input);
+
+    // 3.6 Mutual Receptions & Perfection (Perfection mechanisms only in Horary mode)
+    let mutual_receptions = reception::find_mutual_receptions(&planet_pos_tuples, is_day_chart);
+    let perfection = if is_horary {
+        reception::analyze_perfection_mechanisms(&planet_tuples)
+    } else {
+        reception::PerfectionReport::default()
+    };
+
+    // 3.7 House Cusp Dignities
+    let cusp_dignities = almuten::calculate_house_cusp_dignities(&cusps, is_day_chart);
+
+    // 3.8 Arabic Parts
+    let arabic_parts = if system == WesternHouseSystem::WholeSign {
+        parts::calculate_hellenistic_lots(
+            ascendant,
+            sun_lon,
+            moon_lon,
+            mercury_lon,
+            venus_lon,
+            mars_lon,
+            jupiter_lon,
+            saturn_lon,
+            &cusps,
+            is_day_chart,
+            is_male,
+        )
+    } else {
+        parts::calculate_arabic_parts(
+            ascendant,
+            sun_lon,
+            moon_lon,
+            mercury_lon,
+            venus_lon,
+            mars_lon,
+            jupiter_lon,
+            saturn_lon,
+            &cusps,
+            is_day_chart,
+            is_male,
+        )
+    };
+
+    // 3.9 Fixed Stars
+    let fixed_stars = fixed_stars::calculate_traditional_fixed_stars(ephem.jd_tt, latitude, ephem.true_obliquity_deg);
+    let dsc = (ascendant + 180.0).rem_euclid(360.0);
+    let ic = (midheaven + 180.0).rem_euclid(360.0);
+    let mut star_check_bodies = planet_pos_tuples.clone();
+    star_check_bodies.push(("Ascendant", ascendant));
+    star_check_bodies.push(("Midheaven", midheaven));
+    star_check_bodies.push(("Descendant", dsc));
+    star_check_bodies.push(("Immum Coeli", ic));
+    let fixed_star_conjunctions = fixed_stars::detect_fixed_star_conjunctions(&fixed_stars, &star_check_bodies, DEFAULT_FIXED_STAR_MAX_ORB);
+
+    // 3.10 Prenatal Syzygy (SAN)
+    let prenatal_syzygy = syzygy::calculate_prenatal_syzygy_with_coords(ephem.jd_ut1, sun_lon, moon_lon).ok();
+
+    let traditional = Some(WesternTraditionalData {
+        planet_dignities,
+        moon_condition,
+        planetary_hours,
+        traditional_aspects,
+        antiscia,
+        mutual_receptions,
+        perfection,
+        cusp_dignities,
+        arabic_parts,
+        fixed_stars,
+        fixed_star_conjunctions,
+        prenatal_syzygy,
+    });
+
+    let hellenistic = if system == WesternHouseSystem::WholeSign {
+        Some(hellenistic::calculate_hellenistic_data(
             &planet_tuples,
             &planet_pos_tuples,
             ascendant,
@@ -326,130 +462,9 @@ pub fn calculate_western_with_mode(
             latitude,
             ephem.true_obliquity_deg,
             DEFAULT_FIXED_STAR_MAX_ORB,
-        );
-        (None, Some(h_data))
+        ))
     } else {
-        // William Lilly Traditional Astrology calculations for Quadrant / Equal house systems
-        let saturn_house = ephem.bodies.iter()
-            .find(|b| b.name == "Saturn")
-            .map_or(1, |b| determine_house(b.tropical_longitude, &cusps));
-
-        let north_node_lon = ephem.bodies.iter().find(|b| b.name == "Rahu").map_or(0.0, |b| b.tropical_longitude);
-        let south_node_lon = ephem.bodies.iter().find(|b| b.name == "Ketu").map_or(180.0, |b| b.tropical_longitude);
-
-        let mercury_lon = ephem.bodies.iter().find(|b| b.name == "Mercury").map_or(0.0, |b| b.tropical_longitude);
-        let venus_lon = ephem.bodies.iter().find(|b| b.name == "Venus").map_or(0.0, |b| b.tropical_longitude);
-        let mars_lon = ephem.bodies.iter().find(|b| b.name == "Mars").map_or(0.0, |b| b.tropical_longitude);
-        let jupiter_lon = ephem.bodies.iter().find(|b| b.name == "Jupiter").map_or(0.0, |b| b.tropical_longitude);
-        let saturn_lon = ephem.bodies.iter().find(|b| b.name == "Saturn").map_or(0.0, |b| b.tropical_longitude);
-
-        // 3.1 Dignities
-        let mut planet_dignities = Vec::new();
-        for p in &planets {
-            if let Some(cp) = dignity::ClassicalPlanet::from_name(&p.name) {
-                planet_dignities.push(dignity::calculate_planet_dignity(
-                    cp,
-                    p.longitude,
-                    p.speed,
-                    p.house_number,
-                    sun_lon,
-                    is_day_chart,
-                    north_node_lon,
-                    south_node_lon,
-                ));
-            }
-        }
-
-        // 3.2 Moon Condition (Horary evaluates VOC, Via Combusta, and Next Applying Aspect; Natal evaluates only Lunar Phase)
-        let moon_condition = if is_horary {
-            moon::evaluate_moon_condition(
-                moon_lon,
-                moon_speed,
-                sun_lon,
-                &planet_tuples,
-            )
-        } else {
-            moon::evaluate_natal_moon_condition(moon_lon, sun_lon)
-        };
-
-        // 3.3 Planetary Hours & Radicality (Radicality & Considerations populated only in Horary mode)
-        let planetary_hours = hours::calculate_astronomical_planetary_hours_with_mode(
-            ephem.jd_ut1,
-            latitude,
-            ephem.ramc,
-            sun_lon,
-            ephem.true_obliquity_deg,
-            ascendant,
-            saturn_house,
-            moon_condition.is_void_of_course,
-            moon_condition.is_via_combusta,
-            is_horary,
-        );
-
-        // 3.4 Traditional Dynamic Aspects
-        let traditional_aspects = aspects::calculate_traditional_aspects(&planet_tuples);
-
-        // 3.5 Antiscia Table
-        let mut antiscia_input = planet_pos_tuples.clone();
-        antiscia_input.push(("Ascendant", ascendant));
-        antiscia_input.push(("Midheaven", midheaven));
-        let antiscia = antiscia::calculate_antiscia_table(&antiscia_input);
-
-        // 3.6 Mutual Receptions & Perfection (Perfection mechanisms only in Horary mode)
-        let mutual_receptions = reception::find_mutual_receptions(&planet_pos_tuples, is_day_chart);
-        let perfection = if is_horary {
-            reception::analyze_perfection_mechanisms(&planet_tuples)
-        } else {
-            reception::PerfectionReport::default()
-        };
-
-        // 3.7 House Cusp Dignities
-        let cusp_dignities = almuten::calculate_house_cusp_dignities(&cusps, is_day_chart);
-
-        // 3.8 Arabic Parts
-        let arabic_parts = parts::calculate_arabic_parts(
-            ascendant,
-            sun_lon,
-            moon_lon,
-            mercury_lon,
-            venus_lon,
-            mars_lon,
-            jupiter_lon,
-            saturn_lon,
-            &cusps,
-            is_day_chart,
-            is_male,
-        );
-
-        // 3.9 Fixed Stars
-        let fixed_stars = fixed_stars::calculate_traditional_fixed_stars(ephem.jd_tt, latitude, ephem.true_obliquity_deg);
-        let dsc = (ascendant + 180.0).rem_euclid(360.0);
-        let ic = (midheaven + 180.0).rem_euclid(360.0);
-        let mut star_check_bodies = planet_pos_tuples.clone();
-        star_check_bodies.push(("Ascendant", ascendant));
-        star_check_bodies.push(("Midheaven", midheaven));
-        star_check_bodies.push(("Descendant", dsc));
-        star_check_bodies.push(("Immum Coeli", ic));
-        let fixed_star_conjunctions = fixed_stars::detect_fixed_star_conjunctions(&fixed_stars, &star_check_bodies, DEFAULT_FIXED_STAR_MAX_ORB);
-
-        // 3.10 Prenatal Syzygy (SAN)
-        let prenatal_syzygy = syzygy::calculate_prenatal_syzygy_with_coords(ephem.jd_ut1, sun_lon, moon_lon).ok();
-
-        let trad = WesternTraditionalData {
-            planet_dignities,
-            moon_condition,
-            planetary_hours,
-            traditional_aspects,
-            antiscia,
-            mutual_receptions,
-            perfection,
-            cusp_dignities,
-            arabic_parts,
-            fixed_stars,
-            fixed_star_conjunctions,
-            prenatal_syzygy,
-        };
-        (Some(trad), None)
+        None
     };
 
     WesternChart {
@@ -577,7 +592,7 @@ mod tests {
 
         let chart = calculate_western(&ephem, 60.0, WesternHouseSystem::WholeSign, true);
 
-        assert!(chart.traditional.is_none(), "Lilly traditional data must be None for Whole Sign");
+        assert!(chart.traditional.is_some(), "Traditional data must also be available for Whole Sign");
         assert!(chart.hellenistic.is_some(), "Hellenistic data must be Some for Whole Sign");
 
         let h = chart.hellenistic.as_ref().unwrap();
