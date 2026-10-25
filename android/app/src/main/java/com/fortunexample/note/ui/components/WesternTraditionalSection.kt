@@ -1,7 +1,9 @@
 package com.fortunexample.note.ui.components
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -9,591 +11,523 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.fortunexample.note.data.HellenisticData
-import com.fortunexample.note.data.WesternTraditionalData
-import com.fortunexample.note.data.getZodiacSignName
+import com.fortunexample.note.data.*
 import com.fortunexample.note.ui.theme.*
+import java.util.Locale
+
+fun formatWesternBodyName(name: String): String = name.trim()
+
+fun formatWesternAspectName(aspect: String): String = aspect.trim()
+
+fun formatDignityTerm(term: String): String = term.trim()
+
+fun formatAccidentalReason(reason: String): String = reason.trim()
 
 @Composable
-private fun SectionCopyButton(
+fun SectionCopyButton(
     title: String,
-    onCopy: () -> String
+    textProvider: () -> String
 ) {
-    val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
-
     IconButton(
         onClick = {
-            val text = onCopy()
-            clipboardManager.setText(AnnotatedString(text))
-            Toast.makeText(context, "$title 복사 완료", Toast.LENGTH_SHORT).show()
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = ClipData.newPlainText(title, textProvider())
+            clipboard.setPrimaryClip(clip)
+            Toast.makeText(context, "Copied $title", Toast.LENGTH_SHORT).show()
         },
-        modifier = Modifier.size(28.dp)
+        modifier = Modifier.size(22.dp)
     ) {
         Icon(
             imageVector = Icons.Default.ContentCopy,
-            contentDescription = "$title 복사",
+            contentDescription = "Copy $title",
             tint = TextSecondary,
-            modifier = Modifier.size(16.dp)
+            modifier = Modifier.size(13.dp)
         )
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun WesternTraditionalSection(
-    traditional: WesternTraditionalData?,
-    isHorary: Boolean = false,
-    hellenistic: HellenisticData? = null
+    data: WesternTraditionalData,
+    hellenistic: HellenisticData? = null,
+    isHorary: Boolean = false
 ) {
-    if (hellenistic != null) {
-        HellenisticSectionContent(hellenistic)
-        return
+    var selectedSubTab by remember { mutableIntStateOf(0) }
+    val subTabs = buildList {
+        add("Dignities")
+        add("Hours & Moon")
+        add("Receptions & Cusps")
+        add("Lots & Stars")
+        if (hellenistic != null) add("Hellenistic")
     }
 
-    if (traditional == null) return
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        AstroSubTabBar(
+            tabs = subTabs,
+            selectedIndex = selectedSubTab.coerceIn(0, subTabs.lastIndex),
+            onSelect = { selectedSubTab = it }
+        )
 
-    var isDignityExpanded by remember { mutableStateOf(true) }
-    var isStarsExpanded by remember { mutableStateOf(true) }
-    var isPartsExpanded by remember { mutableStateOf(false) }
+        when (selectedSubTab.coerceIn(0, subTabs.lastIndex)) {
+            0 -> DignitiesMatrixSubSection(data)
+            1 -> HoursAndMoonSubSection(data, isHorary)
+            2 -> ReceptionsAndCuspsSubSection(data)
+            3 -> LotsAndStarsSubSection(data)
+            4 -> if (hellenistic != null) HellenisticSubSection(hellenistic)
+        }
+    }
+}
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        // 1. Planetary Hours Card (호라리일 때만 Radicality 및 판단 전 고려사항 표시)
-        Card(
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
-            border = BorderStroke(1.dp, BorderColor),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                // 1행: 제목 + 복사 버튼
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if (isHorary) "Planetary Hours & Radicality" else "Planetary Hours",
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp
-                    )
-                    SectionCopyButton(title = "Planetary Hours") {
-                        val sb = StringBuilder()
-                        if (isHorary) {
-                            sb.appendLine("[Planetary Hours & Radicality]")
-                            sb.appendLine("• Status: ${if (traditional.planetary_hours.is_radical) "Radical" else "Non-radical"}")
-                            sb.appendLine("• Day of ${traditional.planetary_hours.day_ruler} · Hour of ${traditional.planetary_hours.hour_ruler} (Hour ${traditional.planetary_hours.hour_number}, ${if (traditional.planetary_hours.is_day_hour) "Day" else "Night"})")
-                            sb.appendLine("• Reason: ${traditional.planetary_hours.radicality_reason}")
-                            if (traditional.planetary_hours.considerations.isNotEmpty()) {
-                                sb.appendLine("• Considerations Before Judgment:")
-                                traditional.planetary_hours.considerations.forEach { c -> sb.appendLine("  - $c") }
-                            }
-                        } else {
-                            sb.appendLine("[Planetary Hours]")
-                            sb.appendLine("• Day of ${traditional.planetary_hours.day_ruler} · Hour of ${traditional.planetary_hours.hour_ruler} (Hour ${traditional.planetary_hours.hour_number}, ${if (traditional.planetary_hours.is_day_hour) "Day" else "Night"})")
-                        }
-                        sb.toString().trimEnd()
-                    }
-                }
+@Composable
+private fun DignitiesMatrixSubSection(data: WesternTraditionalData) {
+    var expandedPlanet by remember { mutableStateOf<String?>(null) }
 
-                if (isHorary) {
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    // 2행: Radicality 배지 (호라리 전용)
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = if (traditional.planetary_hours.is_radical) VedicGreen.copy(alpha = 0.12f) else AstrologicalRed.copy(alpha = 0.12f)
-                    ) {
-                        Text(
-                            text = if (traditional.planetary_hours.is_radical) "Radical" else "Non-radical",
-                            color = if (traditional.planetary_hours.is_radical) VedicGreen else AstrologicalRed,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+    AstroPanelCard(
+        title = "Essential & Accidental Dignities",
+        subtitle = "Tap any row to inspect Accidental Lilly score breakdown",
+        contentPadding = PaddingValues(0.dp),
+        headerAction = {
+            SectionCopyButton("Dignities") {
+                buildString {
+                    appendLine("[Essential & Accidental Dignities]")
+                    data.planet_dignities.forEach { d ->
+                        appendLine(
+                            "${bodyCode(d.planet)} (${formatSignAndDeg(d.sign_index, d.sign_degree)}, H${d.house_number}): " +
+                                "Ess ${formatSignedScore(d.essential_score)}, Acc ${formatSignedScore(d.accidental_score)}, Total ${formatSignedScore(d.total_lilly_score)}"
                         )
                     }
+                }.trimEnd()
+            }
+        }
+    ) {
+        val cols = listOf(
+            TableColSpec("BODY", 0.95f, TextAlign.Start, monospace = true),
+            TableColSpec("POS", 1.35f, TextAlign.Start, monospace = true),
+            TableColSpec("H", 0.55f, TextAlign.Center, monospace = true),
+            TableColSpec("ESSENTIAL", 1.55f, TextAlign.Start, monospace = true),
+            TableColSpec("ESS", 0.65f, TextAlign.End, monospace = true),
+            TableColSpec("ACC", 0.65f, TextAlign.End, monospace = true),
+            TableColSpec("TOT", 0.75f, TextAlign.End, monospace = true)
+        )
+        AstroTableHeader(cols)
 
-                    Spacer(modifier = Modifier.height(8.dp))
-                } else {
-                    Spacer(modifier = Modifier.height(10.dp))
-                }
+        data.planet_dignities.forEachIndexed { idx, d ->
+            val tags = buildList {
+                if (d.is_in_domicile) add("DOM")
+                if (d.is_in_exaltation) add("EXA")
+                if (d.is_in_triplicity) add("TRI")
+                if (d.is_in_term) add("TRM")
+                if (d.is_in_face) add("FAC")
+                if (d.is_in_detriment) add("DET")
+                if (d.is_in_fall) add("FAL")
+                if (d.is_peregrine && isEmpty()) add("PER")
+            }.joinToString("·").ifEmpty { "-" }
 
-                Text(
-                    text = "Day of ${traditional.planetary_hours.day_ruler} · Hour of ${traditional.planetary_hours.hour_ruler} (Hour ${traditional.planetary_hours.hour_number}, ${if (traditional.planetary_hours.is_day_hour) "Day" else "Night"})",
-                    color = TextPrimary,
-                    fontSize = 13.sp
+            val essColor = when {
+                d.essential_score > 0 -> CelestialBlue
+                d.essential_score < 0 -> CrimsonAlert
+                else -> TextSecondary
+            }
+            val totColor = when {
+                d.total_lilly_score >= 5 -> CelestialBlue
+                d.total_lilly_score <= -5 -> CrimsonAlert
+                else -> TextPrimary
+            }
+
+            val isExpanded = expandedPlanet == d.planet
+            AstroTableRow(
+                columns = cols,
+                striped = idx % 2 == 1,
+                onClick = { expandedPlanet = if (isExpanded) null else d.planet },
+                cells = listOf(
+                    TableCellData(bodyCode(d.planet), TextPrimary, FontWeight.Bold),
+                    TableCellData(formatSignAndDeg(d.sign_index, d.sign_degree), TextPrimary),
+                    TableCellData("${d.house_number}", TextSecondary),
+                    TableCellData(tags, essColor, FontWeight.SemiBold),
+                    TableCellData(formatSignedScore(d.essential_score), essColor, FontWeight.SemiBold),
+                    TableCellData(formatSignedScore(d.accidental_score), TextSecondary),
+                    TableCellData(formatSignedScore(d.total_lilly_score), totColor, FontWeight.Bold)
                 )
+            )
 
-                if (isHorary) {
+            if (isExpanded) {
+                val reasons = d.accidental_reasons.ifEmpty { d.accidental_factors }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(SurfaceLight)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
                     Text(
-                        text = traditional.planetary_hours.radicality_reason,
+                        text = "${d.planet.uppercase(Locale.US)} ACCIDENTAL BREAKDOWN",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
                         color = TextSecondary,
-                        fontSize = 12.sp
+                        style = TabularMonoStyle
                     )
-
-                    if (traditional.planetary_hours.considerations.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Considerations Before Judgment:",
-                            color = AstrologicalRed,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 12.sp
-                        )
-                        traditional.planetary_hours.considerations.forEach { c ->
+                    if (reasons.isEmpty()) {
+                        Text("No accidental modifiers recorded.", fontSize = 11.sp, color = TextSecondary)
+                    } else {
+                        reasons.forEach { r ->
                             Text(
-                                text = "• $c",
-                                color = TextSecondary,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                                text = "• $r",
+                                fontSize = 11.sp,
+                                color = TextPrimary,
+                                style = TabularSansStyle,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
                 }
+                HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HoursAndMoonSubSection(
+    data: WesternTraditionalData,
+    isHorary: Boolean
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // 1. Planetary Hours & Radicality
+        val ph = data.planetary_hours
+        AstroPanelCard(
+            title = "Planetary Hours & Radicality",
+            headerAction = {
+                AstroStatusBadge(
+                    text = if (ph.is_radical) "RADICAL" else "NON-RADICAL",
+                    color = if (ph.is_radical) CelestialBlue else CrimsonAlert
+                )
+            }
+        ) {
+            val tiles = listOf(
+                MetricTileItem("DAY RULER", bodyCode(ph.day_ruler), ph.day_ruler),
+                MetricTileItem("HOUR RULER", bodyCode(ph.hour_ruler), ph.hour_ruler),
+                MetricTileItem("HOUR NO.", "#${ph.hour_number}", if (ph.is_day_hour) "DIURNAL" else "NOCTURNAL"),
+                MetricTileItem("STATUS", if (ph.is_radical) "MATCH" else "WARN", if (isHorary) "HORARY" else "NATAL")
+            )
+            CompactMetricGrid(items = tiles, columns = 4)
+
+            if (ph.radicality_reason.isNotBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = ph.radicality_reason,
+                    fontSize = 11.sp,
+                    color = TextSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            if (ph.considerations.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                ph.considerations.forEach { c ->
+                    Text(
+                        text = "• $c",
+                        fontSize = 11.sp,
+                        color = CrimsonAlert,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        // 2. Lunar Phase & Condition
+        val mc = data.moon_condition
+        AstroPanelCard(title = "Lunar Phase & Condition") {
+            val tiles = listOf(
+                MetricTileItem(
+                    tag = "PHASE",
+                    primary = mc.lunar_phase_name.uppercase(Locale.US),
+                    secondary = if (mc.is_waxing) "WAX" else "WAN"
+                ),
+                MetricTileItem(
+                    tag = "ELONGATION",
+                    primary = String.format(Locale.US, "%.1f°", mc.elongation_deg),
+                    secondary = "SUN-MON"
+                ),
+                MetricTileItem(
+                    tag = "VOID OF COURSE",
+                    primary = if (mc.is_void_of_course) "YES (VOC)" else "NO (ACTIVE)",
+                    secondary = if (mc.is_in_tincture_exception) "EXEMPT" else "",
+                    highlightColor = if (mc.is_void_of_course) CrimsonAlert else CelestialBlue
+                ),
+                MetricTileItem(
+                    tag = "VIA COMBUSTA",
+                    primary = if (mc.is_via_combusta) "YES" else "CLEAR",
+                    secondary = "15°LIB-15°SCO",
+                    highlightColor = if (mc.is_via_combusta) CrimsonAlert else null
+                )
+            )
+            CompactMetricGrid(items = tiles, columns = 2)
 
-        // 2. Moon Condition Card
-        Card(
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
-            border = BorderStroke(1.dp, BorderColor),
-            modifier = Modifier.fillMaxWidth()
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("NEXT APPLYING ASPECT", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextSecondary, style = TabularMonoStyle)
+                Text(
+                    text = mc.next_applying_aspect ?: "None before sign exit",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextPrimary,
+                    style = TabularMonoStyle,
+                    maxLines = 1
+                )
+            }
+        }
+
+        // 3. Prenatal Syzygy (SAN)
+        data.prenatal_syzygy?.let { san ->
+            AstroPanelCard(title = "Prenatal Syzygy (SAN)") {
+                val tiles = listOf(
+                    MetricTileItem("TYPE", san.syzygy_type.uppercase(Locale.US)),
+                    MetricTileItem("DEGREE", formatSignAndDeg(san.sign_index, san.sign_degree)),
+                    MetricTileItem("UTC DATE", san.exact_datetime_utc.take(16))
+                )
+                CompactMetricGrid(items = tiles, columns = 3)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReceptionsAndCuspsSubSection(data: WesternTraditionalData) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // 1. Perfection & Reception Summary
+        val perf = data.perfection
+        if (data.mutual_receptions.isNotEmpty() ||
+            perf.translation_of_light.isNotEmpty() ||
+            perf.collection_of_light.isNotEmpty() ||
+            perf.besiegement.isNotEmpty()
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Moon Condition", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    SectionCopyButton(title = "Moon Condition") {
-                        val sb = StringBuilder()
-                        sb.appendLine("[Moon Condition]")
-                        sb.appendLine("• Phase: ${traditional.moon_condition.lunar_phase_name}")
-                        if (isHorary) {
-                            if (traditional.moon_condition.is_void_of_course) sb.appendLine("• Void of Course: Yes")
-                            if (traditional.moon_condition.is_via_combusta) sb.appendLine("• Via Combusta: Yes")
-                            traditional.moon_condition.next_applying_aspect?.let {
-                                sb.appendLine("• Next Applying Aspect: $it")
-                            }
-                        }
-                        sb.toString().trimEnd()
-                    }
-                }
-                Spacer(modifier = Modifier.height(10.dp))
+            AstroPanelCard(
+                title = "Mutual Receptions & Perfection",
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                val cols = listOf(
+                    TableColSpec("TYPE", 1.1f, TextAlign.Start, monospace = true),
+                    TableColSpec("BODIES / DETAIL", 2.9f, TextAlign.Start)
+                )
+                AstroTableHeader(cols)
 
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = CelestialBlue.copy(alpha = 0.1f)
-                    ) {
-                        Text(
-                            text = traditional.moon_condition.lunar_phase_name,
-                            color = CelestialBlue,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                data.mutual_receptions.forEachIndexed { idx, mr ->
+                    AstroTableRow(
+                        columns = cols,
+                        striped = idx % 2 == 1,
+                        cells = listOf(
+                            TableCellData(mr.reception_type.uppercase(Locale.US), CelestialBlue, FontWeight.Bold),
+                            TableCellData("${bodyCode(mr.planet1)} ↔ ${bodyCode(mr.planet2)} · ${mr.description}", TextPrimary)
                         )
-                    }
+                    )
+                }
+                perf.translation_of_light.forEach { item ->
+                    AstroTableRow(
+                        columns = cols,
+                        cells = listOf(
+                            TableCellData("TRANSLATION", CelestialBlue, FontWeight.Bold),
+                            TableCellData(item, TextPrimary)
+                        )
+                    )
+                }
+                perf.collection_of_light.forEach { item ->
+                    AstroTableRow(
+                        columns = cols,
+                        cells = listOf(
+                            TableCellData("COLLECTION", CelestialBlue, FontWeight.Bold),
+                            TableCellData(item, TextPrimary)
+                        )
+                    )
+                }
+                perf.besiegement.forEach { item ->
+                    AstroTableRow(
+                        columns = cols,
+                        cells = listOf(
+                            TableCellData("BESIEGEMENT", CrimsonAlert, FontWeight.Bold),
+                            TableCellData(item, CrimsonAlert)
+                        )
+                    )
+                }
+            }
+        }
 
-                    if (isHorary && traditional.moon_condition.is_void_of_course) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = AstrologicalRed.copy(alpha = 0.12f)
+        // 2. House Cusp Dignities & Almutens
+        if (data.cusp_dignities.isNotEmpty()) {
+            AstroPanelCard(
+                title = "House Cusp Rulers & Almutens",
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                val cols = listOf(
+                    TableColSpec("H", 0.55f, TextAlign.Start, monospace = true),
+                    TableColSpec("CUSP", 1.35f, TextAlign.Start, monospace = true),
+                    TableColSpec("DOM", 0.7f, TextAlign.Center, monospace = true),
+                    TableColSpec("EXA", 0.7f, TextAlign.Center, monospace = true),
+                    TableColSpec("TRI", 0.7f, TextAlign.Center, monospace = true),
+                    TableColSpec("TRM", 0.7f, TextAlign.Center, monospace = true),
+                    TableColSpec("ALM", 0.9f, TextAlign.End, monospace = true)
+                )
+                AstroTableHeader(cols)
+                data.cusp_dignities.forEachIndexed { idx, c ->
+                    AstroTableRow(
+                        columns = cols,
+                        striped = idx % 2 == 1,
+                        cells = listOf(
+                            TableCellData("H${c.house_number}", TextPrimary, FontWeight.Bold),
+                            TableCellData(formatSignAndDeg(c.sign_index, c.sign_degree), TextPrimary),
+                            TableCellData(bodyCode(c.domicile), TextSecondary),
+                            TableCellData(c.exaltation?.let { bodyCode(it) } ?: "-", TextSecondary),
+                            TableCellData(bodyCode(c.triplicity), TextSecondary),
+                            TableCellData(bodyCode(c.term), TextSecondary),
+                            TableCellData("${bodyCode(c.almuten)}(${c.almuten_score})", CelestialBlue, FontWeight.Bold)
+                        )
+                    )
+                }
+            }
+        }
+
+        // 3. Antiscia & Contra-Antiscia
+        if (data.antiscia.isNotEmpty()) {
+            AstroPanelCard(
+                title = "Antiscia & Contra-Antiscia",
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                val cols = listOf(
+                    TableColSpec("BODY", 0.9f, TextAlign.Start, monospace = true),
+                    TableColSpec("NATAL", 1.3f, TextAlign.Start, monospace = true),
+                    TableColSpec("ANTISCION", 1.3f, TextAlign.Start, monospace = true),
+                    TableColSpec("CONTRA", 1.3f, TextAlign.End, monospace = true)
+                )
+                AstroTableHeader(cols)
+                data.antiscia.forEachIndexed { idx, a ->
+                    AstroTableRow(
+                        columns = cols,
+                        striped = idx % 2 == 1,
+                        cells = listOf(
+                            TableCellData(bodyCode(a.body_name), TextPrimary, FontWeight.Bold),
+                            TableCellData(formatLongitudeSignDeg(a.true_longitude), TextSecondary),
+                            TableCellData(formatSignAndDeg(a.antiscion_sign_index, a.antiscion_degree), CelestialBlue, FontWeight.SemiBold),
+                            TableCellData(formatLongitudeSignDeg(a.contra_antiscion_longitude), TextSecondary)
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LotsAndStarsSubSection(data: WesternTraditionalData) {
+    var expandedStar by remember { mutableStateOf<String?>(null) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // 1. Arabic Parts / Lots
+        if (data.arabic_parts.isNotEmpty()) {
+            AstroPanelCard(
+                title = "Arabic Parts & Lots",
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                val cols = listOf(
+                    TableColSpec("LOT", 1.5f, TextAlign.Start),
+                    TableColSpec("POSITION", 1.25f, TextAlign.Start, monospace = true),
+                    TableColSpec("H", 0.55f, TextAlign.Center, monospace = true),
+                    TableColSpec("RULER", 0.75f, TextAlign.Center, monospace = true),
+                    TableColSpec("FORMULA", 1.4f, TextAlign.End, monospace = true)
+                )
+                AstroTableHeader(cols)
+                data.arabic_parts.forEachIndexed { idx, part ->
+                    AstroTableRow(
+                        columns = cols,
+                        striped = idx % 2 == 1,
+                        cells = listOf(
+                            TableCellData(part.name, TextPrimary, FontWeight.SemiBold),
+                            TableCellData(formatSignAndDeg(part.sign_index, part.sign_degree), TextPrimary),
+                            TableCellData("${part.house_number}", TextSecondary),
+                            TableCellData(bodyCode(part.ruler), CelestialBlue, FontWeight.Bold),
+                            TableCellData(part.formula.ifBlank { "-" }, TextSecondary)
+                        )
+                    )
+                }
+            }
+        }
+
+        // 2. Fixed Star Conjunctions
+        AstroPanelCard(
+            title = "Fixed Star Conjunctions",
+            subtitle = "Tap row to view traditional nature & meaning",
+            contentPadding = PaddingValues(0.dp)
+        ) {
+            if (data.fixed_star_conjunctions.isEmpty()) {
+                Box(modifier = Modifier.padding(12.dp)) {
+                    Text("No active fixed star conjunctions within orb.", fontSize = 12.sp, color = TextSecondary)
+                }
+            } else {
+                val cols = listOf(
+                    TableColSpec("STAR", 1.5f, TextAlign.Start),
+                    TableColSpec("BODY", 0.75f, TextAlign.Center, monospace = true),
+                    TableColSpec("ORB", 0.85f, TextAlign.End, monospace = true),
+                    TableColSpec("NATURE", 0.95f, TextAlign.Center, monospace = true),
+                    TableColSpec("STATUS", 0.95f, TextAlign.End, monospace = true)
+                )
+                AstroTableHeader(cols)
+                data.fixed_star_conjunctions.forEachIndexed { idx, fsc ->
+                    val key = "${fsc.star_name}_${fsc.body_name}"
+                    val isExp = expandedStar == key
+                    AstroTableRow(
+                        columns = cols,
+                        striped = idx % 2 == 1,
+                        onClick = { expandedStar = if (isExp) null else key },
+                        cells = listOf(
+                            TableCellData(fsc.star_name, TextPrimary, FontWeight.Bold),
+                            TableCellData(bodyCode(fsc.body_name), CelestialBlue, FontWeight.Bold),
+                            TableCellData(formatOrb(fsc.orb), TextPrimary),
+                            TableCellData(fsc.nature, TextSecondary),
+                            TableCellData(
+                                text = if (fsc.is_qualified) "QUAL" else "FILT",
+                                color = if (fsc.is_qualified) CelestialBlue else TextSecondary,
+                                badgeColor = if (fsc.is_qualified) CelestialBlue else null
+                            )
+                        )
+                    )
+                    if (isExp) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(SurfaceLight)
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
                             Text(
-                                text = "Void of Course",
-                                color = AstrologicalRed,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-
-                    if (isHorary && traditional.moon_condition.is_via_combusta) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = AstrologicalRed.copy(alpha = 0.12f)
-                        ) {
-                            Text(
-                                text = "Via Combusta",
-                                color = AstrologicalRed,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-                }
-
-                if (isHorary) {
-                    traditional.moon_condition.next_applying_aspect?.let { nextAsp ->
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Next Applying Aspect: $nextAsp",
-                            color = TextSecondary,
-                            fontSize = 13.sp
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // 3. Essential Dignities & Lilly Scores Table Card
-        Card(
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
-            border = BorderStroke(1.dp, BorderColor),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { isDignityExpanded = !isDignityExpanded },
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text("Essential Dignities & Lilly Scores", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        Icon(
-                            if (isDignityExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                            contentDescription = null,
-                            tint = TextSecondary
-                        )
-                    }
-                    SectionCopyButton(title = "Dignities") {
-                        val sb = StringBuilder()
-                        sb.appendLine("[Essential Dignities & Lilly Scores]")
-                        traditional.planet_dignities.forEach { d ->
-                            val badges = mutableListOf<String>()
-                            if (d.is_in_domicile) badges.add("Domicile +5")
-                            if (d.is_in_exaltation) badges.add("Exaltation +4")
-                            if (d.is_in_triplicity) badges.add("Triplicity +3")
-                            if (d.is_in_term) badges.add("Term +2")
-                            if (d.is_in_face) badges.add("Face +1")
-                            if (d.is_in_detriment) badges.add("Detriment -5")
-                            if (d.is_in_fall) badges.add("Fall -4")
-                            if (d.is_peregrine) badges.add("Peregrine -5")
-                            val badgeStr = if (badges.isEmpty()) "Neutral" else badges.joinToString(", ")
-                            sb.appendLine("• ${d.planet} (House ${d.house_number}): Score ${String.format("%+d", d.total_lilly_score)} [Ess ${String.format("%+d", d.essential_score)} / Acc ${String.format("%+d", d.accidental_score)}] | $badgeStr")
-                        }
-                        sb.toString().trimEnd()
-                    }
-                }
-
-                AnimatedVisibility(visible = isDignityExpanded) {
-                    Column(modifier = Modifier.padding(top = 10.dp)) {
-                        traditional.planet_dignities.forEach { d ->
-                            val statusBadges = mutableListOf<Pair<String, Boolean>>()
-                            if (d.is_in_domicile) statusBadges.add("Domicile +5" to true)
-                            if (d.is_in_exaltation) statusBadges.add("Exaltation +4" to true)
-                            if (d.is_in_triplicity) statusBadges.add("Triplicity +3" to true)
-                            if (d.is_in_term) statusBadges.add("Term +2" to true)
-                            if (d.is_in_face) statusBadges.add("Face +1" to true)
-                            if (d.is_in_detriment) statusBadges.add("Detriment -5" to false)
-                            if (d.is_in_fall) statusBadges.add("Fall -4" to false)
-                            if (d.is_peregrine) statusBadges.add("Peregrine -5" to false)
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 6.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                                    Text(
-                                        text = "${d.planet} · House ${d.house_number}",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp,
-                                        color = TextPrimary
-                                    )
-                                    FlowRow(
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                                        modifier = Modifier.padding(top = 4.dp)
-                                    ) {
-                                        if (statusBadges.isEmpty()) {
-                                            Text("Neutral", color = TextSecondary, fontSize = 11.sp)
-                                        } else {
-                                            statusBadges.forEach { (badge, isPositive) ->
-                                                Surface(
-                                                    shape = RoundedCornerShape(4.dp),
-                                                    color = if (isPositive) VedicGreen.copy(alpha = 0.1f) else AstrologicalRed.copy(alpha = 0.1f)
-                                                ) {
-                                                    Text(
-                                                        text = badge,
-                                                        color = if (isPositive) VedicGreen else AstrologicalRed,
-                                                        fontSize = 10.sp,
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        text = String.format("%+d", d.total_lilly_score),
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 15.sp,
-                                        color = if (d.total_lilly_score >= 0) CelestialBlue else AstrologicalRed
-                                    )
-                                    Text(
-                                        text = "Ess ${String.format("%+d", d.essential_score)} / Acc ${String.format("%+d", d.accidental_score)}",
-                                        color = TextSecondary,
-                                        fontSize = 11.sp
-                                    )
-                                }
-                            }
-                            HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
-                        }
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // 4. Fixed Star Conjunctions Card (순수 수직 3단 컬럼 배치)
-        Card(
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
-            border = BorderStroke(1.dp, BorderColor),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { isStarsExpanded = !isStarsExpanded },
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = "Fixed Star Conjunctions (${traditional.fixed_star_conjunctions.size} in orb)",
-                            color = TextPrimary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp
-                        )
-                        Icon(
-                            if (isStarsExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                            contentDescription = null,
-                            tint = TextSecondary
-                        )
-                    }
-                    SectionCopyButton(title = "Fixed Stars") {
-                        val sb = StringBuilder()
-                        sb.appendLine("[Fixed Star Conjunctions (Orb <= 1.5°)]")
-                        if (traditional.fixed_star_conjunctions.isEmpty()) {
-                            sb.appendLine("  (None in orb)")
-                        } else {
-                            traditional.fixed_star_conjunctions.forEach { fs ->
-                                sb.appendLine("• ${fs.star_name} · ${fs.body_name}")
-                                sb.appendLine("  - Orb ${String.format("%.2f°", fs.orb)} · Nature: ${fs.nature}")
-                                if (fs.meaning.isNotBlank()) {
-                                    sb.appendLine("  - Meaning: ${fs.meaning}")
-                                }
-                            }
-                        }
-                        sb.toString().trimEnd()
-                    }
-                }
-
-                AnimatedVisibility(visible = isStarsExpanded) {
-                    Column(modifier = Modifier.padding(top = 10.dp)) {
-                        if (traditional.fixed_star_conjunctions.isEmpty()) {
-                            Text(
-                                text = "No fixed stars conjunct within 1.5° orb.",
+                                text = "Mag ${fsc.star_magnitude} · Lat ${String.format(Locale.US, "%+.1f°", fsc.star_latitude)} · Max Alt ${String.format(Locale.US, "%+.1f°", fsc.max_altitude)}",
+                                fontSize = 10.sp,
                                 color = TextSecondary,
-                                fontSize = 13.sp
+                                style = TabularMonoStyle
                             )
-                        } else {
-                            traditional.fixed_star_conjunctions.forEach { fs ->
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 6.dp)
-                                ) {
-                                    // 1행: 항성명 · 결합 천체 + 유효성 뱃지 + 가시성 뱃지
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Text(
-                                            text = "${fs.star_name} · ${fs.body_name}",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 13.sp,
-                                            color = TextPrimary
-                                        )
-                                        Surface(
-                                            shape = RoundedCornerShape(4.dp),
-                                            color = if (fs.is_qualified) AstrologicalGreen.copy(alpha = 0.12f) else BorderColor.copy(alpha = 0.5f)
-                                        ) {
-                                            Text(
-                                                text = if (fs.is_qualified) "Qualified" else "Filtered",
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = if (fs.is_qualified) AstrologicalGreen else TextSecondary,
-                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                                            )
-                                        }
-                                        Surface(
-                                            shape = RoundedCornerShape(4.dp),
-                                            color = if (fs.is_visible) AstrologicalGreen.copy(alpha = 0.12f) else BorderColor.copy(alpha = 0.5f)
-                                        ) {
-                                            Text(
-                                                text = if (fs.is_visible) "Visible (${String.format("%+.1f°", fs.max_altitude)})" else "Below Horizon",
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = if (fs.is_visible) AstrologicalGreen else TextSecondary,
-                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                                            )
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    // 2행: 사유 · 오차 · 황위 · 등급 · 성질
-                                    Text(
-                                        text = "${fs.qualification_reason} · Orb ${String.format("%.2f°", fs.orb)} · Lat ${String.format("%+.1f°", fs.star_latitude)} · Mag ${fs.star_magnitude} · Nature: ${fs.nature}",
-                                        color = if (fs.is_qualified) CelestialBlue else TextSecondary,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    // 3행: 전통 의미 및 해석
-                                    if (fs.meaning.isNotBlank()) {
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = fs.meaning,
-                                            color = TextSecondary,
-                                            fontSize = 12.sp
-                                        )
-                                    }
-                                }
-                                HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
+                            if (fsc.meaning.isNotBlank()) {
+                                Text(text = fsc.meaning, fontSize = 11.sp, color = TextPrimary)
                             }
                         }
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // 5. Arabic Parts & Almutens Card (제목 축약 및 Almuten 중복 라벨 제거)
-        Card(
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
-            border = BorderStroke(1.dp, BorderColor),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { isPartsExpanded = !isPartsExpanded },
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text("Arabic Parts & Almutens", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        Icon(
-                            if (isPartsExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                            contentDescription = null,
-                            tint = TextSecondary
-                        )
-                    }
-                    SectionCopyButton(title = "Arabic Parts & Almutens") {
-                        val sb = StringBuilder()
-                        sb.appendLine("[Arabic Parts & Almutens]")
-                        sb.appendLine("Arabic Parts (Lots):")
-                        traditional.arabic_parts.forEach { p ->
-                            val s = getZodiacSignName(p.sign_index)
-                            sb.appendLine("• ${p.name}: ${String.format("%.2f°", p.longitude)} ($s) · House ${p.house_number}")
-                        }
-                        sb.appendLine("House Cusp Almutens:")
-                        traditional.house_almutens.forEach { ha ->
-                            sb.appendLine("• House ${ha.house_number}: ${ha.almuten} (${ha.almuten_score} pts)")
-                        }
-                        sb.toString().trimEnd()
-                    }
-                }
-
-                AnimatedVisibility(visible = isPartsExpanded) {
-                    Column(modifier = Modifier.padding(top = 10.dp)) {
-                        Text("Arabic Parts (Lots):", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
-                        traditional.arabic_parts.forEach { part ->
-                            val sign = getZodiacSignName(part.sign_index)
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(text = part.name, color = TextPrimary, fontSize = 13.sp)
-                                Text(
-                                    text = "${String.format("%.2f°", part.longitude)} ($sign) · H${part.house_number}",
-                                    color = TextSecondary,
-                                    fontSize = 12.sp
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text("House Cusp Almutens:", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = TextPrimary)
-                        traditional.house_almutens.forEach { ha ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 3.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(text = "House ${ha.house_number}", color = TextPrimary, fontSize = 12.sp)
-                                Text(
-                                    text = "${ha.almuten} (${ha.almuten_score} pts)",
-                                    color = CelestialBlue,
-                                    fontWeight = FontWeight.Medium,
-                                    fontSize = 12.sp
-                                )
-                            }
-                        }
+                        HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
                     }
                 }
             }
@@ -602,276 +536,80 @@ fun WesternTraditionalSection(
 }
 
 @Composable
-private fun HellenisticSectionContent(h: HellenisticData) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = "Hellenistic Analysis (Vettius Valens / Whole Sign)",
-            fontWeight = FontWeight.Bold,
-            fontSize = 17.sp,
-            color = TextPrimary,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
-
-        // 1. Independent Angles & Action Points Card
-        Card(
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
-            border = BorderStroke(1.dp, BorderColor),
-            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Angles & Planetary Action Points", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
-                    SectionCopyButton(title = "Hellenistic Angles") {
-                        val ascSign = getZodiacSignName(h.angles.ascendant_sign)
-                        val mcSign = getZodiacSignName(h.angles.midheaven_sign)
-                        val mcHouseStr = if (h.angles.is_mc_in_10th) "House 10 (Culmination)" else "House ${h.angles.midheaven_house} (Action Point)"
-                        """
-                        [Hellenistic Angles]
-                        • Ascendant (ASC): ${String.format("%.2f°", h.angles.ascendant_degree)} $ascSign
-                        • Midheaven (MC): ${String.format("%.2f°", h.angles.midheaven_degree)} $mcSign · $mcHouseStr
-                        """.trimIndent()
-                    }
-                }
-                Spacer(modifier = Modifier.height(10.dp))
-                val ascSign = getZodiacSignName(h.angles.ascendant_sign)
-                val mcSign = getZodiacSignName(h.angles.midheaven_sign)
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Ascendant (ASC)", fontSize = 13.sp, color = TextPrimary, fontWeight = FontWeight.Medium)
-                    Text("${String.format("%.2f°", h.angles.ascendant_degree)} $ascSign", fontSize = 13.sp, color = AccentPrimary, fontWeight = FontWeight.SemiBold)
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Column {
-                        Text("Midheaven (MC)", fontSize = 13.sp, color = TextPrimary, fontWeight = FontWeight.Medium)
-                        val mcActionTag = if (h.angles.is_mc_in_10th) "10H Culmination" else "${h.angles.midheaven_house}H Action Point"
-                        Text(mcActionTag, fontSize = 11.sp, color = if (h.angles.is_mc_in_10th) TextSecondary else VedicGreen, fontWeight = FontWeight.Normal)
-                    }
-                    Text("${String.format("%.2f°", h.angles.midheaven_degree)} $mcSign", fontSize = 13.sp, color = AccentPrimary, fontWeight = FontWeight.SemiBold)
-                }
-            }
+private fun HellenisticSubSection(h: HellenisticData) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // 1. Angles & Bounds
+        AstroPanelCard(title = "Hellenistic Angles (Whole Sign)") {
+            val tiles = listOf(
+                MetricTileItem("ASCENDANT", formatSignAndDeg(h.angles.ascendant_sign, h.angles.ascendant_degree), "H1"),
+                MetricTileItem("MIDHEAVEN", formatSignAndDeg(h.angles.midheaven_sign, h.angles.midheaven_degree), "H${h.angles.midheaven_house}"),
+                MetricTileItem("MC IN 10TH", if (h.angles.is_mc_in_10th) "YES" else "NO (H${h.angles.midheaven_house})")
+            )
+            CompactMetricGrid(items = tiles, columns = 3)
         }
 
-        // 2. Qualitative Planet Conditions (Hellenistic Essential States)
-        Card(
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
-            border = BorderStroke(1.dp, BorderColor),
-            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Qualitative Dignities (States)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
-                    SectionCopyButton(title = "Hellenistic Dignities") {
-                        val sb = StringBuilder()
-                        sb.appendLine("[Hellenistic Qualitative Dignities]")
-                        h.planet_conditions.forEach { pc ->
-                            val lordTag = if (pc.is_ruler_of_asc) " [Lord of ASC]" else ""
-                            sb.appendLine("• ${pc.name}: ${pc.condition_label} · House ${pc.house_number}$lordTag")
-                        }
-                        sb.toString().trimEnd()
-                    }
-                }
-                Spacer(modifier = Modifier.height(10.dp))
-                h.planet_conditions.forEach { pc ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 5.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(pc.name, fontWeight = FontWeight.Medium, fontSize = 13.sp, color = TextPrimary)
-                            if (pc.is_ruler_of_asc) {
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Surface(
-                                    color = AccentPrimary.copy(alpha = 0.12f),
-                                    shape = RoundedCornerShape(4.dp)
-                                ) {
-                                    Text(
-                                        text = "Lord of ASC",
-                                        color = AccentPrimary,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                                    )
-                                }
-                            }
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            val badgeColor = when (pc.condition_label) {
-                                "Domicile" -> VedicGreen
-                                "Exaltation" -> CelestialBlue
-                                "Fall" -> AstrologicalRed
-                                else -> TextSecondary
-                            }
-                            Surface(
-                                color = badgeColor.copy(alpha = 0.12f),
-                                shape = RoundedCornerShape(4.dp)
-                            ) {
-                                Text(
-                                    text = pc.condition_label,
-                                    color = badgeColor,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("House ${pc.house_number}", fontSize = 12.sp, color = TextSecondary)
-                        }
-                    }
-                    HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
-                }
-            }
-        }
-
-        // 3. Hermetic Lots (Lots of Soul & Body)
-        if (h.lots.isNotEmpty()) {
-            Card(
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
-                border = BorderStroke(1.dp, BorderColor),
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+        // 2. Planet Conditions & Egyptian Bounds
+        if (h.planet_conditions.isNotEmpty()) {
+            AstroPanelCard(
+                title = "Planetary Conditions & Egyptian Bounds",
+                contentPadding = PaddingValues(0.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Hermetic Lots (Paulus Alexandrinus)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
-                        SectionCopyButton(title = "Hermetic Lots") {
-                            val sb = StringBuilder()
-                            sb.appendLine("[Hermetic Lots]")
-                            h.lots.forEach { lot ->
-                                val sign = getZodiacSignName(lot.sign_index)
-                                sb.appendLine("• ${lot.name}: ${String.format("%.2f°", lot.sign_degree)} $sign · House ${lot.house_number} · Ruler: ${lot.ruler}")
-                            }
-                            sb.toString().trimEnd()
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(10.dp))
-                    h.lots.forEach { lot ->
-                        val sign = getZodiacSignName(lot.sign_index)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(lot.name, fontSize = 13.sp, color = TextPrimary)
-                            Text(
-                                text = "${String.format("%.2f°", lot.sign_degree)} $sign · H${lot.house_number}",
-                                fontSize = 12.sp,
-                                color = TextSecondary
-                            )
-                        }
-                        HorizontalDivider(color = BorderColor.copy(alpha = 0.4f))
-                    }
-                }
-            }
-        }
-
-        // 4. Sign-Based Aspects & Degree Contacts
-        if (h.aspects.isNotEmpty()) {
-            Card(
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
-                border = BorderStroke(1.dp, BorderColor),
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Sign-Based Aspects & Contacts", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    h.aspects.forEach { asp ->
-                        val appText = if (asp.is_applying) "App (${String.format("%.1f°", asp.degrees_to_perfection)})" else "Sep"
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("${asp.planet1} ${asp.aspect_type} ${asp.planet2}", fontSize = 13.sp, color = TextPrimary)
-                            Text(
-                                text = "Orb ${String.format("%.2f°", asp.orb)} · $appText",
-                                fontSize = 12.sp,
-                                color = if (asp.is_partile) AccentPrimary else TextSecondary
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // 5. Fixed Star Conjunctions
-        if (h.fixed_star_conjunctions.isNotEmpty()) {
-            Card(
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
-                border = BorderStroke(1.dp, BorderColor),
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Fixed Star Conjunctions (Orb ≤ 1.5°)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    h.fixed_star_conjunctions.forEach { fsc ->
-                        Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Text(
-                                    text = "★ ${fsc.star_name} (${fsc.korean_name}) ☌ ${fsc.body_name} (Orb ${String.format("%.2f°", fsc.orb)})",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = TextPrimary
-                                )
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = if (fsc.is_qualified) AstrologicalGreen.copy(alpha = 0.12f) else BorderColor.copy(alpha = 0.5f)
-                                ) {
-                                    Text(
-                                        text = if (fsc.is_qualified) "Qualified" else "Filtered",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = if (fsc.is_qualified) AstrologicalGreen else TextSecondary,
-                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                                    )
-                                }
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = if (fsc.is_visible) AstrologicalGreen.copy(alpha = 0.12f) else BorderColor.copy(alpha = 0.5f)
-                                ) {
-                                    Text(
-                                        text = if (fsc.is_visible) "Visible (${String.format("%+.1f°", fsc.max_altitude)})" else "Below Horizon",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = if (fsc.is_visible) AstrologicalGreen else TextSecondary,
-                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                                    )
-                                }
-                            }
-                            Text(
-                                text = "${fsc.qualification_reason} · Lat ${String.format("%+.1f°", fsc.star_latitude)} · Mag ${fsc.star_magnitude}",
-                                fontSize = 11.sp,
-                                color = if (fsc.is_qualified) CelestialBlue else TextSecondary,
+                val cols = listOf(
+                    TableColSpec("BODY", 0.8f, TextAlign.Start, monospace = true),
+                    TableColSpec("POSITION", 1.3f, TextAlign.Start, monospace = true),
+                    TableColSpec("H", 0.5f, TextAlign.Center, monospace = true),
+                    TableColSpec("BOUND", 0.8f, TextAlign.Center, monospace = true),
+                    TableColSpec("CONDITION", 1.6f, TextAlign.End)
+                )
+                AstroTableHeader(cols)
+                h.planet_conditions.forEachIndexed { idx, pc ->
+                    AstroTableRow(
+                        columns = cols,
+                        striped = idx % 2 == 1,
+                        cells = listOf(
+                            TableCellData(bodyCode(pc.name), if (pc.is_ruler_of_asc) CelestialBlue else TextPrimary, FontWeight.Bold),
+                            TableCellData(formatSignAndDeg(pc.sign_index, pc.sign_degree), TextPrimary),
+                            TableCellData("${pc.house_number}", TextSecondary),
+                            TableCellData(if (pc.bound_ruler.isNotBlank()) bodyCode(pc.bound_ruler) else "-", TextSecondary),
+                            TableCellData(
+                                text = pc.condition_label.ifBlank { "Peregrine" },
+                                color = when {
+                                    pc.is_in_domicile || pc.is_in_exaltation -> CelestialBlue
+                                    pc.is_in_fall -> CrimsonAlert
+                                    else -> TextSecondary
+                                },
                                 fontWeight = FontWeight.Medium
                             )
-                            Text(text = fsc.meaning, fontSize = 12.sp, color = TextSecondary)
-                        }
-                    }
+                        )
+                    )
+                }
+            }
+        }
+
+        // 3. Hellenistic Lots
+        if (h.lots.isNotEmpty()) {
+            AstroPanelCard(
+                title = "Hellenistic Lots",
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                val cols = listOf(
+                    TableColSpec("LOT", 1.7f, TextAlign.Start),
+                    TableColSpec("POSITION", 1.3f, TextAlign.Start, monospace = true),
+                    TableColSpec("H", 0.55f, TextAlign.Center, monospace = true),
+                    TableColSpec("LORD", 0.8f, TextAlign.End, monospace = true)
+                )
+                AstroTableHeader(cols)
+                h.lots.forEachIndexed { idx, lot ->
+                    AstroTableRow(
+                        columns = cols,
+                        striped = idx % 2 == 1,
+                        cells = listOf(
+                            TableCellData(lot.name, TextPrimary, FontWeight.SemiBold),
+                            TableCellData(formatSignAndDeg(lot.sign_index, lot.sign_degree), TextPrimary),
+                            TableCellData("${lot.house_number}", TextSecondary),
+                            TableCellData(bodyCode(lot.ruler), CelestialBlue, FontWeight.Bold)
+                        )
+                    )
                 }
             }
         }

@@ -1,12 +1,12 @@
 package com.fortunexample.note.ui.components
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -27,117 +27,70 @@ fun SajuChartTable(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // 1. 사주 4주 명식표 바둑판 그리드
-        Card(
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
-            border = BorderStroke(1.dp, BorderColor),
-            modifier = Modifier.fillMaxWidth()
+        AstroPanelCard(
+            title = "Four Pillars (원국 명식)",
+            contentPadding = PaddingValues(12.dp)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "사주팔자 명식 (Four Pillars)",
-                    color = TextPrimary,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    PillarColumn(title = "시주", pillar = chart.hour_pillar, modifier = Modifier.weight(1f))
-                    PillarColumn(title = "일주", pillar = chart.day_pillar, modifier = Modifier.weight(1f))
-                    PillarColumn(title = "월주", pillar = chart.month_pillar, modifier = Modifier.weight(1f))
-                    PillarColumn(title = "연주", pillar = chart.year_pillar, modifier = Modifier.weight(1f))
-                }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                PillarBox("HOUR · 시주", chart.hour_pillar, Modifier.weight(1f))
+                PillarBox("DAY · 일주", chart.day_pillar, Modifier.weight(1f))
+                PillarBox("MONTH · 월주", chart.month_pillar, Modifier.weight(1f))
+                PillarBox("YEAR · 연주", chart.year_pillar, Modifier.weight(1f))
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // 2. 대운(Daeun) 헤더
-        Card(
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
-            border = BorderStroke(1.dp, BorderColor),
-            modifier = Modifier.fillMaxWidth()
+        AstroPanelCard(
+            title = "Major Cycles (대운 · ${if (chart.is_forward_daeun) "순행" else "역행"})",
+            headerAction = {
+                AstroStatusBadge(
+                    text = "DAEUN ${chart.daeun_number}",
+                    color = CelestialBlue
+                )
+            }
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "대운 (Daeun) · ${if (chart.is_forward_daeun) "순행" else "역행"}",
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp
-                    )
-                    Text(
-                        text = "대운수 ${chart.daeun_number}",
-                        color = CelestialBlue,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // 3. 10년 주기 대운 가로 스크롤 타임라인 (중앙 정렬)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    chart.daeun_periods.forEach { period ->
-                        Card(
-                            shape = RoundedCornerShape(8.dp),
-                            colors = CardDefaults.cardColors(containerColor = SurfaceLight),
-                            border = BorderStroke(1.dp, BorderColor),
-                            modifier = Modifier.width(64.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 10.dp, horizontal = 4.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = "${period.start_age}세",
-                                    color = TextSecondary,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    textAlign = TextAlign.Center
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = period.pillar.hanja,
-                                    color = TextPrimary,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 17.sp,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    textAlign = TextAlign.Center
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = period.pillar.korean,
-                                    color = TextSecondary,
-                                    fontSize = 12.sp,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                chart.daeun_periods.forEach { period ->
+                    Column(
+                        modifier = Modifier
+                            .width(56.dp)
+                            .background(SurfaceLight, RoundedCornerShape(6.dp))
+                            .border(1.dp, BorderColor, RoundedCornerShape(6.dp))
+                            .padding(vertical = 8.dp, horizontal = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "${period.start_age}",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CelestialBlue,
+                            style = TabularMonoStyle,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = period.pillar.hanja,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = period.pillar.korean,
+                            fontSize = 11.sp,
+                            color = TextSecondary,
+                            textAlign = TextAlign.Center
+                        )
                     }
                 }
             }
@@ -146,66 +99,58 @@ fun SajuChartTable(
 }
 
 @Composable
-private fun PillarColumn(
-    title: String,
+private fun PillarBox(
+    label: String,
     pillar: PillarData,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceLight),
-        border = BorderStroke(1.dp, BorderColor),
+    Column(
         modifier = modifier
-            .padding(horizontal = 4.dp)
+            .background(SurfaceLight, RoundedCornerShape(6.dp))
+            .border(1.dp, BorderColor, RoundedCornerShape(6.dp))
+            .padding(vertical = 10.dp, horizontal = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp, horizontal = 2.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = title,
-                color = TextSecondary,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            // 천간
-            Text(
-                text = PillarData.STEMS_HANJA[pillar.stem_index % 10],
-                color = TextPrimary,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center
-            )
-            Text(
-                text = PillarData.STEMS[pillar.stem_index % 10],
-                color = TextSecondary,
-                fontSize = 13.sp,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            // 지지
-            Text(
-                text = PillarData.BRANCHES_HANJA[pillar.branch_index % 12],
-                color = TextPrimary,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center
-            )
-            Text(
-                text = PillarData.BRANCHES[pillar.branch_index % 12],
-                color = TextSecondary,
-                fontSize = 13.sp,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center
-            )
-        }
+        Text(
+            text = label,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = TextSecondary,
+            style = TabularMonoStyle,
+            textAlign = TextAlign.Center,
+            maxLines = 1
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = PillarData.STEMS_HANJA[pillar.stem_index % 10],
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            color = TextPrimary,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = PillarData.STEMS[pillar.stem_index % 10],
+            fontSize = 11.sp,
+            color = TextSecondary,
+            textAlign = TextAlign.Center
+        )
+        HorizontalDivider(
+            color = BorderColor,
+            thickness = 0.5.dp,
+            modifier = Modifier.padding(vertical = 6.dp, horizontal = 10.dp)
+        )
+        Text(
+            text = PillarData.BRANCHES_HANJA[pillar.branch_index % 12],
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            color = TextPrimary,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = PillarData.BRANCHES[pillar.branch_index % 12],
+            fontSize = 11.sp,
+            color = TextSecondary,
+            textAlign = TextAlign.Center
+        )
     }
 }

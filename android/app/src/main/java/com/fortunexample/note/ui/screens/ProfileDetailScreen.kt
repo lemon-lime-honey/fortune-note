@@ -1,12 +1,8 @@
 package com.fortunexample.note.ui.screens
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -18,31 +14,45 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fortunexample.note.FortuneApp
-import com.fortunexample.note.data.PredictiveSuiteData
-import com.fortunexample.note.data.ProfileDto
-import com.fortunexample.note.data.SajuCalculationOutputDto
-import com.fortunexample.note.data.VedicCalculationOutputDto
-import com.fortunexample.note.data.WesternCalculationOutputDto
-import com.fortunexample.note.data.findHouseNumber
-import com.fortunexample.note.data.getZodiacSignName
-import com.fortunexample.note.data.getZodiacSignRuler
+import com.fortunexample.note.data.*
 import com.fortunexample.note.ui.components.*
 import com.fortunexample.note.ui.theme.*
 import kotlinx.coroutines.launch
+import java.util.Calendar
+import java.util.Locale
+
+private val VARGA_DEFINITIONS = listOf(
+    "D1" to "Rasi",
+    "D2" to "Hora",
+    "D3" to "Drekkana",
+    "D4" to "Chaturthamsha",
+    "D6" to "Shashthamsha",
+    "D7" to "Saptamsha",
+    "D8" to "Ashtamamsha",
+    "D9" to "Navamsha",
+    "D10" to "Dashamsha",
+    "D11" to "Rudramsha",
+    "D12" to "Dwadashamsha",
+    "D16" to "Shodashamsha",
+    "D20" to "Vimshamsha",
+    "D24" to "Chaturvimshamsha",
+    "D27" to "Saptavimshamsha",
+    "D30" to "Trimshamsha",
+    "D40" to "Khavedamsha",
+    "D45" to "Akshavedamsha",
+    "D60" to "Shashtiamsha"
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,13 +62,14 @@ fun ProfileDetailScreen(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val context = LocalContext.current
-    val clipboardManager = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
-    var selectedDomainTab by remember { mutableStateOf(0) }
-    var selectedVarga by remember { mutableStateOf("D1") }
-    var expandedDashaLord by remember { mutableStateOf<String?>(null) }
+    var selectedDomainTab by remember { mutableIntStateOf(0) }
+    var selectedWesternSubTab by remember { mutableIntStateOf(0) }
+    var selectedVedicSubTab by remember { mutableIntStateOf(0) }
 
+    var selectedVarga by remember { mutableStateOf("D1") }
+    var showVargaPickerSheet by remember { mutableStateOf(false) }
+    var expandedDashaLord by remember { mutableStateOf<String?>(null) }
     var showSelectiveCopySheet by remember { mutableStateOf(false) }
 
     // Decoupled domain states
@@ -75,16 +86,15 @@ fun ProfileDetailScreen(
     var isVedicLoading by remember { mutableStateOf(false) }
     var vedicError by remember { mutableStateOf<String?>(null) }
 
-    val todayCal = remember { java.util.Calendar.getInstance() }
-    var predictiveTargetYear by remember { mutableIntStateOf(todayCal.get(java.util.Calendar.YEAR)) }
-    var predictiveTargetMonth by remember { mutableIntStateOf(todayCal.get(java.util.Calendar.MONTH) + 1) }
-    var predictiveTargetDay by remember { mutableIntStateOf(todayCal.get(java.util.Calendar.DAY_OF_MONTH)) }
+    val todayCal = remember { Calendar.getInstance() }
+    var predictiveTargetYear by remember { mutableIntStateOf(todayCal.get(Calendar.YEAR)) }
+    var predictiveTargetMonth by remember { mutableIntStateOf(todayCal.get(Calendar.MONTH) + 1) }
+    var predictiveTargetDay by remember { mutableIntStateOf(todayCal.get(Calendar.DAY_OF_MONTH)) }
     var predictiveTargetHour by remember { mutableStateOf<Int?>(null) }
     var predictiveTargetMinute by remember { mutableStateOf<Int?>(null) }
     var predictiveData by remember { mutableStateOf<PredictiveSuiteData?>(null) }
     var isPredictiveLoading by remember { mutableStateOf(false) }
 
-    // 1. Saju immediate load on screen enter or profile update
     LaunchedEffect(profile) {
         sajuOutput = null
         westernOutput = null
@@ -98,12 +108,11 @@ fun ProfileDetailScreen(
                 isSajuLoading = false
             }
             .onFailure {
-                sajuError = it.message ?: "사주명리 데이터 계산에 실패했습니다."
+                sajuError = it.message ?: "Failed to compute Four Pillars data."
                 isSajuLoading = false
             }
     }
 
-    // 2. Western lazy load on Western tab (tab index 1)
     LaunchedEffect(profile, selectedDomainTab, selectedHouse) {
         if (selectedDomainTab == 1 && (westernOutput == null || westernOutput?.western?.house_system != selectedHouse)) {
             isWesternLoading = true
@@ -114,13 +123,12 @@ fun ProfileDetailScreen(
                     isWesternLoading = false
                 }
                 .onFailure {
-                    westernError = it.message ?: "서양 점성술 데이터 계산에 실패했습니다."
+                    westernError = it.message ?: "Failed to compute Western chart."
                     isWesternLoading = false
                 }
         }
     }
 
-    // 3. Vedic lazy load on Vedic tab (tab index 2)
     LaunchedEffect(profile, selectedDomainTab) {
         if (selectedDomainTab == 2 && vedicOutput == null) {
             isVedicLoading = true
@@ -131,14 +139,22 @@ fun ProfileDetailScreen(
                     isVedicLoading = false
                 }
                 .onFailure {
-                    vedicError = it.message ?: "베딕 점성술 데이터 계산에 실패했습니다."
+                    vedicError = it.message ?: "Failed to compute Vedic chart."
                     isVedicLoading = false
                 }
         }
     }
 
-    // 4. Lazy-load predictive suite when user enters Western tab (tab index 1) or changes target date/time/house
-    LaunchedEffect(profile, predictiveTargetYear, predictiveTargetMonth, predictiveTargetDay, predictiveTargetHour, predictiveTargetMinute, selectedHouse, selectedDomainTab) {
+    LaunchedEffect(
+        profile,
+        predictiveTargetYear,
+        predictiveTargetMonth,
+        predictiveTargetDay,
+        predictiveTargetHour,
+        predictiveTargetMinute,
+        selectedHouse,
+        selectedDomainTab
+    ) {
         if (selectedDomainTab == 1) {
             isPredictiveLoading = true
             FortuneApp.repository.calculateProfilePredictiveSuite(
@@ -158,52 +174,58 @@ fun ProfileDetailScreen(
         }
     }
 
-    val vargaList = listOf(
-        "D1" to "Rasi (D1)",
-        "D2" to "Hora (D2)",
-        "D3" to "Drekkana (D3)",
-        "D4" to "Chaturthamsha (D4)",
-        "D6" to "Shashthamsha (D6)",
-        "D7" to "Saptamsha (D7)",
-        "D8" to "Ashtamamsha (D8)",
-        "D9" to "Navamsha (D9)",
-        "D10" to "Dashamsha (D10)",
-        "D11" to "Rudramsha (D11)",
-        "D12" to "Dwadashamsha (D12)",
-        "D16" to "Shodashamsha (D16)",
-        "D20" to "Vimshamsha (D20)",
-        "D24" to "Chaturvimshamsha (D24)",
-        "D27" to "Saptavimshamsha (D27)",
-        "D30" to "Trimshamsha (D30)",
-        "D40" to "Khavedamsha (D40)",
-        "D45" to "Akshavedamsha (D45)",
-        "D60" to "Shashtiamsha (D60)"
-    )
-
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Column {
-                        Text(profile.name, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextPrimary)
                         Text(
-                            text = "${profile.birth_year}-${String.format("%02d", profile.birth_month)}-${String.format("%02d", profile.birth_day)} ${String.format("%02d:%02d:%02d", profile.birth_hour, profile.birth_minute, profile.birth_second.toInt())} · ${if (profile.gender == "male") "남성" else "여성"}",
-                            fontSize = 12.sp,
-                            color = TextSecondary
+                            text = profile.name,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp,
+                            color = TextPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = String.format(
+                                Locale.US,
+                                "%04d-%02d-%02d %02d:%02d:%02d · %s",
+                                profile.birth_year,
+                                profile.birth_month,
+                                profile.birth_day,
+                                profile.birth_hour,
+                                profile.birth_minute,
+                                profile.birth_second.toInt(),
+                                if (profile.gender == "male") "M" else "F"
+                            ),
+                            fontSize = 11.sp,
+                            color = TextSecondary,
+                            style = TabularMonoStyle
                         )
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로", tint = TextPrimary)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { showSelectiveCopySheet = true },
+                        enabled = when (selectedDomainTab) {
+                            0 -> sajuOutput != null
+                            1 -> westernOutput != null
+                            else -> vedicOutput != null
+                        }
+                    ) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy Markdown", tint = TextPrimary)
+                    }
                     IconButton(onClick = onEdit) {
-                        Icon(Icons.Default.Edit, contentDescription = "수정", tint = TextPrimary)
+                        Icon(Icons.Default.Edit, contentDescription = "Edit", tint = TextPrimary)
                     }
                     IconButton(onClick = onDelete) {
-                        Icon(Icons.Default.Delete, contentDescription = "삭제", tint = AstrologicalRed)
+                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = CrimsonAlert)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -225,945 +247,130 @@ fun ProfileDetailScreen(
                 containerColor = SurfaceLight,
                 contentColor = AccentPrimary
             ) {
-                Tab(selected = selectedDomainTab == 0, onClick = { selectedDomainTab = 0 }, text = { Text("사주명리", fontWeight = FontWeight.SemiBold) })
-                Tab(selected = selectedDomainTab == 1, onClick = { selectedDomainTab = 1 }, text = { Text("Western", fontWeight = FontWeight.SemiBold) })
-                Tab(selected = selectedDomainTab == 2, onClick = { selectedDomainTab = 2 }, text = { Text("Vedic", fontWeight = FontWeight.SemiBold) })
+                Tab(
+                    selected = selectedDomainTab == 0,
+                    onClick = { selectedDomainTab = 0 },
+                    text = { Text("FOUR PILLARS", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp) }
+                )
+                Tab(
+                    selected = selectedDomainTab == 1,
+                    onClick = { selectedDomainTab = 1 },
+                    text = { Text("WESTERN", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp) }
+                )
+                Tab(
+                    selected = selectedDomainTab == 2,
+                    onClick = { selectedDomainTab = 2 },
+                    text = { Text("VEDIC", fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp) }
+                )
             }
 
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(16.dp)
+                    .padding(14.dp)
             ) {
-                    // 차트 상단 헤더 및 데이터 선택 복사 버튼
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = when (selectedDomainTab) {
-                                0 -> "사주명리 분석 차트"
-                                1 -> "Western Tropical Chart"
-                                else -> "Vedic Sidereal Chart"
-                            },
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = TextPrimary
-                        )
-                        OutlinedButton(
-                            onClick = { showSelectiveCopySheet = true },
-                            enabled = when (selectedDomainTab) {
-                                0 -> sajuOutput != null
-                                1 -> westernOutput != null
-                                else -> vedicOutput != null
-                            },
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, BorderColor)
-                        ) {
-                            Icon(
-                                Icons.Default.ContentCopy,
-                                contentDescription = "데이터 선택 복사",
-                                modifier = Modifier.size(15.dp),
-                                tint = TextPrimary
+                when (selectedDomainTab) {
+                    0 -> {
+                        when {
+                            isSajuLoading -> LoadingStateBox()
+                            sajuError != null -> DomainErrorCard(message = sajuError!!) {
+                                scope.launch {
+                                    isSajuLoading = true
+                                    sajuError = null
+                                    FortuneApp.repository.calculateProfileSaju(profile.id)
+                                        .onSuccess { sajuOutput = it; isSajuLoading = false }
+                                        .onFailure { sajuError = it.message ?: "Error"; isSajuLoading = false }
+                                }
+                            }
+                            sajuOutput != null -> SajuChartTable(
+                                chart = sajuOutput!!.saju,
+                                modifier = Modifier.padding(0.dp)
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("데이터 복사", fontSize = 12.sp, color = TextPrimary, fontWeight = FontWeight.Medium)
                         }
                     }
 
-                    when (selectedDomainTab) {
-                        0 -> {
-                            if (isSajuLoading) {
-                                Box(modifier = Modifier.fillMaxWidth().height(260.dp), contentAlignment = Alignment.Center) {
-                                    CircularProgressIndicator(color = AccentPrimary)
-                                }
-                            } else if (sajuError != null) {
-                                DomainErrorCard(message = sajuError!!, onRetry = {
-                                    scope.launch {
-                                        isSajuLoading = true
-                                        sajuError = null
-                                        FortuneApp.repository.calculateProfileSaju(profile.id)
-                                            .onSuccess { sajuOutput = it; isSajuLoading = false }
-                                            .onFailure { sajuError = it.message ?: "계산 실패"; isSajuLoading = false }
-                                    }
-                                })
-                            } else if (sajuOutput != null) {
-                                SajuChartTable(chart = sajuOutput!!.saju)
-                            }
-                        }
-                        1 -> {
-                            val houseSystems = listOf("Regiomontanus", "Placidus", "WholeSign", "Equal", "Koch", "Campanus")
-
-                            Text(
-                                text = "하우스 시스템 (House System)",
-                                color = TextPrimary,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                houseSystems.forEach { hSys ->
-                                    val isSelected = selectedHouse.equals(hSys, ignoreCase = true)
-                                    FilterChip(
-                                        selected = isSelected,
-                                        onClick = {
-                                            selectedHouse = hSys
-                                        },
-                                        label = { Text(hSys, fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
-                                        colors = FilterChipDefaults.filterChipColors(
-                                            selectedContainerColor = AccentPrimary,
-                                            selectedLabelColor = BackgroundWhite,
-                                            containerColor = SurfaceLight,
-                                            labelColor = TextSecondary
-                                        ),
-                                        border = FilterChipDefaults.filterChipBorder(
-                                            enabled = true,
-                                            selected = isSelected,
-                                            borderColor = BorderColor,
-                                            selectedBorderColor = AccentPrimary
-                                        )
-                                    )
+                    1 -> {
+                        WesternDomainContent(
+                            profile = profile,
+                            westernOutput = westernOutput,
+                            isLoading = isWesternLoading,
+                            error = westernError,
+                            selectedHouse = selectedHouse,
+                            onSelectHouse = { selectedHouse = it },
+                            selectedSubTab = selectedWesternSubTab,
+                            onSelectSubTab = { selectedWesternSubTab = it },
+                            predictiveData = predictiveData,
+                            predictiveTargetYear = predictiveTargetYear,
+                            predictiveTargetMonth = predictiveTargetMonth,
+                            predictiveTargetDay = predictiveTargetDay,
+                            isPredictiveLoading = isPredictiveLoading,
+                            onYearChange = { predictiveTargetYear = it },
+                            onDateChange = { y, m, d ->
+                                predictiveTargetYear = y
+                                predictiveTargetMonth = m
+                                predictiveTargetDay = d
+                            },
+                            onTimeChange = { hr, min ->
+                                predictiveTargetHour = hr
+                                predictiveTargetMinute = min
+                            },
+                            onDateTimeChange = { y, m, d, hr, min ->
+                                predictiveTargetYear = y
+                                predictiveTargetMonth = m
+                                predictiveTargetDay = d
+                                predictiveTargetHour = hr
+                                predictiveTargetMinute = min
+                            },
+                            onRetry = {
+                                scope.launch {
+                                    isWesternLoading = true
+                                    westernError = null
+                                    FortuneApp.repository.calculateProfileWestern(profile.id, selectedHouse)
+                                        .onSuccess { westernOutput = it; isWesternLoading = false }
+                                        .onFailure { westernError = it.message ?: "Error"; isWesternLoading = false }
                                 }
                             }
+                        )
+                    }
 
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            if (isWesternLoading) {
-                                Box(modifier = Modifier.fillMaxWidth().height(260.dp), contentAlignment = Alignment.Center) {
-                                    CircularProgressIndicator(color = AccentPrimary)
-                                }
-                            } else if (westernError != null) {
-                                DomainErrorCard(message = westernError!!, onRetry = {
-                                    scope.launch {
-                                        isWesternLoading = true
-                                        westernError = null
-                                        FortuneApp.repository.calculateProfileWestern(profile.id, selectedHouse)
-                                            .onSuccess { westernOutput = it; isWesternLoading = false }
-                                            .onFailure { westernError = it.message ?: "계산 실패"; isWesternLoading = false }
-                                    }
-                                })
-                            } else if (westernOutput != null) {
-                                val westernChart = westernOutput!!.western
-                                WesternChartWheel(chart = westernChart)
-                                Spacer(modifier = Modifier.height(20.dp))
-
-                            // Western Planetary Placements 카드
-                            Card(
-                                shape = RoundedCornerShape(12.dp),
-                                colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
-                                border = BorderStroke(1.dp, BorderColor),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text("Planets & Points", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                        IconButton(
-                                            onClick = {
-                                                val sb = StringBuilder()
-                                                sb.appendLine("[Western Tropical Chart - Planets & Points]")
-                                                sb.appendLine("Ascendant: ${String.format("%.2f°", westernChart.ascendant)} (${getZodiacSignName((westernChart.ascendant / 30.0).toInt() % 12)})")
-                                                sb.appendLine("Midheaven (MC): ${String.format("%.2f°", westernChart.midheaven)} (${getZodiacSignName((westernChart.midheaven / 30.0).toInt() % 12)})")
-                                                westernChart.planets.forEach { p ->
-                                                    val rx = if (p.is_retrograde) " [Rx]" else ""
-                                                    val speedStr = String.format("%+.2f°/d", p.speed)
-                                                    sb.appendLine("• ${p.name}$rx: ${String.format("%.2f°", p.sign_degree)} ${getZodiacSignName(p.sign_index)} · House ${p.house_number} · $speedStr")
-                                                }
-                                                westernChart.nodes.forEach { n ->
-                                                    sb.appendLine("• ${n.name}: ${String.format("%.2f°", n.sign_degree)} ${getZodiacSignName(n.sign_index)} · House ${n.house_number}")
-                                                }
-                                                clipboardManager.setText(AnnotatedString(sb.toString().trimEnd()))
-                                                Toast.makeText(context, "Planets & Points 복사 완료", Toast.LENGTH_SHORT).show()
-                                            },
-                                            modifier = Modifier.size(28.dp)
-                                        ) {
-                                            Icon(
-                                                Icons.Default.ContentCopy,
-                                                contentDescription = "Planets & Points 복사",
-                                                tint = TextSecondary,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    // 앵글 포인트 (ASC, MC) 명시적 렌더링
-                                    val ascSignIdx = ((westernChart.ascendant / 30.0).toInt() % 12 + 12) % 12
-                                    val ascSignDeg = westernChart.ascendant % 30.0
-                                    val mcSignIdx = ((westernChart.midheaven / 30.0).toInt() % 12 + 12) % 12
-                                    val mcSignDeg = westernChart.midheaven % 30.0
-                                    val mcHouseNum = if (westernChart.house_cusps.isNotEmpty()) findHouseNumber(westernChart.midheaven, westernChart.house_cusps) else 10
-
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(text = "Ascendant (ASC)", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                                        Text(
-                                            text = "${String.format("%.2f°", ascSignDeg)} ${getZodiacSignName(ascSignIdx)} · House 1",
-                                            color = AccentPrimary,
-                                            fontWeight = FontWeight.Medium,
-                                            fontSize = 13.sp
-                                        )
-                                    }
-                                    HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
-
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(text = "Midheaven (MC)", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                                        Text(
-                                            text = "${String.format("%.2f°", mcSignDeg)} ${getZodiacSignName(mcSignIdx)} · House $mcHouseNum",
-                                            color = AccentPrimary,
-                                            fontWeight = FontWeight.Medium,
-                                            fontSize = 13.sp
-                                        )
-                                    }
-                                    HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
-
-                                    westernChart.planets.forEach { p ->
-                                        val rx = if (p.is_retrograde) " [Rx]" else ""
-                                        val speedStr = String.format("%+.2f°/d", p.speed)
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text(text = "${p.name}$rx", color = TextPrimary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(
-                                                    text = speedStr,
-                                                    color = if (p.is_retrograde) AccentPrimary else TextSecondary.copy(alpha = 0.8f),
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Normal
-                                                )
-                                            }
-                                            Text(
-                                                text = "${String.format("%.2f°", p.sign_degree)} ${getZodiacSignName(p.sign_index)} · House ${p.house_number}",
-                                                color = TextSecondary,
-                                                fontSize = 13.sp
-                                            )
-                                        }
-                                        HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
-                                    }
-                                    westernChart.nodes.forEach { n ->
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(text = n.name, color = TextPrimary, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                                            Text(
-                                                text = "${String.format("%.2f°", n.sign_degree)} ${getZodiacSignName(n.sign_index)} · House ${n.house_number}",
-                                                color = TextSecondary,
-                                                fontSize = 13.sp
-                                            )
-                                        }
-                                        HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
-                                    }
+                    2 -> {
+                        VedicDomainContent(
+                            vedicOutput = vedicOutput,
+                            isLoading = isVedicLoading,
+                            error = vedicError,
+                            selectedVarga = selectedVarga,
+                            onOpenVargaPicker = { showVargaPickerSheet = true },
+                            selectedSubTab = selectedVedicSubTab,
+                            onSelectSubTab = { selectedVedicSubTab = it },
+                            expandedDashaLord = expandedDashaLord,
+                            onToggleDashaLord = { lord ->
+                                expandedDashaLord = if (expandedDashaLord == lord) null else lord
+                            },
+                            onRetry = {
+                                scope.launch {
+                                    isVedicLoading = true
+                                    vedicError = null
+                                    FortuneApp.repository.calculateProfileVedic(profile.id)
+                                        .onSuccess { vedicOutput = it; isVedicLoading = false }
+                                        .onFailure { vedicError = it.message ?: "Error"; isVedicLoading = false }
                                 }
                             }
-
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            // 12 하우스 커스프 도수/사인 카드
-                            if (westernChart.house_cusps.isNotEmpty()) {
-                                Card(
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
-                                    border = BorderStroke(1.dp, BorderColor),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        val houseSysName = westernChart.house_system ?: selectedHouse
-                                        val isWholeSign = houseSysName.lowercase() in listOf("wholesign", "whole_sign", "whole")
-                                        val mcHouseNum = if (westernChart.house_cusps.isNotEmpty()) findHouseNumber(westernChart.midheaven, westernChart.house_cusps) else 10
-                                        val cardTitle = if (isWholeSign) "House Signs ($houseSysName)" else "House Cusps ($houseSysName)"
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = cardTitle,
-                                                color = TextPrimary,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 15.sp
-                                            )
-                                            IconButton(
-                                                onClick = {
-                                                    val sb = StringBuilder()
-                                                    sb.appendLine("[Western Tropical Chart - $cardTitle]")
-                                                    westernChart.house_cusps.forEachIndexed { idx, deg ->
-                                                        val hNum = idx + 1
-                                                        val signIdx = ((deg / 30.0).toInt() % 12 + 12) % 12
-                                                        val signName = getZodiacSignName(signIdx)
-                                                        val ruler = getZodiacSignRuler(signIdx)
-                                                        val signDeg = deg % 30.0
-                                                        if (isWholeSign) {
-                                                            val mcTag = if (hNum == mcHouseNum) " [MC Location]" else ""
-                                                            sb.appendLine("• House ${String.format("%02d", hNum)}$mcTag: $signName · Ruler: $ruler")
-                                                        } else {
-                                                            val angleTag = when (hNum) {
-                                                                1 -> " (ASC)"
-                                                                4 -> " (IC)"
-                                                                7 -> " (DSC)"
-                                                                10 -> " (MC)"
-                                                                else -> ""
-                                                            }
-                                                            sb.appendLine("• House ${String.format("%02d", hNum)}$angleTag: ${String.format("%.2f°", signDeg)} $signName")
-                                                        }
-                                                    }
-                                                    clipboardManager.setText(AnnotatedString(sb.toString().trimEnd()))
-                                                    Toast.makeText(context, "$cardTitle 복사 완료", Toast.LENGTH_SHORT).show()
-                                                },
-                                                modifier = Modifier.size(28.dp)
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.ContentCopy,
-                                                    contentDescription = "$cardTitle 복사",
-                                                    tint = TextSecondary,
-                                                    modifier = Modifier.size(16.dp)
-                                                )
-                                            }
-                                        }
-                                        Spacer(modifier = Modifier.height(10.dp))
-                                        val chunks = westernChart.house_cusps.chunked(2)
-                                        chunks.forEachIndexed { rowIdx, pair ->
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(vertical = 4.dp),
-                                                horizontalArrangement = Arrangement.SpaceBetween
-                                            ) {
-                                                val h1 = rowIdx * 2 + 1
-                                                val deg1 = pair[0]
-                                                val sIdx1 = ((deg1 / 30.0).toInt() % 12 + 12) % 12
-                                                val s1 = getZodiacSignName(sIdx1)
-                                                val r1 = getZodiacSignRuler(sIdx1)
-                                                val d1 = deg1 % 30.0
-                                                val tag1 = if (!isWholeSign) {
-                                                    when (h1) { 1 -> " (ASC)"; 7 -> " (DSC)"; else -> "" }
-                                                } else if (h1 == mcHouseNum) {
-                                                    " [MC]"
-                                                } else {
-                                                    ""
-                                                }
-                                                val text1 = if (isWholeSign) "H$h1$tag1: $s1 · $r1" else "H$h1$tag1: ${String.format("%.1f°", d1)} $s1"
-                                                val isH1Highlighted = if (!isWholeSign) (h1 == 1 || h1 == 7) else (h1 == 1 || h1 == mcHouseNum)
-                                                Text(
-                                                    text = text1,
-                                                    fontSize = 12.sp,
-                                                    color = if (isH1Highlighted) AccentPrimary else TextPrimary,
-                                                    fontWeight = if (isH1Highlighted) FontWeight.SemiBold else FontWeight.Normal,
-                                                    modifier = Modifier.weight(1f)
-                                                )
-
-                                                if (pair.size > 1) {
-                                                    val h2 = rowIdx * 2 + 2
-                                                    val deg2 = pair[1]
-                                                    val sIdx2 = ((deg2 / 30.0).toInt() % 12 + 12) % 12
-                                                    val s2 = getZodiacSignName(sIdx2)
-                                                    val r2 = getZodiacSignRuler(sIdx2)
-                                                    val d2 = deg2 % 30.0
-                                                    val tag2 = if (!isWholeSign) {
-                                                        when (h2) { 4 -> " (IC)"; 10 -> " (MC)"; else -> "" }
-                                                    } else if (h2 == mcHouseNum) {
-                                                        " [MC]"
-                                                    } else {
-                                                        ""
-                                                    }
-                                                    val text2 = if (isWholeSign) "H$h2$tag2: $s2 · $r2" else "H$h2$tag2: ${String.format("%.1f°", d2)} $s2"
-                                                    val isH2Highlighted = if (!isWholeSign) (h2 == 4 || h2 == 10) else (h2 == mcHouseNum)
-                                                    Text(
-                                                        text = text2,
-                                                        fontSize = 12.sp,
-                                                        color = if (isH2Highlighted) AccentPrimary else TextPrimary,
-                                                        fontWeight = if (isH2Highlighted) FontWeight.SemiBold else FontWeight.Normal,
-                                                        modifier = Modifier.weight(1f)
-                                                    )
-                                                }
-                                            }
-                                            if (rowIdx < chunks.size - 1) {
-                                                HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
-                                            }
-                                        }
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(14.dp))
-                            }
-
-                            if (westernChart.aspects.isNotEmpty()) {
-                                Card(
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
-                                    border = BorderStroke(1.dp, BorderColor),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text("Major Aspects", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                            IconButton(
-                                                onClick = {
-                                                    val sb = StringBuilder()
-                                                    sb.appendLine("[Western Tropical Chart - Major Aspects]")
-                                                    westernChart.aspects.forEach { a ->
-                                                        val dynStr = if (a.is_applying) "Applying" else "Separating"
-                                                        sb.appendLine("• ${a.planet1} · ${a.planet2}: ${a.aspect_type} (Orb ${String.format("%.2f°", a.orb)}, $dynStr)")
-                                                    }
-                                                    clipboardManager.setText(AnnotatedString(sb.toString().trimEnd()))
-                                                    Toast.makeText(context, "Major Aspects 복사 완료", Toast.LENGTH_SHORT).show()
-                                                },
-                                                modifier = Modifier.size(28.dp)
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.ContentCopy,
-                                                    contentDescription = "Major Aspects 복사",
-                                                    tint = TextSecondary,
-                                                    modifier = Modifier.size(16.dp)
-                                                )
-                                            }
-                                        }
-                                        Spacer(modifier = Modifier.height(10.dp))
-                                        westernChart.aspects.forEach { a ->
-                                            val dynStr = if (a.is_applying) "App" else "Sep"
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Text(text = "${a.planet1} · ${a.planet2}", color = TextPrimary, fontSize = 13.sp)
-                                                    Spacer(modifier = Modifier.width(6.dp))
-                                                    Text(
-                                                        text = dynStr,
-                                                        color = if (a.is_applying) AccentPrimary else TextSecondary.copy(alpha = 0.7f),
-                                                        fontSize = 11.sp,
-                                                        fontWeight = FontWeight.Medium
-                                                    )
-                                                }
-                                                Text(
-                                                    text = "${a.aspect_type} (Orb ${String.format("%.2f°", a.orb)})",
-                                                    color = TextSecondary,
-                                                    fontSize = 13.sp
-                                                )
-                                            }
-                                            HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
-                                        }
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(14.dp))
-                            }
-
-                            // 서양 전통 점성술 분석 섹션 (헬레니즘 / 릴리 분기)
-                            WesternTraditionalSection(
-                                traditional = westernChart.traditional,
-                                isHorary = false,
-                                hellenistic = westernChart.hellenistic
-                            )
-
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            // 6대 서양 예측 기법 보조 메뉴 섹션
-                            WesternPredictiveSection(
-                                profile = profile,
-                                predictiveData = predictiveData,
-                                targetYear = predictiveTargetYear,
-                                targetMonth = predictiveTargetMonth,
-                                targetDay = predictiveTargetDay,
-                                isLoading = isPredictiveLoading,
-                                onYearChange = {
-                                    predictiveTargetYear = it
-                                },
-                                onDateChange = { y, m, d ->
-                                    predictiveTargetYear = y
-                                    predictiveTargetMonth = m
-                                    predictiveTargetDay = d
-                                },
-                                onTimeChange = { h, m ->
-                                    predictiveTargetHour = h
-                                    predictiveTargetMinute = m
-                                },
-                                onDateTimeChange = { y, m, d, h, min ->
-                                    predictiveTargetYear = y
-                                    predictiveTargetMonth = m
-                                    predictiveTargetDay = d
-                                    predictiveTargetHour = h
-                                    predictiveTargetMinute = min
-                                }
-                            )
-                            }
-                        }
-                        2 -> {
-                            // 11종 바르가 분점도 선택 칩 바
-                            Text(
-                                text = "Divisional Charts (Vargas)",
-                                color = TextPrimary,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                vargaList.forEach { (key, title) ->
-                                    val isSelected = selectedVarga == key
-                                    FilterChip(
-                                        selected = isSelected,
-                                        onClick = { selectedVarga = key },
-                                        label = { Text(title, fontSize = 12.sp) },
-                                        colors = FilterChipDefaults.filterChipColors(
-                                            selectedContainerColor = AccentPrimary,
-                                            selectedLabelColor = BackgroundWhite,
-                                            containerColor = SurfaceLight,
-                                            labelColor = TextPrimary
-                                        ),
-                                        border = BorderStroke(1.dp, if (isSelected) AccentPrimary else BorderColor)
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            if (isVedicLoading) {
-                                Box(modifier = Modifier.fillMaxWidth().height(260.dp), contentAlignment = Alignment.Center) {
-                                    CircularProgressIndicator(color = AccentPrimary)
-                                }
-                            } else if (vedicError != null) {
-                                DomainErrorCard(message = vedicError!!, onRetry = {
-                                    scope.launch {
-                                        isVedicLoading = true
-                                        vedicError = null
-                                        FortuneApp.repository.calculateProfileVedic(profile.id)
-                                            .onSuccess { vedicOutput = it; isVedicLoading = false }
-                                            .onFailure { vedicError = it.message ?: "계산 실패"; isVedicLoading = false }
-                                    }
-                                })
-                            } else if (vedicOutput != null) {
-                                val vedicChart = vedicOutput!!.vedic
-
-                                // 선택된 바르가 다이아몬드 차트
-                                VedicChartDiamond(
-                                    chart = vedicChart,
-                                    selectedVargaKey = selectedVarga
-                                )
-
-                                Spacer(modifier = Modifier.height(20.dp))
-
-                            // Sidereal Planetary Placements (낙샤트라 줄바꿈 깨짐 완전 해결)
-                            Card(
-                                shape = RoundedCornerShape(12.dp),
-                                colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
-                                border = BorderStroke(1.dp, BorderColor),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    val activeVarga = vedicChart.vargas[selectedVarga]
-                                    val vargaLagnaSign = activeVarga?.lagna_sign ?: vedicChart.lagna_sign
-                                    val vargaTitle = vargaList.find { it.first == selectedVarga }?.second ?: selectedVarga
-                                    Text(
-                                        text = "$vargaTitle Placements",
-                                        color = TextPrimary,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = "Lagna: ${getZodiacSignName(vargaLagnaSign)}",
-                                        color = TextSecondary,
-                                        fontWeight = FontWeight.Medium,
-                                        fontSize = 12.sp,
-                                        textAlign = TextAlign.End,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                    Spacer(modifier = Modifier.height(10.dp))
-
-                                    vedicChart.planets.forEach { p ->
-                                        val rx = if (p.is_retrograde) " [Rx]" else ""
-                                        val comb = if (p.combustion != "None" && p.combustion.isNotEmpty()) " [${p.combustion}]" else ""
-                                        val dig = if (p.dignity.isNotEmpty()) " · ${p.dignity}" else ""
-                                        val pPlacement = activeVarga?.placements?.find { it.planet_name == p.name }
-                                        val houseNum = pPlacement?.house ?: (((p.sign_index - vargaLagnaSign + 12) % 12) + 1)
-                                        val signIdx = pPlacement?.sign_index ?: p.sign_index
-
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(vertical = 6.dp)
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text(
-                                                    text = "${p.name}$rx$comb",
-                                                    color = TextPrimary,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    fontSize = 14.sp
-                                                )
-                                                Text(
-                                                    text = "House $houseNum · ${getZodiacSignName(signIdx)}${if (selectedVarga == "D1") dig else ""}",
-                                                    color = TextSecondary,
-                                                    fontSize = 13.sp,
-                                                    fontWeight = FontWeight.Medium
-                                                )
-                                            }
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            val displayDegree = if (selectedVarga == "D1") {
-                                                p.sign_degree
-                                            } else {
-                                                pPlacement?.sign_degree ?: p.sign_degree
-                                            }
-                                            val degreeLabel = if (selectedVarga == "D1") "in sign" else "in varga sign"
-                                            val nakshatraLabel = if (selectedVarga == "D1") {
-                                                "${p.nakshatra_name} (Pada ${p.nakshatra_pada})"
-                                            } else {
-                                                "D1: ${p.nakshatra_name} (Pada ${p.nakshatra_pada})"
-                                            }
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text(
-                                                    text = "${String.format(java.util.Locale.US, "%.2f°", displayDegree)} $degreeLabel",
-                                                    color = TextSecondary,
-                                                    fontSize = 12.sp,
-                                                    modifier = Modifier.weight(1f, fill = false)
-                                                )
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Text(
-                                                    text = nakshatraLabel,
-                                                    color = CelestialBlue,
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.Medium,
-                                                    textAlign = TextAlign.End,
-                                                    modifier = Modifier.weight(1f, fill = false)
-                                                )
-                                            }
-                                        }
-                                        HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            // Panchanga (5 Limbs of Time) 카드
-                            if (vedicChart.panchanga.tithi_name.isNotEmpty()) {
-                                val pan = vedicChart.panchanga
-                                Card(
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
-                                    border = BorderStroke(1.dp, BorderColor),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Text("Panchanga (5 Limbs of Time)", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                            Text("Tithi", color = TextSecondary, fontSize = 13.sp)
-                                            Text("${pan.tithi_name} (#${pan.tithi_number}, ${pan.paksha})", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                                        }
-                                        HorizontalDivider(color = BorderColor.copy(alpha = 0.4f))
-                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                            Text("Vara", color = TextSecondary, fontSize = 13.sp)
-                                            Text("${pan.vara_name} · ${pan.vara_lord}", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                                        }
-                                        HorizontalDivider(color = BorderColor.copy(alpha = 0.4f))
-                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                            Text("Nakshatra", color = TextSecondary, fontSize = 13.sp)
-                                            Text("${pan.nakshatra_name} (Pada ${pan.nakshatra_pada}) · ${pan.nakshatra_lord}", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                                        }
-                                        HorizontalDivider(color = BorderColor.copy(alpha = 0.4f))
-                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                            Text("Yoga / Karana", color = TextSecondary, fontSize = 13.sp)
-                                            Text("${pan.yoga_name} / ${pan.karana_name}", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                                        }
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(16.dp))
-                            }
-
-                            // Jaimini Chara Karakas (8-Karaka Scheme) 카드
-                            if (vedicChart.chara_karakas.isNotEmpty()) {
-                                Card(
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
-                                    border = BorderStroke(1.dp, BorderColor),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("Jaimini Chara Karakas (8 Karakas)", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        vedicChart.chara_karakas.forEachIndexed { idx, ck ->
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text(ck.karaka, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                                                Text(
-                                                    "${ck.planet} (${String.format(java.util.Locale.US, "%.2f°", ck.effective_degree)})",
-                                                    color = CelestialBlue,
-                                                    fontSize = 13.sp,
-                                                    fontWeight = FontWeight.SemiBold
-                                                )
-                                            }
-                                            if (idx < vedicChart.chara_karakas.size - 1) {
-                                                HorizontalDivider(color = BorderColor.copy(alpha = 0.4f))
-                                            }
-                                        }
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(16.dp))
-                            }
-
-                            // Arudha Padas (A1..A12) 카드
-                            if (vedicChart.arudha_padas.isNotEmpty()) {
-                                Card(
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
-                                    border = BorderStroke(1.dp, BorderColor),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("Arudha Padas (AL ~ UL)", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        val padaPairs = vedicChart.arudha_padas.chunked(2)
-                                        padaPairs.forEachIndexed { rIdx, pair ->
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                                horizontalArrangement = Arrangement.SpaceBetween
-                                            ) {
-                                                pair.forEach { ap ->
-                                                    val isKeyPada = ap.code == "AL" || ap.code == "UL"
-                                                    Text(
-                                                        text = "${ap.code}: ${getZodiacSignName(ap.sign_index)} (H${ap.house_from_lagna})",
-                                                        fontSize = 12.sp,
-                                                        color = if (isKeyPada) AccentPrimary else TextPrimary,
-                                                        fontWeight = if (isKeyPada) FontWeight.Bold else FontWeight.Normal,
-                                                        modifier = Modifier.weight(1f)
-                                                    )
-                                                }
-                                            }
-                                            if (rIdx < padaPairs.size - 1) {
-                                                HorizontalDivider(color = BorderColor.copy(alpha = 0.4f))
-                                            }
-                                        }
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(16.dp))
-                            }
-
-                            // Graha Drishti (Planetary Aspects) 카드
-                            val activeDrishti = vedicChart.drishti.filter { it.aspected_planets.isNotEmpty() }
-                            if (activeDrishti.isNotEmpty()) {
-                                Card(
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
-                                    border = BorderStroke(1.dp, BorderColor),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("Graha Drishti (Full Aspects)", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        activeDrishti.forEachIndexed { idx, d ->
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text(
-                                                    text = "${d.from_planet} (H${d.from_house}) · ${d.aspect_offset}th",
-                                                    color = TextPrimary,
-                                                    fontSize = 13.sp,
-                                                    fontWeight = FontWeight.Medium
-                                                )
-                                                Text(
-                                                    text = "H${d.target_house} (${getZodiacSignName(d.target_sign)}): ${d.aspected_planets.joinToString(", ")}",
-                                                    color = TextSecondary,
-                                                    fontSize = 12.sp
-                                                )
-                                            }
-                                            if (idx < activeDrishti.size - 1) {
-                                                HorizontalDivider(color = BorderColor.copy(alpha = 0.4f))
-                                            }
-                                        }
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(16.dp))
-                            }
-
-                            // Ashtakavarga (Sarvashtakavarga & Bhinna Totals) 카드
-                            if (vedicChart.ashtakavarga.total_bindus > 0) {
-                                Card(
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
-                                    border = BorderStroke(1.dp, BorderColor),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text("Sarvashtakavarga (SAV)", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                            Text("Total ${vedicChart.ashtakavarga.total_bindus} Bindus", color = CelestialBlue, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                                        }
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        val savChunks = vedicChart.ashtakavarga.sarva.mapIndexed { idx, pts -> idx to pts }.chunked(3)
-                                        savChunks.forEachIndexed { rIdx, row ->
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                                horizontalArrangement = Arrangement.SpaceBetween
-                                            ) {
-                                                row.forEach { (sIdx, pts) ->
-                                                    val isStrong = pts >= 28
-                                                    Text(
-                                                        text = "${getZodiacSignName(sIdx).take(3)}: $pts",
-                                                        fontSize = 12.sp,
-                                                        color = if (isStrong) AccentPrimary else TextSecondary,
-                                                        fontWeight = if (isStrong) FontWeight.Bold else FontWeight.Normal,
-                                                        modifier = Modifier.weight(1f)
-                                                    )
-                                                }
-                                            }
-                                            if (rIdx < savChunks.size - 1) {
-                                                HorizontalDivider(color = BorderColor.copy(alpha = 0.4f))
-                                            }
-                                        }
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(16.dp))
-                            }
-
-                            // 빔쇼타리 다샤 아코디언 UI (안타르다샤 확장, Mahadasha 접두어 제거, YYYY.MM.DD 환산)
-                            Card(
-                                shape = RoundedCornerShape(12.dp),
-                                colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
-                                border = BorderStroke(1.dp, BorderColor),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Text(
-                                        text = "Vimshottari Dasha Sequence",
-                                        color = TextPrimary,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 15.sp
-                                    )
-                                    Spacer(modifier = Modifier.height(10.dp))
-
-                                    vedicChart.vimshottari_dashas.forEach { d ->
-                                        val isExpanded = expandedDashaLord == d.lord
-                                        Column(modifier = Modifier.fillMaxWidth()) {
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .clickable {
-                                                        expandedDashaLord = if (isExpanded) null else d.lord
-                                                    }
-                                                    .padding(vertical = 10.dp),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text(
-                                                    text = d.lord,
-                                                    color = TextPrimary,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 15.sp
-                                                )
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Text(
-                                                        text = "${d.startDateFormatted} ~ ${d.endDateFormatted}",
-                                                        color = TextSecondary,
-                                                        fontSize = 12.sp
-                                                    )
-                                                    Spacer(modifier = Modifier.width(4.dp))
-                                                    Icon(
-                                                        imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                                        contentDescription = null,
-                                                        tint = TextSecondary,
-                                                        modifier = Modifier.size(18.dp)
-                                                    )
-                                                }
-                                            }
-
-                                            // 안타르다샤 아코디언 펼침 내용
-                                            AnimatedVisibility(visible = isExpanded) {
-                                                Column(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .background(SurfaceLight, RoundedCornerShape(8.dp))
-                                                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                                                ) {
-                                                    if (d.sub_periods.isEmpty()) {
-                                                        Text(
-                                                            text = "No Antardasha records available",
-                                                            color = TextSecondary,
-                                                            fontSize = 12.sp,
-                                                            modifier = Modifier.padding(vertical = 4.dp)
-                                                        )
-                                                    } else {
-                                                        d.sub_periods.forEach { sub ->
-                                                            Row(
-                                                                modifier = Modifier
-                                                                    .fillMaxWidth()
-                                                                    .padding(vertical = 4.dp),
-                                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                                verticalAlignment = Alignment.CenterVertically
-                                                            ) {
-                                                                Text(
-                                                                    text = sub.lord,
-                                                                    color = TextPrimary,
-                                                                    fontWeight = FontWeight.Medium,
-                                                                    fontSize = 13.sp
-                                                                )
-                                                                Text(
-                                                                    text = "${sub.startDateFormatted} ~ ${sub.endDateFormatted}",
-                                                                    color = TextSecondary,
-                                                                    fontSize = 12.sp
-                                                                )
-                                                            }
-                                                            HorizontalDivider(color = BorderColor.copy(alpha = 0.3f))
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                            HorizontalDivider(color = BorderColor.copy(alpha = 0.5f))
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        )
                     }
                 }
             }
+        }
+
+        if (showVargaPickerSheet) {
+            VargaPickerModalSheet(
+                selectedVarga = selectedVarga,
+                onSelect = { key ->
+                    selectedVarga = key
+                    showVargaPickerSheet = false
+                },
+                onDismiss = { showVargaPickerSheet = false }
+            )
         }
 
         SelectiveCopyBottomSheet(
@@ -1181,17 +388,896 @@ fun ProfileDetailScreen(
 }
 
 @Composable
+private fun WesternDomainContent(
+    profile: ProfileDto,
+    westernOutput: WesternCalculationOutputDto?,
+    isLoading: Boolean,
+    error: String?,
+    selectedHouse: String,
+    onSelectHouse: (String) -> Unit,
+    selectedSubTab: Int,
+    onSelectSubTab: (Int) -> Unit,
+    predictiveData: PredictiveSuiteData?,
+    predictiveTargetYear: Int,
+    predictiveTargetMonth: Int,
+    predictiveTargetDay: Int,
+    isPredictiveLoading: Boolean,
+    onYearChange: (Int) -> Unit,
+    onDateChange: (Int, Int, Int) -> Unit,
+    onTimeChange: (Int?, Int?) -> Unit,
+    onDateTimeChange: (Int, Int, Int, Int?, Int?) -> Unit,
+    onRetry: () -> Unit
+) {
+    val houseSystems = listOf("Regiomontanus", "Placidus", "WholeSign", "Equal", "Koch", "Campanus")
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // House system selector bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "HOUSE SYSTEM",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextSecondary,
+                style = TabularMonoStyle,
+                modifier = Modifier.padding(end = 4.dp)
+            )
+            houseSystems.forEach { hSys ->
+                val isSelected = selectedHouse.equals(hSys, ignoreCase = true)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(if (isSelected) AccentPrimary else SurfaceLight)
+                        .border(1.dp, if (isSelected) AccentPrimary else BorderColor, RoundedCornerShape(4.dp))
+                        .clickable { onSelectHouse(hSys) }
+                        .padding(horizontal = 9.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        text = hSys.uppercase(Locale.US),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isSelected) BackgroundWhite else TextSecondary,
+                        style = TabularMonoStyle
+                    )
+                }
+            }
+        }
+
+        when {
+            isLoading -> LoadingStateBox()
+            error != null -> DomainErrorCard(message = error, onRetry = onRetry)
+            westernOutput != null -> {
+                val w = westernOutput.western
+
+                // Chart Wheel + Angles Summary Strip
+                WesternChartWheel(data = w)
+
+                val angleItems = listOf(
+                    MetricTileItem("ASC", formatLongitudeSignDeg(w.ascendant), "H1", CrimsonAlert),
+                    MetricTileItem("MC", formatLongitudeSignDeg(w.midheaven), "H10", CelestialBlue),
+                    MetricTileItem("DSC", formatLongitudeSignDeg((w.ascendant + 180.0) % 360.0), "H7"),
+                    MetricTileItem("IC", formatLongitudeSignDeg((w.midheaven + 180.0) % 360.0), "H4")
+                )
+                CompactMetricGrid(items = angleItems, columns = 4, tileHeight = 44.dp)
+
+                // Sub-tabs to eliminate endless scrolling
+                AstroSubTabBar(
+                    tabs = listOf("Placements", "Aspects", "Traditional", "Predictive"),
+                    selectedIndex = selectedSubTab,
+                    onSelect = onSelectSubTab
+                )
+
+                when (selectedSubTab) {
+                    0 -> WesternPlacementsSubSection(w)
+                    1 -> WesternAspectsSubSection(w)
+                    2 -> {
+                        if (w.traditional != null) {
+                            WesternTraditionalSection(
+                                data = w.traditional,
+                                hellenistic = w.hellenistic,
+                                isHorary = false
+                            )
+                        } else {
+                            AstroPanelCard(title = "Traditional Analysis") {
+                                Text("Traditional data unavailable.", fontSize = 12.sp, color = TextSecondary)
+                            }
+                        }
+                    }
+                    3 -> {
+                        WesternPredictiveSection(
+                            profile = profile,
+                            predictiveData = predictiveData,
+                            targetYear = predictiveTargetYear,
+                            targetMonth = predictiveTargetMonth,
+                            targetDay = predictiveTargetDay,
+                            isLoading = isPredictiveLoading,
+                            onYearChange = onYearChange,
+                            onDateChange = onDateChange,
+                            onTimeChange = onTimeChange,
+                            onDateTimeChange = onDateTimeChange
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun WesternPlacementsSubSection(w: WesternChartData) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // 1. Planetary & Nodal Positions Table
+        AstroPanelCard(
+            title = "Planetary & Nodal Placements",
+            contentPadding = PaddingValues(0.dp),
+            headerAction = {
+                SectionCopyButton("Western Placements") {
+                    buildString {
+                        appendLine("ASC: ${formatLongitudeSignDeg(w.ascendant)} | MC: ${formatLongitudeSignDeg(w.midheaven)}")
+                        w.planets.forEach { p ->
+                            appendLine("${bodyCode(p.name)}: ${formatSignAndDeg(p.sign_index, p.sign_degree)} (H${p.house_number}) ${if (p.is_retrograde) "Rx" else ""}")
+                        }
+                        w.nodes.forEach { n ->
+                            appendLine("${bodyCode(n.name)}: ${formatSignAndDeg(n.sign_index, n.sign_degree)} (H${n.house_number})")
+                        }
+                    }.trimEnd()
+                }
+            }
+        ) {
+            val cols = listOf(
+                TableColSpec("BODY", 0.85f, TextAlign.Start, monospace = true),
+                TableColSpec("SIGN & DEG", 1.35f, TextAlign.Start, monospace = true),
+                TableColSpec("HOUSE", 0.7f, TextAlign.Center, monospace = true),
+                TableColSpec("SPEED", 1.0f, TextAlign.End, monospace = true),
+                TableColSpec("STATE", 0.75f, TextAlign.End, monospace = true)
+            )
+            AstroTableHeader(cols)
+
+            w.planets.forEachIndexed { idx, p ->
+                AstroTableRow(
+                    columns = cols,
+                    striped = idx % 2 == 1,
+                    cells = listOf(
+                        TableCellData(bodyCode(p.name), TextPrimary, FontWeight.Bold),
+                        TableCellData(formatSignAndDeg(p.sign_index, p.sign_degree), TextPrimary),
+                        TableCellData("H${p.house_number}", TextSecondary),
+                        TableCellData(String.format(Locale.US, "%+.2f°", p.speed), TextSecondary),
+                        TableCellData(
+                            text = if (p.is_retrograde) "RETRO" else "DIR",
+                            color = if (p.is_retrograde) CrimsonAlert else TextSecondary,
+                            badgeColor = if (p.is_retrograde) CrimsonAlert else null
+                        )
+                    )
+                )
+            }
+
+            w.nodes.forEachIndexed { idx, n ->
+                AstroTableRow(
+                    columns = cols,
+                    striped = (w.planets.size + idx) % 2 == 1,
+                    cells = listOf(
+                        TableCellData(bodyCode(n.name), CelestialBlue, FontWeight.Bold),
+                        TableCellData(formatSignAndDeg(n.sign_index, n.sign_degree), TextPrimary),
+                        TableCellData("H${n.house_number}", TextSecondary),
+                        TableCellData("-", TextSecondary),
+                        TableCellData("NODE", TextSecondary)
+                    )
+                )
+            }
+        }
+
+        // 2. 12 House Cusps (Compact 3x4 Tile Grid)
+        if (w.house_cusps.size == 12) {
+            AstroPanelCard(
+                title = "12 House Cusps (${w.house_system ?: "Default"})"
+            ) {
+                val tiles = w.house_cusps.mapIndexed { idx, cuspLon ->
+                    val hNum = idx + 1
+                    val norm = ((cuspLon % 360.0) + 360.0) % 360.0
+                    val sIdx = (norm / 30.0).toInt().coerceIn(0, 11)
+                    val ruler = bodyCode(getZodiacSignRuler(sIdx))
+                    val highlight = when (hNum) {
+                        1 -> CrimsonAlert
+                        10 -> CelestialBlue
+                        4, 7 -> TextPrimary
+                        else -> null
+                    }
+                    MetricTileItem(
+                        tag = "H$hNum",
+                        primary = formatLongitudeSignDeg(cuspLon),
+                        secondary = ruler,
+                        highlightColor = highlight
+                    )
+                }
+                CompactMetricGrid(items = tiles, columns = 3)
+            }
+        }
+    }
+}
+
+@Composable
+fun WesternAspectsSubSection(w: WesternChartData) {
+    val tradAspects = w.traditional?.traditional_aspects ?: emptyList()
+
+    AstroPanelCard(
+        title = "Planetary Aspects",
+        contentPadding = PaddingValues(0.dp),
+        headerAction = {
+            SectionCopyButton("Western Aspects") {
+                w.aspects.joinToString("\n") { a ->
+                    "${bodyCode(a.planet1)} ${aspectShortCode(a.aspect_type)} ${bodyCode(a.planet2)} (Orb ${formatOrb(a.orb)})"
+                }
+            }
+        }
+    ) {
+        if (tradAspects.isNotEmpty()) {
+            val cols = listOf(
+                TableColSpec("BODY A", 0.9f, TextAlign.Start, monospace = true),
+                TableColSpec("ASPECT", 1.1f, TextAlign.Center, monospace = true),
+                TableColSpec("BODY B", 0.9f, TextAlign.Center, monospace = true),
+                TableColSpec("ORB", 0.85f, TextAlign.End, monospace = true),
+                TableColSpec("MOTION", 0.95f, TextAlign.End, monospace = true)
+            )
+            AstroTableHeader(cols)
+            tradAspects.forEachIndexed { idx, a ->
+                val aspColor = when {
+                    isHardAspect(a.aspect_type) -> CrimsonAlert
+                    isSoftAspect(a.aspect_type) -> CelestialBlue
+                    else -> TextPrimary
+                }
+                val motionTag = buildString {
+                    append(if (a.is_applying) "APP" else "SEP")
+                    if (a.is_partile) append("·PRT")
+                }
+                AstroTableRow(
+                    columns = cols,
+                    striped = idx % 2 == 1,
+                    cells = listOf(
+                        TableCellData(bodyCode(a.planet1), TextPrimary, FontWeight.Bold),
+                        TableCellData(aspectCode(a.aspect_type), aspColor, FontWeight.Bold),
+                        TableCellData(bodyCode(a.planet2), TextPrimary, FontWeight.Bold),
+                        TableCellData(formatOrb(a.orb), TextPrimary),
+                        TableCellData(
+                            text = motionTag,
+                            color = if (a.is_applying) CelestialBlue else TextSecondary,
+                            badgeColor = if (a.is_partile) CelestialBlue else null
+                        )
+                    )
+                )
+            }
+        } else if (w.aspects.isNotEmpty()) {
+            val cols = listOf(
+                TableColSpec("BODY A", 1.0f, TextAlign.Start, monospace = true),
+                TableColSpec("ASPECT", 1.2f, TextAlign.Center, monospace = true),
+                TableColSpec("BODY B", 1.0f, TextAlign.Center, monospace = true),
+                TableColSpec("ORB", 1.0f, TextAlign.End, monospace = true)
+            )
+            AstroTableHeader(cols)
+            w.aspects.forEachIndexed { idx, a ->
+                val aspColor = when {
+                    isHardAspect(a.aspect_type) -> CrimsonAlert
+                    isSoftAspect(a.aspect_type) -> CelestialBlue
+                    else -> TextPrimary
+                }
+                AstroTableRow(
+                    columns = cols,
+                    striped = idx % 2 == 1,
+                    cells = listOf(
+                        TableCellData(bodyCode(a.planet1), TextPrimary, FontWeight.Bold),
+                        TableCellData(aspectCode(a.aspect_type), aspColor, FontWeight.Bold),
+                        TableCellData(bodyCode(a.planet2), TextPrimary, FontWeight.Bold),
+                        TableCellData(formatOrb(a.orb), TextPrimary)
+                    )
+                )
+            }
+        } else {
+            Box(modifier = Modifier.padding(12.dp)) {
+                Text("No major aspects within orb.", fontSize = 12.sp, color = TextSecondary)
+            }
+        }
+    }
+}
+
+@Composable
+private fun VedicDomainContent(
+    vedicOutput: VedicCalculationOutputDto?,
+    isLoading: Boolean,
+    error: String?,
+    selectedVarga: String,
+    onOpenVargaPicker: () -> Unit,
+    selectedSubTab: Int,
+    onSelectSubTab: (Int) -> Unit,
+    expandedDashaLord: String?,
+    onToggleDashaLord: (String) -> Unit,
+    onRetry: () -> Unit
+) {
+    when {
+        isLoading -> LoadingStateBox()
+        error != null -> DomainErrorCard(message = error, onRetry = onRetry)
+        vedicOutput != null -> {
+            val v = vedicOutput.vedic
+            val activeVargaChart = v.vargas[selectedVarga]
+            val vargaTitle = VARGA_DEFINITIONS.find { it.first == selectedVarga }?.let { "${it.first} · ${it.second}" } ?: selectedVarga
+
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // Top Varga Selector Bar (Quick D1/D9/D10/D60 + 19-Varga Grid Trigger)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf("D1", "D9", "D10", "D12", "D60").forEach { key ->
+                            val isSel = selectedVarga == key
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(if (isSel) AccentPrimary else SurfaceLight)
+                                    .border(1.dp, if (isSel) AccentPrimary else BorderColor, RoundedCornerShape(4.dp))
+                                    .clickable {
+                                        if (isSel) onOpenVargaPicker() else {
+                                            // Direct quick switch handled via parent or modal
+                                        }
+                                    }
+                            )
+                        }
+                    }
+                }
+
+                // Clean Varga Header + Modal Picker Button
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = SurfaceLight,
+                    border = BorderStroke(1.dp, BorderColor),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onOpenVargaPicker() }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "ACTIVE DIVISIONAL CHART",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextSecondary,
+                                style = TabularMonoStyle
+                            )
+                            Text(
+                                text = vargaTitle.uppercase(Locale.US),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary,
+                                style = TabularMonoStyle
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = AccentPrimary
+                        ) {
+                            Text(
+                                text = "SELECT VARGA (19)",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = BackgroundWhite,
+                                style = TabularMonoStyle,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                            )
+                        }
+                    }
+                }
+
+                // North Indian Diamond Chart
+                VedicChartDiamond(
+                    data = v,
+                    selectedVarga = activeVargaChart
+                )
+
+                // Sub-navigation for Vedic Sections
+                AstroSubTabBar(
+                    tabs = listOf("Placements", "Panchanga & Karakas", "Padas & Drishti", "Ashtakavarga", "Dasha"),
+                    selectedIndex = selectedSubTab,
+                    onSelect = onSelectSubTab
+                )
+
+                when (selectedSubTab) {
+                    0 -> VedicPlacementsSubSection(v, selectedVarga, activeVargaChart)
+                    1 -> VedicPanchangaKarakasSubSection(v)
+                    2 -> VedicPadasDrishtiSubSection(v)
+                    3 -> VedicAshtakavargaSubSection(v)
+                    4 -> VedicDashaSubSection(v, expandedDashaLord, onToggleDashaLord)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VedicPlacementsSubSection(
+    v: VedicChartData,
+    selectedVarga: String,
+    activeVargaChart: VargaChartData?
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // 1. D1 Rasi Full Sidereal Table
+        AstroPanelCard(
+            title = "Sidereal Graha Placements (D1 Rasi)",
+            subtitle = "Lagna: ${vedicRasiCode(v.lagna_sign)} ${formatDegMin(v.lagna_sidereal % 30.0)}",
+            contentPadding = PaddingValues(0.dp)
+        ) {
+            val cols = listOf(
+                TableColSpec("GRAHA", 0.8f, TextAlign.Start, monospace = true),
+                TableColSpec("RASI & DEG", 1.3f, TextAlign.Start, monospace = true),
+                TableColSpec("H", 0.5f, TextAlign.Center, monospace = true),
+                TableColSpec("NAKSHATRA", 1.45f, TextAlign.Start, monospace = true),
+                TableColSpec("STATUS", 1.1f, TextAlign.End, monospace = true)
+            )
+            AstroTableHeader(cols)
+
+            v.planets.forEachIndexed { idx, p ->
+                val statusTag = buildList {
+                    if (p.dignity.isNotBlank() && p.dignity != "Neutral") {
+                        add(p.dignity.take(4).uppercase(Locale.US))
+                    }
+                    if (p.combustion != "None" && p.combustion.isNotBlank()) {
+                        add(if (p.combustion == "Cazimi") "CAZ" else "CMB")
+                    }
+                    if (p.is_retrograde && p.name != "Rahu" && p.name != "Ketu") {
+                        add("RX")
+                    }
+                }.joinToString("·").ifEmpty { "NORM" }
+
+                val statusColor = when {
+                    p.dignity == "Exalted" || p.dignity == "Moolatrikona" || p.dignity == "OwnSign" -> CelestialBlue
+                    p.dignity == "Debilitated" || p.combustion == "Combust" -> CrimsonAlert
+                    else -> TextSecondary
+                }
+
+                AstroTableRow(
+                    columns = cols,
+                    striped = idx % 2 == 1,
+                    cells = listOf(
+                        TableCellData(vedicGrahaCode(p.name), TextPrimary, FontWeight.Bold),
+                        TableCellData(formatSignAndDeg(p.sign_index, p.sign_degree), TextPrimary),
+                        TableCellData("${p.house}", TextSecondary),
+                        TableCellData("${p.nakshatra_name.take(8)} P${p.nakshatra_pada}", TextSecondary),
+                        TableCellData(statusTag, statusColor, FontWeight.Bold)
+                    )
+                )
+            }
+        }
+
+        // 2. If a non-D1 Varga is selected, show its exact placements table too
+        if (selectedVarga != "D1" && activeVargaChart != null) {
+            AstroPanelCard(
+                title = "$selectedVarga Divisional Placements",
+                subtitle = "$selectedVarga Lagna: ${vedicRasiCode(activeVargaChart.lagna_sign)}",
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                val cols = listOf(
+                    TableColSpec("GRAHA", 1.0f, TextAlign.Start, monospace = true),
+                    TableColSpec("RASI", 1.5f, TextAlign.Start, monospace = true),
+                    TableColSpec("V-DEG", 1.0f, TextAlign.End, monospace = true),
+                    TableColSpec("BHAVA", 0.8f, TextAlign.End, monospace = true)
+                )
+                AstroTableHeader(cols)
+                activeVargaChart.placements.forEachIndexed { idx, vp ->
+                    AstroTableRow(
+                        columns = cols,
+                        striped = idx % 2 == 1,
+                        cells = listOf(
+                            TableCellData(vedicGrahaCode(vp.planet_name), TextPrimary, FontWeight.Bold),
+                            TableCellData(vedicRasiCode(vp.sign_index), TextPrimary),
+                            TableCellData(formatDegMin(vp.sign_degree), TextSecondary),
+                            TableCellData("H${vp.house}", CelestialBlue, FontWeight.Bold)
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VedicPanchangaKarakasSubSection(v: VedicChartData) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // 1. Panchanga
+        val pan = v.panchanga
+        if (pan.tithi_name.isNotEmpty()) {
+            AstroPanelCard(
+                title = "Natal Panchanga",
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                val cols = listOf(
+                    TableColSpec("LIMB", 1.1f, TextAlign.Start, monospace = true),
+                    TableColSpec("VALUE", 1.9f, TextAlign.Start),
+                    TableColSpec("META / LORD", 1.2f, TextAlign.End, monospace = true)
+                )
+                AstroTableHeader(cols)
+                AstroTableRow(
+                    columns = cols,
+                    striped = false,
+                    cells = listOf(
+                        TableCellData("TITHI", TextSecondary, FontWeight.Bold),
+                        TableCellData(pan.tithi_name, TextPrimary, FontWeight.SemiBold),
+                        TableCellData("#${pan.tithi_number} · ${pan.paksha.take(6).uppercase(Locale.US)}", CelestialBlue)
+                    )
+                )
+                AstroTableRow(
+                    columns = cols,
+                    striped = true,
+                    cells = listOf(
+                        TableCellData("VARA", TextSecondary, FontWeight.Bold),
+                        TableCellData(pan.vara_name, TextPrimary, FontWeight.SemiBold),
+                        TableCellData("LORD ${vedicGrahaCode(pan.vara_lord)}", TextSecondary)
+                    )
+                )
+                AstroTableRow(
+                    columns = cols,
+                    striped = false,
+                    cells = listOf(
+                        TableCellData("NAKSHATRA", TextSecondary, FontWeight.Bold),
+                        TableCellData("${pan.nakshatra_name} (Pada ${pan.nakshatra_pada})", TextPrimary, FontWeight.SemiBold),
+                        TableCellData("LORD ${vedicGrahaCode(pan.nakshatra_lord)}", CelestialBlue)
+                    )
+                )
+                AstroTableRow(
+                    columns = cols,
+                    striped = true,
+                    cells = listOf(
+                        TableCellData("YOGA", TextSecondary, FontWeight.Bold),
+                        TableCellData(pan.yoga_name, TextPrimary, FontWeight.SemiBold),
+                        TableCellData("-", TextSecondary)
+                    )
+                )
+                AstroTableRow(
+                    columns = cols,
+                    striped = false,
+                    cells = listOf(
+                        TableCellData("KARANA", TextSecondary, FontWeight.Bold),
+                        TableCellData(pan.karana_name, TextPrimary, FontWeight.SemiBold),
+                        TableCellData("-", TextSecondary)
+                    )
+                )
+            }
+        }
+
+        // 2. Jaimini Chara Karakas (8 Karakas)
+        if (v.chara_karakas.isNotEmpty()) {
+            AstroPanelCard(
+                title = "Jaimini Chara Karakas (8-Karaka Scheme)",
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                val cols = listOf(
+                    TableColSpec("KARAKA", 1.8f, TextAlign.Start),
+                    TableColSpec("GRAHA", 0.9f, TextAlign.Center, monospace = true),
+                    TableColSpec("EFF. DEGREE", 1.1f, TextAlign.End, monospace = true)
+                )
+                AstroTableHeader(cols)
+                v.chara_karakas.forEachIndexed { idx, ck ->
+                    val isAtmakaraka = ck.karaka.startsWith("Atmakaraka", ignoreCase = true)
+                    AstroTableRow(
+                        columns = cols,
+                        striped = idx % 2 == 1,
+                        cells = listOf(
+                            TableCellData(ck.karaka, if (isAtmakaraka) CelestialBlue else TextPrimary, FontWeight.Bold),
+                            TableCellData(vedicGrahaCode(ck.planet), if (isAtmakaraka) CelestialBlue else TextPrimary, FontWeight.Bold),
+                            TableCellData(formatDegMin(ck.effective_degree), TextSecondary)
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VedicPadasDrishtiSubSection(v: VedicChartData) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // 1. Arudha Padas (12 Tiles in 4x3 Grid)
+        if (v.arudha_padas.isNotEmpty()) {
+            AstroPanelCard(title = "Arudha Padas (AL ~ UL)") {
+                val tiles = v.arudha_padas.map { ap ->
+                    val isPrimary = ap.code == "AL" || ap.code == "UL"
+                    MetricTileItem(
+                        tag = ap.code,
+                        primary = signCode(ap.sign_index),
+                        secondary = "H${ap.house_from_lagna}",
+                        highlightColor = if (isPrimary) CelestialBlue else null
+                    )
+                }
+                CompactMetricGrid(items = tiles, columns = 4)
+            }
+        }
+
+        // 2. Graha Drishti (Full Aspects)
+        val activeDrishti = v.drishti.filter { it.aspected_planets.isNotEmpty() }
+        AstroPanelCard(
+            title = "Graha Drishti (Parashari Full Aspects)",
+            contentPadding = PaddingValues(0.dp)
+        ) {
+            if (activeDrishti.isEmpty()) {
+                Box(modifier = Modifier.padding(12.dp)) {
+                    Text("No active Graha-to-Graha Drishti.", fontSize = 12.sp, color = TextSecondary)
+                }
+            } else {
+                val cols = listOf(
+                    TableColSpec("SOURCE", 0.95f, TextAlign.Start, monospace = true),
+                    TableColSpec("DRISHTI", 0.85f, TextAlign.Center, monospace = true),
+                    TableColSpec("TARGET BHAVA", 1.15f, TextAlign.Center, monospace = true),
+                    TableColSpec("ASPECTED GRAHAS", 1.35f, TextAlign.End, monospace = true)
+                )
+                AstroTableHeader(cols)
+                activeDrishti.forEachIndexed { idx, d ->
+                    AstroTableRow(
+                        columns = cols,
+                        striped = idx % 2 == 1,
+                        cells = listOf(
+                            TableCellData("${vedicGrahaCode(d.from_planet)} (H${d.from_house})", TextPrimary, FontWeight.Bold),
+                            TableCellData("${d.aspect_offset}TH", CelestialBlue, FontWeight.Bold),
+                            TableCellData("H${d.target_house}·${signCode(d.target_sign)}", TextSecondary),
+                            TableCellData(d.aspected_planets.joinToString(" ") { vedicGrahaCode(it) }, TextPrimary, FontWeight.SemiBold)
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VedicAshtakavargaSubSection(v: VedicChartData) {
+    val av = v.ashtakavarga
+    if (av.total_bindus == 0) {
+        AstroPanelCard(title = "Ashtakavarga") {
+            Text("Ashtakavarga data unavailable.", fontSize = 12.sp, color = TextSecondary)
+        }
+        return
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // 1. Sarvashtakavarga (SAV) 4x3 Grid
+        AstroPanelCard(
+            title = "Sarvashtakavarga (SAV)",
+            headerAction = {
+                AstroStatusBadge("TOTAL ${av.total_bindus}", CelestialBlue)
+            }
+        ) {
+            val tiles = av.sarva.mapIndexed { sIdx, pts ->
+                val bhava = ((sIdx - v.lagna_sign + 12) % 12) + 1
+                val highlight = when {
+                    pts >= 30 -> CelestialBlue
+                    pts < 25 -> CrimsonAlert
+                    else -> null
+                }
+                MetricTileItem(
+                    tag = signCode(sIdx),
+                    primary = "$pts PTS",
+                    secondary = "H$bhava",
+                    highlightColor = highlight
+                )
+            }
+            CompactMetricGrid(items = tiles, columns = 4)
+        }
+
+        // 2. Bhinna Ashtakavarga (BAV) Totals & Sign Breakdown
+        if (av.bhinna.isNotEmpty()) {
+            AstroPanelCard(
+                title = "Bhinna Ashtakavarga (BAV)",
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                val cols = buildList {
+                    add(TableColSpec("GRAHA", 1.1f, TextAlign.Start, monospace = true))
+                    for (i in 0 until 12) {
+                        add(TableColSpec("${i + 1}", 0.55f, TextAlign.Center, monospace = true))
+                    }
+                    add(TableColSpec("TOT", 0.85f, TextAlign.End, monospace = true))
+                }
+                AstroTableHeader(cols)
+                av.bhinna.forEachIndexed { idx, row ->
+                    val cells = buildList {
+                        add(TableCellData(vedicGrahaCode(row.planet), TextPrimary, FontWeight.Bold))
+                        for (i in 0 until 12) {
+                            val b = row.bindus.getOrElse(i) { 0 }
+                            val col = when {
+                                b >= 5 -> CelestialBlue
+                                b <= 2 -> CrimsonAlert
+                                else -> TextSecondary
+                            }
+                            add(TableCellData("$b", col, if (b >= 5) FontWeight.Bold else FontWeight.Normal))
+                        }
+                        add(TableCellData("${row.total}", TextPrimary, FontWeight.Bold))
+                    }
+                    AstroTableRow(
+                        columns = cols,
+                        striped = idx % 2 == 1,
+                        cells = cells
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VedicDashaSubSection(
+    v: VedicChartData,
+    expandedDashaLord: String?,
+    onToggleDashaLord: (String) -> Unit
+) {
+    AstroPanelCard(
+        title = "Vimshottari Dasha Sequence",
+        subtitle = "Tap any Mahadasha row to expand Antardasha sub-periods",
+        contentPadding = PaddingValues(0.dp)
+    ) {
+        val cols = listOf(
+            TableColSpec("MAHADASHA", 1.2f, TextAlign.Start, monospace = true),
+            TableColSpec("START DATE", 1.3f, TextAlign.Start, monospace = true),
+            TableColSpec("END DATE", 1.3f, TextAlign.End, monospace = true)
+        )
+        AstroTableHeader(cols)
+
+        v.vimshottari_dashas.forEachIndexed { idx, d ->
+            val isExpanded = expandedDashaLord == d.lord
+            AstroTableRow(
+                columns = cols,
+                striped = idx % 2 == 1,
+                onClick = { onToggleDashaLord(d.lord) },
+                cells = listOf(
+                    TableCellData("${vedicGrahaCode(d.lord)} · ${d.lord}", if (isExpanded) CelestialBlue else TextPrimary, FontWeight.Bold),
+                    TableCellData(d.startDateFormatted, TextSecondary),
+                    TableCellData(d.endDateFormatted, TextPrimary, FontWeight.SemiBold)
+                )
+            )
+
+            if (isExpanded && d.sub_periods.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(SurfaceLight)
+                        .padding(vertical = 4.dp)
+                ) {
+                    d.sub_periods.forEach { sub ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(28.dp)
+                                .padding(horizontal = 20.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "${vedicGrahaCode(d.lord)}-${vedicGrahaCode(sub.lord)} (${sub.lord})",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextPrimary,
+                                style = TabularMonoStyle
+                            )
+                            Text(
+                                text = "${sub.startDateFormatted} ~ ${sub.endDateFormatted}",
+                                fontSize = 11.sp,
+                                color = TextSecondary,
+                                style = TabularMonoStyle
+                            )
+                        }
+                    }
+                }
+                HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VargaPickerModalSheet(
+    selectedVarga: String,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = BackgroundWhite
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "SELECT DIVISIONAL CHART (19 VARGAS)",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.6.sp,
+                color = TextPrimary,
+                style = TabularMonoStyle
+            )
+
+            val rows = VARGA_DEFINITIONS.chunked(3)
+            rows.forEach { rowItems ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    for (i in 0 until 3) {
+                        val item = rowItems.getOrNull(i)
+                        if (item != null) {
+                            val (code, name) = item
+                            val isSel = code == selectedVarga
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(48.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (isSel) AccentPrimary else SurfaceLight)
+                                    .border(1.dp, if (isSel) AccentPrimary else BorderColor, RoundedCornerShape(6.dp))
+                                    .clickable { onSelect(code) }
+                                    .padding(horizontal = 8.dp, vertical = 5.dp),
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = code,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSel) BackgroundWhite else CelestialBlue,
+                                    style = TabularMonoStyle,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    text = name,
+                                    fontSize = 10.sp,
+                                    color = if (isSel) BackgroundWhite.copy(alpha = 0.85f) else TextSecondary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoadingStateBox() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(240.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator(color = AccentPrimary, strokeWidth = 2.dp)
+    }
+}
+
+@Composable
 private fun DomainErrorCard(
     message: String,
     onRetry: () -> Unit
 ) {
-    Card(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 16.dp),
-        colors = CardDefaults.cardColors(containerColor = AstrologicalRed.copy(alpha = 0.08f)),
-        border = BorderStroke(1.dp, AstrologicalRed.copy(alpha = 0.3f)),
-        shape = RoundedCornerShape(10.dp)
+            .padding(vertical = 12.dp),
+        color = CrimsonAlert.copy(alpha = 0.06f),
+        border = BorderStroke(1.dp, CrimsonAlert.copy(alpha = 0.35f)),
+        shape = RoundedCornerShape(8.dp)
     ) {
         Column(
             modifier = Modifier
@@ -1201,8 +1287,8 @@ private fun DomainErrorCard(
         ) {
             Text(
                 text = message,
-                color = AstrologicalRed,
-                fontSize = 14.sp,
+                color = CrimsonAlert,
+                fontSize = 13.sp,
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(10.dp))
@@ -1210,7 +1296,7 @@ private fun DomainErrorCard(
                 onClick = onRetry,
                 colors = ButtonDefaults.buttonColors(containerColor = AccentPrimary)
             ) {
-                Text("다시 시도", color = BackgroundWhite, fontSize = 13.sp)
+                Text("RETRY", color = BackgroundWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold, style = TabularMonoStyle)
             }
         }
     }

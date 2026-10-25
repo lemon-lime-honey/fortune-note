@@ -1,12 +1,12 @@
 package com.fortunexample.note.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.background
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
@@ -17,11 +17,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fortunexample.note.data.HoraryDto
 import com.fortunexample.note.data.ProfileDto
+import com.fortunexample.note.ui.components.AstroStatusBadge
+import com.fortunexample.note.ui.components.TabularMonoStyle
 import com.fortunexample.note.ui.theme.*
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,20 +39,29 @@ fun HomeScreen(
     onSearch: (String) -> Unit,
     onNavigateToDataManagement: () -> Unit
 ) {
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
     var showMenu by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Fortune Note", fontWeight = FontWeight.Bold, color = TextPrimary) },
+                title = {
+                    Text(
+                        text = "FORTUNE NOTE",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        letterSpacing = 0.8.sp,
+                        color = TextPrimary,
+                        style = TabularMonoStyle
+                    )
+                },
                 actions = {
                     IconButton(onClick = onNavigateToDataManagement) {
-                        Icon(Icons.Default.Storage, contentDescription = "데이터 관리 및 백업", tint = TextPrimary)
+                        Icon(Icons.Default.Storage, contentDescription = "Data Management", tint = TextPrimary)
                     }
                     IconButton(onClick = { showMenu = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "메뉴", tint = TextPrimary)
+                        Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = TextPrimary)
                     }
                     DropdownMenu(
                         expanded = showMenu,
@@ -56,7 +69,7 @@ fun HomeScreen(
                         modifier = Modifier.background(BackgroundWhite)
                     ) {
                         DropdownMenuItem(
-                            text = { Text("데이터 백업 및 복원 관리", color = TextPrimary, fontSize = 14.sp) },
+                            text = { Text("Backup & Restore", color = TextPrimary, fontSize = 13.sp) },
                             onClick = {
                                 showMenu = false
                                 onNavigateToDataManagement()
@@ -74,9 +87,10 @@ fun HomeScreen(
             FloatingActionButton(
                 onClick = { if (selectedTab == 0) onAddProfile() else onAddHorary() },
                 containerColor = AccentPrimary,
-                contentColor = BackgroundWhite
+                contentColor = BackgroundWhite,
+                shape = RoundedCornerShape(8.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = "추가")
+                Icon(Icons.Default.Add, contentDescription = "Add")
             }
         },
         containerColor = BackgroundWhite
@@ -86,19 +100,18 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // 검색 필드
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = {
                     searchQuery = it
                     onSearch(it)
                 },
-                placeholder = { Text("이름 또는 메모 검색", color = TextSecondary) },
+                placeholder = { Text("Search name, question, or notes...", color = TextSecondary, fontSize = 13.sp) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = TextSecondary) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                shape = RoundedCornerShape(10.dp),
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(8.dp),
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = AccentPrimary,
@@ -108,7 +121,6 @@ fun HomeScreen(
                 )
             )
 
-            // 탭 헤더
             TabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = SurfaceLight,
@@ -117,26 +129,41 @@ fun HomeScreen(
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("인물 노트 (${profiles.size})", fontWeight = FontWeight.SemiBold) }
+                    text = {
+                        Text(
+                            text = "NATAL PROFILES (${profiles.size})",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp,
+                            style = TabularMonoStyle
+                        )
+                    }
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    text = { Text("질문 노트 (${horaryQuestions.size})", fontWeight = FontWeight.SemiBold) }
+                    text = {
+                        Text(
+                            text = "HORARY & PRASHNA (${horaryQuestions.size})",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp,
+                            style = TabularMonoStyle
+                        )
+                    }
                 )
             }
 
-            // 목록 영역
             if (selectedTab == 0) {
                 if (profiles.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("등록된 인물 정보가 없습니다.", color = TextSecondary, fontSize = 14.sp)
+                        Text("No natal profiles registered.", color = TextSecondary, fontSize = 13.sp)
                     }
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        contentPadding = PaddingValues(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(profiles) { profile ->
                             ProfileCard(profile = profile, onClick = { onProfileClick(profile.id) })
@@ -146,13 +173,13 @@ fun HomeScreen(
             } else {
                 if (horaryQuestions.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("등록된 질문 기록이 없습니다.", color = TextSecondary, fontSize = 14.sp)
+                        Text("No horary questions registered.", color = TextSecondary, fontSize = 13.sp)
                     }
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        contentPadding = PaddingValues(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(horaryQuestions) { horary ->
                             HoraryCard(horary = horary, onClick = { onHoraryClick(horary.id) })
@@ -169,15 +196,15 @@ private fun ProfileCard(
     profile: ProfileDto,
     onClick: () -> Unit
 ) {
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = BackgroundWhite,
         border = BorderStroke(1.dp, BorderColor),
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -187,28 +214,54 @@ private fun ProfileCard(
                     text = profile.name,
                     color = TextPrimary,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp
+                    fontSize = 15.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
                 )
-                Text(
-                    text = if (profile.gender == "male") "남성" else "여성",
-                    color = TextSecondary,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium
+                Spacer(modifier = Modifier.width(8.dp))
+                AstroStatusBadge(
+                    text = if (profile.gender == "male") "MALE" else "FEMALE",
+                    color = if (profile.gender == "male") CelestialBlue else TextSecondary
                 )
             }
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = "${profile.birth_year}-${String.format("%02d", profile.birth_month)}-${String.format("%02d", profile.birth_day)} ${String.format("%02d:%02d:%02d", profile.birth_hour, profile.birth_minute, profile.birth_second.toInt())}",
-                color = TextSecondary,
-                fontSize = 14.sp
-            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = String.format(
+                        Locale.US,
+                        "%04d-%02d-%02d %02d:%02d:%02d",
+                        profile.birth_year,
+                        profile.birth_month,
+                        profile.birth_day,
+                        profile.birth_hour,
+                        profile.birth_minute,
+                        profile.birth_second.toInt()
+                    ),
+                    color = TextSecondary,
+                    fontSize = 12.sp,
+                    style = TabularMonoStyle
+                )
+                Text(
+                    text = profile.timezone_id,
+                    color = TextSecondary,
+                    fontSize = 11.sp,
+                    style = TabularMonoStyle,
+                    maxLines = 1
+                )
+            }
             if (profile.notes.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = profile.notes,
-                    color = TextSecondary.copy(alpha = 0.8f),
+                    color = TextSecondary,
                     fontSize = 12.sp,
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
@@ -220,15 +273,15 @@ private fun HoraryCard(
     horary: HoraryDto,
     onClick: () -> Unit
 ) {
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = BackgroundWhite,
         border = BorderStroke(1.dp, BorderColor),
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -238,27 +291,43 @@ private fun HoraryCard(
                     text = horary.title,
                     color = TextPrimary,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
+                    fontSize = 15.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
                 )
-                Text(
+                Spacer(modifier = Modifier.width(8.dp))
+                AstroStatusBadge(
                     text = horary.category,
-                    color = CelestialBlue,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium
+                    color = CelestialBlue
                 )
             }
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "${horary.query_year}-${String.format("%02d", horary.query_month)}-${String.format("%02d", horary.query_day)} ${String.format("%02d:%02d:%02d", horary.query_hour, horary.query_minute, horary.query_second.toInt())}",
+                text = String.format(
+                    Locale.US,
+                    "%04d-%02d-%02d %02d:%02d:%02d · %s",
+                    horary.query_year,
+                    horary.query_month,
+                    horary.query_day,
+                    horary.query_hour,
+                    horary.query_minute,
+                    horary.query_second.toInt(),
+                    horary.timezone_id
+                ),
                 color = TextSecondary,
-                fontSize = 13.sp
+                fontSize = 12.sp,
+                style = TabularMonoStyle,
+                maxLines = 1
             )
             if (horary.result_notes.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = horary.result_notes,
                     color = TextSecondary,
-                    fontSize = 12.sp
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }

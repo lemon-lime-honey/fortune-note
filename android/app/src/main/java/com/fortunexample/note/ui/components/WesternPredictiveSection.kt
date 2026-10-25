@@ -1,81 +1,73 @@
 package com.fortunexample.note.ui.components
 
-import android.widget.Toast
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fortunexample.note.data.PredictiveSuiteData
 import com.fortunexample.note.data.ProfileDto
 import com.fortunexample.note.data.findHouseNumber
-import com.fortunexample.note.data.getZodiacSignName
 import com.fortunexample.note.ui.theme.*
-
-private fun formatWesternBodyName(rawName: String): String {
-    return rawName
-        .replace("Rahu", "North Node")
-        .replace("Ketu", "South Node")
-}
-
-private fun getZodiacSign(lon: Double): String {
-    val idx = ((lon % 360.0 + 360.0) % 360.0 / 30.0).toInt() % 12
-    return getZodiacSignName(idx)
-}
-
-private fun getSignDegree(lon: Double): Double {
-    val normalized = (lon % 360.0 + 360.0) % 360.0
-    return normalized % 30.0
-}
+import java.util.Calendar
+import java.util.Locale
 
 @Composable
 fun WesternPredictiveSection(
     profile: ProfileDto,
     predictiveData: PredictiveSuiteData?,
     targetYear: Int,
-    targetMonth: Int = profile.birth_month.toInt(),
-    targetDay: Int = profile.birth_day.toInt(),
+    targetMonth: Int = profile.birth_month,
+    targetDay: Int = profile.birth_day,
     isLoading: Boolean,
     onYearChange: (Int) -> Unit,
     onDateChange: ((Int, Int, Int) -> Unit)? = null,
     onTimeChange: ((Int?, Int?) -> Unit)? = null,
     onDateTimeChange: ((Int, Int, Int, Int?, Int?) -> Unit)? = null
 ) {
-    var selectedTechTab by remember { mutableStateOf(0) }
+    var selectedTechTab by remember { mutableIntStateOf(0) }
     val techTabs = listOf(
         "Profections",
         "Solar Arc",
         "Progressions",
-        "Planetary Returns",
+        "Returns",
         "Transits",
-        "Primary Directions"
+        "Directions"
     )
 
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = BackgroundWhite),
-        border = BorderStroke(1.dp, BorderColor),
-        modifier = Modifier.fillMaxWidth()
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Header with year picker & subtle inline loading
+        // Top Target Year Control Bar
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = BackgroundWhite,
+            border = BorderStroke(1.dp, BorderColor),
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -85,952 +77,598 @@ fun WesternPredictiveSection(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "Predictive Astrology Suite",
-                            color = TextPrimary,
+                            text = "PREDICTIVE EPHEMERIS",
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp
+                            letterSpacing = 0.5.sp,
+                            color = TextPrimary
                         )
                         if (isLoading) {
                             CircularProgressIndicator(
                                 color = AccentPrimary,
-                                strokeWidth = 2.dp,
-                                modifier = Modifier.size(16.dp)
+                                strokeWidth = 1.8.dp,
+                                modifier = Modifier.size(13.dp)
                             )
                         }
                     }
                     Text(
-                        text = "Target: Year $targetYear (${targetYear - profile.birth_year} yrs)",
+                        text = "Target Year $targetYear · Age ${targetYear - profile.birth_year}",
+                        fontSize = 11.sp,
                         color = TextSecondary,
-                        fontSize = 12.sp
+                        style = TabularMonoStyle
                     )
                 }
 
-                // Year selector controls
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     IconButton(
                         onClick = { onYearChange(targetYear - 1) },
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(28.dp)
                     ) {
-                        Icon(Icons.Default.Remove, contentDescription = "이전 해", tint = TextPrimary)
+                        Icon(Icons.Default.Remove, contentDescription = "Previous Year", tint = TextPrimary, modifier = Modifier.size(16.dp))
                     }
-
-                    Text(
-                        text = "$targetYear",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
-                        color = CelestialBlue
-                    )
-
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = SurfaceLight,
+                        border = BorderStroke(1.dp, BorderColor)
+                    ) {
+                        Text(
+                            text = "$targetYear",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary,
+                            style = TabularMonoStyle,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
                     IconButton(
                         onClick = { onYearChange(targetYear + 1) },
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(28.dp)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = "다음 해", tint = TextPrimary)
+                        Icon(Icons.Default.Add, contentDescription = "Next Year", tint = TextPrimary, modifier = Modifier.size(16.dp))
                     }
                 }
             }
+        }
 
-            Spacer(modifier = Modifier.height(12.dp))
+        AstroSubTabBar(
+            tabs = techTabs,
+            selectedIndex = selectedTechTab,
+            onSelect = { selectedTechTab = it }
+        )
 
-            // Tech Navigation Chips
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                techTabs.forEachIndexed { idx, title ->
-                    FilterChip(
-                        selected = selectedTechTab == idx,
-                        onClick = { selectedTechTab = idx },
-                        label = {
-                            Text(
-                                text = title,
-                                fontSize = 12.sp,
-                                fontWeight = if (selectedTechTab == idx) FontWeight.Bold else FontWeight.Normal,
-                                maxLines = 1,
-                                softWrap = false
-                            )
-                        },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = AccentPrimary,
-                            selectedLabelColor = BackgroundWhite,
-                            containerColor = SurfaceLight,
-                            labelColor = TextSecondary
-                        ),
-                        border = FilterChipDefaults.filterChipBorder(
-                            enabled = true,
-                            selected = selectedTechTab == idx,
-                            borderColor = BorderColor,
-                            selectedBorderColor = AccentPrimary
-                        )
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            if (predictiveData != null) {
-                when (selectedTechTab) {
-                    0 -> ProfectionCard(predictiveData)
-                    1 -> SolarArcCard(predictiveData)
-                    2 -> SecondaryProgressionCard(predictiveData)
-                    3 -> PlanetaryReturnsCard(predictiveData)
-                    4 -> TransitsCard(predictiveData, profile, onDateChange, onTimeChange, onDateTimeChange)
-                    5 -> PrimaryDirectionsCard(predictiveData)
-                }
-            } else if (isLoading) {
+        if (predictiveData == null) {
+            AstroPanelCard(title = "Loading Predictive Data") {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(140.dp),
+                        .padding(vertical = 24.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = AccentPrimary, modifier = Modifier.size(32.dp))
-                }
-            } else {
-                Text(
-                    text = "해당 연도의 예측 데이터를 불러올 수 없습니다.",
-                    color = TextSecondary,
-                    fontSize = 13.sp
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SectionCopyButton(
-    title: String,
-    onCopy: () -> String
-) {
-    val clipboardManager = LocalClipboardManager.current
-    val context = LocalContext.current
-
-    IconButton(
-        onClick = {
-            val text = onCopy()
-            clipboardManager.setText(AnnotatedString(text))
-            Toast.makeText(context, "$title 복사 완료", Toast.LENGTH_SHORT).show()
-        },
-        modifier = Modifier.size(28.dp)
-    ) {
-        Icon(
-            imageVector = Icons.Default.ContentCopy,
-            contentDescription = "$title 복사",
-            tint = TextSecondary,
-            modifier = Modifier.size(16.dp)
-        )
-    }
-}
-
-@Composable
-private fun ProfectionCard(data: PredictiveSuiteData) {
-    val prof = data.profection
-    val formattedPlanets = prof.active_natal_planets.map { formatWesternBodyName(it) }
-
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Annual Profections", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
-            SectionCopyButton(title = "Profection") {
-                val sb = StringBuilder()
-                sb.appendLine("[Annual Profections - ${data.target_year}년 (${data.age}세)]")
-                sb.appendLine("• Profected House: House ${prof.profected_house}")
-                sb.appendLine("• Profected Sign: ${prof.profected_sign_name}")
-                sb.appendLine("• Lord of the Year: ${formatWesternBodyName(prof.lord_of_the_year)}")
-                if (formattedPlanets.isNotEmpty()) {
-                    sb.appendLine("• Natal Planets in Sign: ${formattedPlanets.joinToString(", ")}")
-                }
-                sb.toString().trimEnd()
-            }
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("Profected House & Sign", color = TextSecondary, fontSize = 13.sp)
-            Text("House ${prof.profected_house} · ${prof.profected_sign_name}", fontWeight = FontWeight.Bold, color = CelestialBlue, fontSize = 13.sp)
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("Lord of the Year", color = TextSecondary, fontSize = 13.sp)
-            Text(formatWesternBodyName(prof.lord_of_the_year), fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 13.sp)
-        }
-        if (formattedPlanets.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Natal Planets in Sign", color = TextSecondary, fontSize = 13.sp)
-                Text(formattedPlanets.joinToString(", "), fontWeight = FontWeight.Medium, color = VedicGreen, fontSize = 13.sp)
-            }
-        }
-    }
-}
-
-@Composable
-private fun SolarArcCard(data: PredictiveSuiteData) {
-    val arc = data.solar_arc
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Solar Arc Directions", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
-            SectionCopyButton(title = "Solar Arc") {
-                val sb = StringBuilder()
-                sb.appendLine("[Solar Arc Directions - ${data.target_year}년]")
-                sb.appendLine("• Solar Arc Degrees: ${String.format("+%.2f°", arc.arc_degrees)}")
-                sb.appendLine("• Contacts to Natal Chart (Orb <= 1°):")
-                if (arc.contacts.isEmpty()) {
-                    sb.appendLine("  (None)")
-                } else {
-                    arc.contacts.forEach { c ->
-                        val moving = formatWesternBodyName(c.moving_body)
-                        val natal = formatWesternBodyName(c.natal_body)
-                        sb.appendLine("  - $moving · $natal : ${c.aspect_type} (Orb ${String.format("%.2f°", c.orb)})")
-                    }
-                }
-                sb.toString().trimEnd()
-            }
-        }
-        Text("Solar Arc Degrees: ${String.format("+%.2f°", arc.arc_degrees)}", color = TextSecondary, fontSize = 12.sp)
-        Spacer(modifier = Modifier.height(8.dp))
-
-        if (arc.contacts.isEmpty()) {
-            Text("No major aspect contacts within 1° orb.", color = TextSecondary, fontSize = 12.sp)
-        } else {
-            Text("Contacts to Natal Chart (Orb ≤ 1°):", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = TextPrimary)
-            Spacer(modifier = Modifier.height(4.dp))
-            arc.contacts.forEach { c ->
-                val moving = formatWesternBodyName(c.moving_body)
-                val natal = formatWesternBodyName(c.natal_body)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 3.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("$moving · $natal", fontSize = 12.sp, color = TextPrimary)
                     Text(
-                        "${c.aspect_type} (Orb ${String.format("%.2f°", c.orb)})",
-                        fontSize = 12.sp,
-                        color = CelestialBlue,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SecondaryProgressionCard(data: PredictiveSuiteData) {
-    val sec = data.secondary_progression
-    if (sec == null) {
-        Text("Secondary progression data unavailable.", color = TextSecondary, fontSize = 12.sp)
-        return
-    }
-
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Secondary Progressions (1 day = 1 year)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
-            SectionCopyButton(title = "Secondary Progressions") {
-                val sb = StringBuilder()
-                sb.appendLine("[Secondary Progressions - ${data.target_year}년]")
-                sb.appendLine("• Progressed Date: ${sec.progressed_date_utc}")
-                sb.appendLine("• Progressed Moon Phase: ${sec.progressed_lunar_phase}")
-                sb.appendLine("• Contacts to Natal Chart:")
-                if (sec.contacts.isEmpty()) {
-                    sb.appendLine("  (None)")
-                } else {
-                    sec.contacts.forEach { c ->
-                        val moving = formatWesternBodyName(c.moving_body)
-                        val natal = formatWesternBodyName(c.natal_body)
-                        sb.appendLine("  - $moving · $natal : ${c.aspect_type} (Orb ${String.format("%.2f°", c.orb)})")
-                    }
-                }
-                sb.toString().trimEnd()
-            }
-        }
-        // 불필요한 Progressed Date 라벨 제거하고 날짜와 경과 연도만 명시
-        Text(
-            text = "${sec.progressed_date_utc} · ${String.format("%.1f", sec.elapsed_tropical_years)} yrs elapsed",
-            color = TextSecondary,
-            fontSize = 12.sp
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-
-        // 긴 중복 접두어 제거하여 배지 잘림 방지
-        val cleanPhase = sec.progressed_lunar_phase.removePrefix("Progressed ")
-        Surface(
-            shape = RoundedCornerShape(4.dp),
-            color = CelestialBlue.copy(alpha = 0.1f)
-        ) {
-            Text(
-                text = "Moon Phase: $cleanPhase",
-                color = CelestialBlue,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-        if (sec.contacts.isEmpty()) {
-            Text("No contacts to natal chart within 1° orb.", color = TextSecondary, fontSize = 12.sp)
-        } else {
-            Text("Contacts to Natal Chart:", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = TextPrimary)
-            Spacer(modifier = Modifier.height(4.dp))
-            sec.contacts.forEach { c ->
-                val moving = formatWesternBodyName(c.moving_body)
-                val natal = formatWesternBodyName(c.natal_body)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 3.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("$moving · $natal", fontSize = 12.sp, color = TextPrimary)
-                    Text("${c.aspect_type} (Orb ${String.format("%.2f°", c.orb)})", fontSize = 12.sp, color = CelestialBlue, fontWeight = FontWeight.Medium)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PlanetaryReturnsCard(data: PredictiveSuiteData) {
-    val sr = data.solar_return
-    var selectedPlanetIdx by remember { mutableIntStateOf(0) }
-    var selectedOccurrenceIdx by remember(selectedPlanetIdx, data.target_year) { mutableIntStateOf(0) }
-    val planetOptions = listOf("Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn")
-
-    if (sr == null && data.planetary_returns.isEmpty()) {
-        Text("Planetary return data unavailable.", color = TextSecondary, fontSize = 12.sp)
-        return
-    }
-
-    val selectedPlanetName = planetOptions[selectedPlanetIdx]
-    val matchingReturns = if (selectedPlanetIdx == 0) {
-        emptyList()
-    } else {
-        data.planetary_returns.filter { it.return_body.equals(selectedPlanetName, ignoreCase = true) }
-    }
-
-    val safeOccIdx = if (matchingReturns.isEmpty()) 0 else selectedOccurrenceIdx.coerceIn(0, matchingReturns.lastIndex)
-    val activePlanetaryReturn = matchingReturns.getOrNull(safeOccIdx)
-
-    val activeDateUtc = if (selectedPlanetIdx == 0) sr?.return_date_utc else activePlanetaryReturn?.return_date_utc
-    val activeAsc = if (selectedPlanetIdx == 0) sr?.ascendant else activePlanetaryReturn?.ascendant
-    val activeMc = if (selectedPlanetIdx == 0) sr?.midheaven else activePlanetaryReturn?.midheaven
-    val activeCusps = if (selectedPlanetIdx == 0) sr?.house_cusps.orEmpty() else activePlanetaryReturn?.house_cusps.orEmpty()
-    val activePlanets = if (selectedPlanetIdx == 0) sr?.planets.orEmpty() else activePlanetaryReturn?.return_planets.orEmpty()
-    val activeNatalAspects = if (selectedPlanetIdx == 0) sr?.natal_aspects.orEmpty() else activePlanetaryReturn?.natal_aspects.orEmpty()
-
-    val ascSign = activeAsc?.let { getZodiacSign(it) } ?: ""
-    val ascDeg = activeAsc?.let { getSignDegree(it) } ?: 0.0
-    val mcSign = activeMc?.let { getZodiacSign(it) } ?: ""
-    val mcDeg = activeMc?.let { getSignDegree(it) } ?: 0.0
-
-    val classicalPlanets = activePlanets.filter { 
-        it.name != "Rahu" && it.name != "Ketu" && it.name != "North Node" && it.name != "South Node" 
-    }
-    val lunarNodes = activePlanets.filter { 
-        it.name == "Rahu" || it.name == "Ketu" || it.name == "North Node" || it.name == "South Node" 
-    }
-
-    Column {
-        // 1행: 카드 제목과 복사 버튼
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Planetary Returns", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = TextPrimary)
-            SectionCopyButton(title = "Planetary Returns") {
-                val sb = StringBuilder()
-                sb.appendLine("[Planetary Returns ($selectedPlanetName) - ${data.target_year}년]")
-                if (activeDateUtc == null || activeAsc == null || activeMc == null) {
-                    sb.appendLine("• No $selectedPlanetName Return occurs in ${data.target_year}.")
-                } else {
-                    sb.appendLine("• Return Moment: $activeDateUtc")
-                    sb.appendLine("• ASC: ${String.format("%.2f°", ascDeg)} $ascSign (Abs: ${String.format("%.2f°", activeAsc)})")
-                    sb.appendLine("• MC: ${String.format("%.2f°", mcDeg)} $mcSign (Abs: ${String.format("%.2f°", activeMc)})")
-                    if (activeCusps.isNotEmpty()) {
-                        sb.appendLine("• House Cusps:")
-                        activeCusps.forEachIndexed { idx, c ->
-                            val s = getZodiacSign(c)
-                            val d = getSignDegree(c)
-                            sb.appendLine("  - H${idx + 1}: ${String.format("%.2f°", d)} $s")
-                        }
-                    }
-                    if (classicalPlanets.isNotEmpty()) {
-                        sb.appendLine("• Return Planetary Placements:")
-                        classicalPlanets.forEach { p ->
-                            val rx = if (p.is_retrograde) " [Rx]" else ""
-                            val s = getZodiacSign(p.progressed_longitude)
-                            val h = if (activeCusps.isNotEmpty()) "House ${findHouseNumber(p.progressed_longitude, activeCusps)}" else ""
-                            sb.appendLine("  - ${p.name}$rx: ${String.format("%.2f°", p.sign_degree)} $s · $h")
-                        }
-                    }
-                    if (lunarNodes.isNotEmpty()) {
-                        sb.appendLine("• Return Lunar Nodes:")
-                        lunarNodes.forEach { n ->
-                            val displayName = formatWesternBodyName(n.name)
-                            val s = getZodiacSign(n.progressed_longitude)
-                            val h = if (activeCusps.isNotEmpty()) "House ${findHouseNumber(n.progressed_longitude, activeCusps)}" else ""
-                            sb.appendLine("  - $displayName: ${String.format("%.2f°", n.sign_degree)} $s · $h")
-                        }
-                    }
-                    if (activeNatalAspects.isNotEmpty()) {
-                        sb.appendLine("• Return to Natal Contacts (Orb <= 2°):")
-                        activeNatalAspects.forEach { asp ->
-                            val retName = formatWesternBodyName(asp.return_point)
-                            val natName = formatWesternBodyName(asp.natal_point)
-                            sb.appendLine("  - Ret $retName · Nat $natName : ${asp.aspect_type} (Orb ${String.format("%.2f°", asp.orb)})")
-                        }
-                    }
-                }
-                sb.toString().trimEnd()
-            }
-        }
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        // 행성 선택 칩 인터페이스
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            planetOptions.forEachIndexed { idx, pName ->
-                FilterChip(
-                    selected = selectedPlanetIdx == idx,
-                    onClick = { selectedPlanetIdx = idx },
-                    label = {
-                        Text(
-                            text = if (idx == 0) "$pName (Solar)" else pName,
-                            fontSize = 11.sp,
-                            fontWeight = if (selectedPlanetIdx == idx) FontWeight.Bold else FontWeight.Normal
-                        )
-                    },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = CelestialBlue,
-                        selectedLabelColor = BackgroundWhite,
-                        containerColor = SurfaceLight,
-                        labelColor = TextSecondary
-                    ),
-                    border = FilterChipDefaults.filterChipBorder(
-                        enabled = true,
-                        selected = selectedPlanetIdx == idx,
-                        borderColor = BorderColor,
-                        selectedBorderColor = CelestialBlue
-                    )
-                )
-            }
-        }
-
-        // 한 해에 여러 번 회귀하는 경우(예: 달 회귀 12~13회) 회차 선택 칩 표시
-        if (selectedPlanetIdx != 0 && matchingReturns.size > 1) {
-            Spacer(modifier = Modifier.height(6.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                matchingReturns.forEachIndexed { occIdx, retItem ->
-                    val shortDate = retItem.return_date_utc.take(10)
-                    FilterChip(
-                        selected = safeOccIdx == occIdx,
-                        onClick = { selectedOccurrenceIdx = occIdx },
-                        label = {
-                            Text(
-                                text = "#${occIdx + 1} ($shortDate)",
-                                fontSize = 11.sp,
-                                fontWeight = if (safeOccIdx == occIdx) FontWeight.Bold else FontWeight.Normal
-                            )
-                        },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = AccentPrimary,
-                            selectedLabelColor = BackgroundWhite,
-                            containerColor = SurfaceLight,
-                            labelColor = TextSecondary
-                        ),
-                        border = FilterChipDefaults.filterChipBorder(
-                            enabled = true,
-                            selected = safeOccIdx == occIdx,
-                            borderColor = BorderColor,
-                            selectedBorderColor = AccentPrimary
-                        )
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        if (activeDateUtc == null || activeAsc == null || activeMc == null) {
-            Surface(
-                color = SurfaceLight,
-                shape = RoundedCornerShape(6.dp),
-                border = BorderStroke(1.dp, BorderColor),
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-            ) {
-                Text(
-                    text = "No exact $selectedPlanetName Return occurs during ${data.target_year}.",
-                    color = TextSecondary,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
-                )
-            }
-            return@Column
-        }
-
-        // 중복 Return Year 라벨 제거하고 정확한 회귀 시각만 표시
-        Text(
-            text = "Exact Return Moment: $activeDateUtc",
-            color = TextSecondary,
-            fontSize = 12.sp
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Return Chart Angles (ASC / MC)
-        Card(
-            shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(containerColor = SurfaceLight),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(10.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Return Ascendant", color = TextSecondary, fontSize = 12.sp)
-                    Text("${String.format("%.2f°", ascDeg)} $ascSign", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 12.sp)
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Return Midheaven (MC)", color = TextSecondary, fontSize = 12.sp)
-                    Text("${String.format("%.2f°", mcDeg)} $mcSign", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 12.sp)
-                }
-            }
-        }
-
-        // Return House Cusps (1~12)
-        if (activeCusps.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(10.dp))
-            Text("Return House Cusps", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = TextPrimary)
-            Spacer(modifier = Modifier.height(4.dp))
-            Column(modifier = Modifier.fillMaxWidth()) {
-                val chunks = activeCusps.chunked(2)
-                chunks.forEachIndexed { rowIdx, pair ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 2.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        val h1 = rowIdx * 2 + 1
-                        val s1 = getZodiacSign(pair[0])
-                        val d1 = getSignDegree(pair[0])
-                        Text("H$h1: ${String.format("%.1f°", d1)} $s1", fontSize = 11.sp, color = TextSecondary, modifier = Modifier.weight(1f))
-
-                        if (pair.size > 1) {
-                            val h2 = rowIdx * 2 + 2
-                            val s2 = getZodiacSign(pair[1])
-                            val d2 = getSignDegree(pair[1])
-                            Text("H$h2: ${String.format("%.1f°", d2)} $s2", fontSize = 11.sp, color = TextSecondary, modifier = Modifier.weight(1f))
-                        }
-                    }
-                }
-            }
-        }
-
-        // 7대 고전 행성 배치 표
-        if (classicalPlanets.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(10.dp))
-            Text("Return Planetary Placements", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = TextPrimary)
-            Spacer(modifier = Modifier.height(4.dp))
-            classicalPlanets.forEach { p ->
-                val rx = if (p.is_retrograde) " [Rx]" else ""
-                val signName = getZodiacSign(p.progressed_longitude)
-                val houseNum = if (activeCusps.isNotEmpty()) findHouseNumber(p.progressed_longitude, activeCusps) else null
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 3.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("${p.name}$rx", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = TextPrimary)
-                    Text(
-                        text = "${String.format("%.2f°", p.sign_degree)} $signName" + (if (houseNum != null) " · H$houseNum" else ""),
-                        fontSize = 12.sp,
-                        color = CelestialBlue
-                    )
-                }
-                HorizontalDivider(color = BorderColor.copy(alpha = 0.4f))
-            }
-        }
-
-        // 달의 교점 (North Node & South Node) 분리 표
-        if (lunarNodes.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(10.dp))
-            Text("Return Lunar Nodes", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = TextPrimary)
-            Spacer(modifier = Modifier.height(4.dp))
-            lunarNodes.forEach { n ->
-                val displayName = formatWesternBodyName(n.name)
-                val signName = getZodiacSign(n.progressed_longitude)
-                val houseNum = if (activeCusps.isNotEmpty()) findHouseNumber(n.progressed_longitude, activeCusps) else null
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 3.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(displayName, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = TextPrimary)
-                    Text(
-                        text = "${String.format("%.2f°", n.sign_degree)} $signName" + (if (houseNum != null) " · H$houseNum" else ""),
-                        fontSize = 12.sp,
-                        color = CelestialBlue
-                    )
-                }
-                HorizontalDivider(color = BorderColor.copy(alpha = 0.4f))
-            }
-        }
-    }
-}
-
-@Composable
-private fun TransitsCard(
-    data: PredictiveSuiteData,
-    profile: ProfileDto,
-    onDateChange: ((Int, Int, Int) -> Unit)? = null,
-    onTimeChange: ((Int?, Int?) -> Unit)? = null,
-    onDateTimeChange: ((Int, Int, Int, Int?, Int?) -> Unit)? = null
-) {
-    val context = LocalContext.current
-
-    val applyDateTime = { year: Int, month: Int, day: Int, hour: Int?, minute: Int? ->
-        if (onDateTimeChange != null) {
-            onDateTimeChange(year, month, day, hour, minute)
-        } else {
-            onDateChange?.invoke(year, month, day)
-            onTimeChange?.invoke(hour, minute)
-        }
-    }
-
-    val openDatePicker = {
-        val dpd = android.app.DatePickerDialog(
-            context,
-            { _, year, monthOfYear, dayOfMonth ->
-                applyDateTime(year, monthOfYear + 1, dayOfMonth, data.target_hour, data.target_minute)
-            },
-            data.target_year,
-            (data.target_month.toInt() - 1).coerceIn(0, 11),
-            data.target_day.toInt()
-        )
-        dpd.show()
-    }
-
-    val openTimePicker = {
-        val tpd = android.app.TimePickerDialog(
-            context,
-            { _, hourOfDay, minute ->
-                applyDateTime(data.target_year, data.target_month.toInt(), data.target_day.toInt(), hourOfDay, minute)
-            },
-            data.target_hour,
-            data.target_minute,
-            true
-        )
-        tpd.show()
-    }
-
-    val shiftDays = { days: Int ->
-        val cal = java.util.Calendar.getInstance()
-        cal.set(
-            data.target_year,
-            (data.target_month.toInt() - 1).coerceIn(0, 11),
-            data.target_day.toInt(),
-            data.target_hour,
-            data.target_minute
-        )
-        cal.add(java.util.Calendar.DAY_OF_MONTH, days)
-        applyDateTime(
-            cal.get(java.util.Calendar.YEAR),
-            cal.get(java.util.Calendar.MONTH) + 1,
-            cal.get(java.util.Calendar.DAY_OF_MONTH),
-            data.target_hour,
-            data.target_minute
-        )
-    }
-
-    val shiftHours = { hours: Int ->
-        val cal = java.util.Calendar.getInstance()
-        cal.set(
-            data.target_year,
-            (data.target_month.toInt() - 1).coerceIn(0, 11),
-            data.target_day.toInt(),
-            data.target_hour,
-            data.target_minute
-        )
-        cal.add(java.util.Calendar.HOUR_OF_DAY, hours)
-        applyDateTime(
-            cal.get(java.util.Calendar.YEAR),
-            cal.get(java.util.Calendar.MONTH) + 1,
-            cal.get(java.util.Calendar.DAY_OF_MONTH),
-            cal.get(java.util.Calendar.HOUR_OF_DAY),
-            cal.get(java.util.Calendar.MINUTE)
-        )
-    }
-
-    val setToToday = {
-        val now = java.util.Calendar.getInstance()
-        applyDateTime(
-            now.get(java.util.Calendar.YEAR),
-            now.get(java.util.Calendar.MONTH) + 1,
-            now.get(java.util.Calendar.DAY_OF_MONTH),
-            data.target_hour,
-            data.target_minute
-        )
-    }
-
-    val setToBirthDay = {
-        applyDateTime(
-            data.target_year,
-            profile.birth_month.toInt(),
-            profile.birth_day.toInt(),
-            data.target_hour,
-            data.target_minute
-        )
-    }
-
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text("Transits (${data.target_year})", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
-                // 트랜짓 계산 기준 시점 명시 (클릭 시 날짜 선택 대화상자 오픈)
-                Text(
-                    text = "${data.target_year}-${String.format("%02d", data.target_month)}-${String.format("%02d", data.target_day)} ${String.format("%02d:%02d", data.target_hour, data.target_minute)} Local",
-                    color = CelestialBlue,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-            }
-            SectionCopyButton(title = "Transits") {
-                val sb = StringBuilder()
-                sb.appendLine("[Transits - ${data.target_year}년 (${data.target_year}-${String.format("%02d", data.target_month)}-${String.format("%02d", data.target_day)} ${String.format("%02d:%02d", data.target_hour, data.target_minute)} Local)]")
-                if (data.transits.isEmpty()) {
-                    sb.appendLine("  (No major aspects within 2° orb)")
-                } else {
-                    data.transits.forEach { t ->
-                        val trPlanet = formatWesternBodyName(t.transiting_planet)
-                        val natPlanet = formatWesternBodyName(t.natal_planet)
-                        sb.appendLine("• Tr $trPlanet · Nat $natPlanet: ${t.aspect_type} (Orb ${String.format("%.2f°", t.orb)})")
-                    }
-                }
-                sb.toString().trimEnd()
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // 트랜짓 날짜 조정 빠른 칩 (오늘, 날짜 선택, 출생일, -1일, +1일)
-        Text(
-            text = "날짜 (Date)",
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-            color = TextSecondary
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            FilterChip(
-                selected = false,
-                onClick = { setToToday() },
-                label = { Text("오늘", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
-            )
-            FilterChip(
-                selected = false,
-                onClick = { openDatePicker() },
-                label = { Text("날짜 선택...", fontSize = 11.sp) }
-            )
-            FilterChip(
-                selected = data.target_month.toInt() == profile.birth_month.toInt() && data.target_day.toInt() == profile.birth_day.toInt(),
-                onClick = { setToBirthDay() },
-                label = { Text("출생일", fontSize = 11.sp) }
-            )
-            FilterChip(
-                selected = false,
-                onClick = { shiftDays(-1) },
-                label = { Text("-1일", fontSize = 11.sp) }
-            )
-            FilterChip(
-                selected = false,
-                onClick = { shiftDays(1) },
-                label = { Text("+1일", fontSize = 11.sp) }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // 트랜짓 시간 조정 빠른 칩 (출생시각, 시간 선택, 12:00 정오, -1시간, +1시간)
-        Text(
-            text = "시각 (Time)",
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-            color = TextSecondary
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            FilterChip(
-                selected = false,
-                onClick = { applyDateTime(data.target_year, data.target_month.toInt(), data.target_day.toInt(), null, null) },
-                label = { Text("출생시각", fontSize = 11.sp) }
-            )
-            FilterChip(
-                selected = false,
-                onClick = { openTimePicker() },
-                label = { Text("시간 선택...", fontSize = 11.sp) }
-            )
-            FilterChip(
-                selected = data.target_hour == 12 && data.target_minute == 0,
-                onClick = { applyDateTime(data.target_year, data.target_month.toInt(), data.target_day.toInt(), 12, 0) },
-                label = { Text("12:00 정오", fontSize = 11.sp) }
-            )
-            FilterChip(
-                selected = false,
-                onClick = { shiftHours(-1) },
-                label = { Text("-1시간", fontSize = 11.sp) }
-            )
-            FilterChip(
-                selected = false,
-                onClick = { shiftHours(1) },
-                label = { Text("+1시간", fontSize = 11.sp) }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        if (data.transits.isEmpty()) {
-            Text("No major transiting aspects within 2° orb.", color = TextSecondary, fontSize = 12.sp)
-        } else {
-            data.transits.take(10).forEach { t ->
-                val trPlanet = formatWesternBodyName(t.transiting_planet)
-                val natPlanet = formatWesternBodyName(t.natal_planet)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 3.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("Tr $trPlanet · Nat $natPlanet", fontSize = 12.sp, color = TextPrimary)
-                    Text("${t.aspect_type} (Orb ${String.format("%.2f°", t.orb)})", fontSize = 12.sp, color = CelestialBlue, fontWeight = FontWeight.Medium)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PrimaryDirectionsCard(data: PredictiveSuiteData) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Primary Directions (Naibod Key)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
-            SectionCopyButton(title = "Primary Directions") {
-                val sb = StringBuilder()
-                sb.appendLine("[Primary Directions (Naibod Key) - ${data.target_year}년]")
-                if (data.primary_directions.isEmpty()) {
-                    sb.appendLine("  (None calculated)")
-                } else {
-                    data.primary_directions.forEach { pd ->
-                        val prom = formatWesternBodyName(pd.promittor)
-                        val sig = formatWesternBodyName(pd.significator)
-                        sb.appendLine("• $prom → $sig ${pd.aspect_type} | Realization: ~${String.format("%.1f", pd.realization_age)} yrs (Arc: ${String.format("%.2f°", pd.direction_arc_deg)})")
-                    }
-                }
-                sb.toString().trimEnd()
-            }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-
-        if (data.primary_directions.isEmpty()) {
-            Text("No primary directions calculated.", color = TextSecondary, fontSize = 12.sp)
-        } else {
-            data.primary_directions.take(8).forEach { pd ->
-                val prom = formatWesternBodyName(pd.promittor)
-                val sig = formatWesternBodyName(pd.significator)
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 5.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "$prom → $sig",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        )
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = CelestialBlue.copy(alpha = 0.12f)
-                        ) {
-                            Text(
-                                text = pd.aspect_type,
-                                color = CelestialBlue,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                softWrap = false,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "Realization: ~${String.format("%.1f", pd.realization_age)} yrs · Arc: ${String.format("%.2f°", pd.direction_arc_deg)}",
+                        text = if (isLoading) "Computing ephemeris tables..." else "Predictive data unavailable.",
                         fontSize = 12.sp,
                         color = TextSecondary
                     )
                 }
-                HorizontalDivider(color = BorderColor.copy(alpha = 0.4f))
+            }
+        } else {
+            when (selectedTechTab) {
+                0 -> ProfectionTabContent(predictiveData)
+                1 -> SolarArcTabContent(predictiveData)
+                2 -> SecondaryProgressionTabContent(predictiveData)
+                3 -> PlanetaryReturnsTabContent(predictiveData)
+                4 -> TransitsTabContent(
+                    data = predictiveData,
+                    profile = profile,
+                    onDateChange = onDateChange,
+                    onTimeChange = onTimeChange,
+                    onDateTimeChange = onDateTimeChange
+                )
+                5 -> PrimaryDirectionsTabContent(predictiveData)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfectionTabContent(data: PredictiveSuiteData) {
+    val prof = data.profection
+    AstroPanelCard(
+        title = "Annual Profection (${data.target_year})",
+        headerAction = {
+            SectionCopyButton("Annual Profection") {
+                "Year ${data.target_year} (Age ${prof.target_age}): H${prof.profected_house} ${signCode(prof.profected_sign_index)} · Lord: ${prof.lord_of_the_year}"
+            }
+        }
+    ) {
+        val tiles = listOf(
+            MetricTileItem("TARGET AGE", "${prof.target_age} YRS", "${prof.target_year}"),
+            MetricTileItem("PROFECTED HOUSE", "H${prof.profected_house}", signCode(prof.profected_sign_index), CelestialBlue),
+            MetricTileItem("TIME LORD", bodyCode(prof.lord_of_the_year), prof.lord_of_the_year, CelestialBlue),
+            MetricTileItem(
+                tag = "NATAL OCCUPANTS",
+                primary = if (prof.active_natal_planets.isEmpty()) "NONE" else prof.active_natal_planets.joinToString(" ") { bodyCode(it) },
+                secondary = "IN H${prof.profected_house}"
+            )
+        )
+        CompactMetricGrid(items = tiles, columns = 2)
+    }
+}
+
+@Composable
+private fun SolarArcTabContent(data: PredictiveSuiteData) {
+    val sa = data.solar_arc
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        AstroPanelCard(
+            title = "Solar Arc Contacts (Orb ≤ 1.5°)",
+            subtitle = String.format(Locale.US, "Arc Offset: +%05.2f°", sa.arc_degrees),
+            contentPadding = PaddingValues(0.dp)
+        ) {
+            if (sa.contacts.isEmpty()) {
+                Box(modifier = Modifier.padding(12.dp)) {
+                    Text("No exact Solar Arc aspects within 1.5° orb.", fontSize = 12.sp, color = TextSecondary)
+                }
+            } else {
+                val cols = listOf(
+                    TableColSpec("SA BODY", 1.0f, TextAlign.Start, monospace = true),
+                    TableColSpec("ASPECT", 1.1f, TextAlign.Center, monospace = true),
+                    TableColSpec("NATAL", 1.0f, TextAlign.Center, monospace = true),
+                    TableColSpec("ORB", 0.9f, TextAlign.End, monospace = true)
+                )
+                AstroTableHeader(cols)
+                sa.contacts.forEachIndexed { idx, c ->
+                    val hard = isHardAspect(c.aspect_type)
+                    val soft = isSoftAspect(c.aspect_type)
+                    val aspColor = when {
+                        hard -> CrimsonAlert
+                        soft -> CelestialBlue
+                        else -> TextPrimary
+                    }
+                    AstroTableRow(
+                        columns = cols,
+                        striped = idx % 2 == 1,
+                        cells = listOf(
+                            TableCellData("SA ${bodyCode(c.moving_body)}", TextPrimary, FontWeight.Bold),
+                            TableCellData(aspectCode(c.aspect_type), aspColor, FontWeight.Bold),
+                            TableCellData("N·${bodyCode(c.natal_body)}", TextPrimary, FontWeight.SemiBold),
+                            TableCellData(formatOrb(c.orb), TextSecondary)
+                        )
+                    )
+                }
+            }
+        }
+
+        AstroPanelCard(
+            title = "Solar Arc Directed Positions",
+            contentPadding = PaddingValues(0.dp)
+        ) {
+            val cols = listOf(
+                TableColSpec("BODY", 0.9f, TextAlign.Start, monospace = true),
+                TableColSpec("NATAL POS", 1.4f, TextAlign.Start, monospace = true),
+                TableColSpec("DIRECTED POS", 1.4f, TextAlign.End, monospace = true)
+            )
+            AstroTableHeader(cols)
+            sa.directed_planets.forEachIndexed { idx, p ->
+                AstroTableRow(
+                    columns = cols,
+                    striped = idx % 2 == 1,
+                    cells = listOf(
+                        TableCellData(bodyCode(p.name), TextPrimary, FontWeight.Bold),
+                        TableCellData(formatLongitudeSignDeg(p.natal_longitude), TextSecondary),
+                        TableCellData(formatSignAndDeg(p.sign_index, p.sign_degree), CelestialBlue, FontWeight.SemiBold)
+                    )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SecondaryProgressionTabContent(data: PredictiveSuiteData) {
+    val sp = data.secondary_progression
+    if (sp == null) {
+        AstroPanelCard(title = "Secondary Progressions") {
+            Text("Secondary progression data unavailable.", fontSize = 12.sp, color = TextSecondary)
+        }
+        return
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        AstroPanelCard(
+            title = "Secondary Progressions Summary",
+            subtitle = "Ephemeris Date: ${sp.progressed_date_utc}"
+        ) {
+            val tiles = listOf(
+                MetricTileItem("LUNAR PHASE", sp.progressed_lunar_phase.uppercase(Locale.US)),
+                MetricTileItem("ELAPSED SPAN", String.format(Locale.US, "%.2f DAYS", sp.elapsed_tropical_years), "1D = 1YR")
+            )
+            CompactMetricGrid(items = tiles, columns = 2)
+        }
+
+        AstroPanelCard(
+            title = "Progressed Planet Positions",
+            contentPadding = PaddingValues(0.dp)
+        ) {
+            val cols = listOf(
+                TableColSpec("BODY", 1.0f, TextAlign.Start, monospace = true),
+                TableColSpec("PROGRESSED POS", 1.6f, TextAlign.Start, monospace = true),
+                TableColSpec("STATE", 0.9f, TextAlign.End, monospace = true)
+            )
+            AstroTableHeader(cols)
+            sp.planets.forEachIndexed { idx, p ->
+                AstroTableRow(
+                    columns = cols,
+                    striped = idx % 2 == 1,
+                    cells = listOf(
+                        TableCellData(bodyCode(p.name), TextPrimary, FontWeight.Bold),
+                        TableCellData(formatSignAndDeg(p.sign_index, p.sign_degree), TextPrimary),
+                        TableCellData(
+                            text = if (p.is_retrograde) "RETRO" else "DIR",
+                            color = if (p.is_retrograde) CrimsonAlert else TextSecondary,
+                            badgeColor = if (p.is_retrograde) CrimsonAlert else null
+                        )
+                    )
+                )
+            }
+        }
+
+        AstroPanelCard(
+            title = "Progressed-to-Natal Contacts (Orb ≤ 1.5°)",
+            contentPadding = PaddingValues(0.dp)
+        ) {
+            if (sp.contacts.isEmpty()) {
+                Box(modifier = Modifier.padding(12.dp)) {
+                    Text("No active Progressed-to-Natal aspects within 1.5° orb.", fontSize = 12.sp, color = TextSecondary)
+                }
+            } else {
+                val cols = listOf(
+                    TableColSpec("PROG", 1.0f, TextAlign.Start, monospace = true),
+                    TableColSpec("ASPECT", 1.1f, TextAlign.Center, monospace = true),
+                    TableColSpec("NATAL", 1.0f, TextAlign.Center, monospace = true),
+                    TableColSpec("ORB", 0.9f, TextAlign.End, monospace = true)
+                )
+                AstroTableHeader(cols)
+                sp.contacts.forEachIndexed { idx, c ->
+                    val aspColor = when {
+                        isHardAspect(c.aspect_type) -> CrimsonAlert
+                        isSoftAspect(c.aspect_type) -> CelestialBlue
+                        else -> TextPrimary
+                    }
+                    AstroTableRow(
+                        columns = cols,
+                        striped = idx % 2 == 1,
+                        cells = listOf(
+                            TableCellData("P·${bodyCode(c.moving_body)}", TextPrimary, FontWeight.Bold),
+                            TableCellData(aspectCode(c.aspect_type), aspColor, FontWeight.Bold),
+                            TableCellData("N·${bodyCode(c.natal_body)}", TextPrimary, FontWeight.SemiBold),
+                            TableCellData(formatOrb(c.orb), TextSecondary)
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlanetaryReturnsTabContent(data: PredictiveSuiteData) {
+    val returns = data.planetary_returns
+    var selectedBodyIdx by remember { mutableIntStateOf(0) }
+
+    if (returns.isEmpty()) {
+        AstroPanelCard(title = "Planetary Returns") {
+            Text("No planetary returns available for ${data.target_year}.", fontSize = 12.sp, color = TextSecondary)
+        }
+        return
+    }
+
+    val safeIdx = selectedBodyIdx.coerceIn(0, returns.lastIndex)
+    val currentReturn = returns[safeIdx]
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        AstroSubTabBar(
+            tabs = returns.map { "${bodyCode(it.return_body)} Return" },
+            selectedIndex = safeIdx,
+            onSelect = { selectedBodyIdx = it }
+        )
+
+        AstroPanelCard(
+            title = "${currentReturn.return_body} Return (${currentReturn.target_year})",
+            subtitle = "Exact UTC: ${currentReturn.return_date_utc}"
+        ) {
+            val tiles = listOf(
+                MetricTileItem("RETURN ASC", formatLongitudeSignDeg(currentReturn.ascendant), "H1", CrimsonAlert),
+                MetricTileItem("RETURN MC", formatLongitudeSignDeg(currentReturn.midheaven), "H10", CelestialBlue),
+                MetricTileItem("RETURN ${bodyCode(currentReturn.return_body)}", formatLongitudeSignDeg(currentReturn.body_longitude), if (currentReturn.is_retrograde) "RX" else "DIR")
+            )
+            CompactMetricGrid(items = tiles, columns = 3)
+        }
+
+        AstroPanelCard(
+            title = "Return Chart Placements",
+            contentPadding = PaddingValues(0.dp)
+        ) {
+            val cols = listOf(
+                TableColSpec("BODY", 0.9f, TextAlign.Start, monospace = true),
+                TableColSpec("POSITION", 1.4f, TextAlign.Start, monospace = true),
+                TableColSpec("RET H", 0.7f, TextAlign.Center, monospace = true),
+                TableColSpec("STATE", 0.8f, TextAlign.End, monospace = true)
+            )
+            AstroTableHeader(cols)
+            currentReturn.return_planets.forEachIndexed { idx, p ->
+                val hNum = findHouseNumber(p.progressed_longitude, currentReturn.house_cusps)
+                AstroTableRow(
+                    columns = cols,
+                    striped = idx % 2 == 1,
+                    cells = listOf(
+                        TableCellData(bodyCode(p.name), TextPrimary, FontWeight.Bold),
+                        TableCellData(formatSignAndDeg(p.sign_index, p.sign_degree), TextPrimary),
+                        TableCellData("H$hNum", TextSecondary),
+                        TableCellData(
+                            text = if (p.is_retrograde) "RETRO" else "DIR",
+                            color = if (p.is_retrograde) CrimsonAlert else TextSecondary,
+                            badgeColor = if (p.is_retrograde) CrimsonAlert else null
+                        )
+                    )
+                )
+            }
+        }
+
+        if (currentReturn.natal_aspects.isNotEmpty()) {
+            AstroPanelCard(
+                title = "Return-to-Natal Aspects",
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                val cols = listOf(
+                    TableColSpec("RET", 1.0f, TextAlign.Start, monospace = true),
+                    TableColSpec("ASPECT", 1.1f, TextAlign.Center, monospace = true),
+                    TableColSpec("NATAL", 1.0f, TextAlign.Center, monospace = true),
+                    TableColSpec("ORB", 0.9f, TextAlign.End, monospace = true)
+                )
+                AstroTableHeader(cols)
+                currentReturn.natal_aspects.forEachIndexed { idx, a ->
+                    val aspColor = when {
+                        isHardAspect(a.aspect_type) -> CrimsonAlert
+                        isSoftAspect(a.aspect_type) -> CelestialBlue
+                        else -> TextPrimary
+                    }
+                    AstroTableRow(
+                        columns = cols,
+                        striped = idx % 2 == 1,
+                        cells = listOf(
+                            TableCellData("R·${bodyCode(a.return_point)}", TextPrimary, FontWeight.Bold),
+                            TableCellData(aspectCode(a.aspect_type), aspColor, FontWeight.Bold),
+                            TableCellData("N·${bodyCode(a.natal_point)}", TextPrimary, FontWeight.SemiBold),
+                            TableCellData(formatOrb(a.orb), TextSecondary)
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TransitsTabContent(
+    data: PredictiveSuiteData,
+    profile: ProfileDto,
+    onDateChange: ((Int, Int, Int) -> Unit)?,
+    onTimeChange: ((Int?, Int?) -> Unit)?,
+    onDateTimeChange: ((Int, Int, Int, Int?, Int?) -> Unit)?
+) {
+    val context = LocalContext.current
+
+    val applyDateTime = { y: Int, m: Int, d: Int, hr: Int?, min: Int? ->
+        if (onDateTimeChange != null) {
+            onDateTimeChange(y, m, d, hr, min)
+        } else {
+            onDateChange?.invoke(y, m, d)
+            onTimeChange?.invoke(hr, min)
+        }
+    }
+
+    val shiftDays = { deltaDays: Int ->
+        val cal = Calendar.getInstance().apply {
+            set(Calendar.YEAR, data.target_year)
+            set(Calendar.MONTH, (data.target_month - 1).coerceIn(0, 11))
+            set(Calendar.DAY_OF_MONTH, data.target_day.coerceIn(1, 31))
+            add(Calendar.DAY_OF_MONTH, deltaDays)
+        }
+        applyDateTime(
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH) + 1,
+            cal.get(Calendar.DAY_OF_MONTH),
+            data.target_hour,
+            data.target_minute
+        )
+    }
+
+    val shiftHours = { deltaHours: Int ->
+        val cal = Calendar.getInstance().apply {
+            set(Calendar.YEAR, data.target_year)
+            set(Calendar.MONTH, (data.target_month - 1).coerceIn(0, 11))
+            set(Calendar.DAY_OF_MONTH, data.target_day.coerceIn(1, 31))
+            set(Calendar.HOUR_OF_DAY, data.target_hour.coerceIn(0, 23))
+            set(Calendar.MINUTE, data.target_minute.coerceIn(0, 59))
+            add(Calendar.HOUR_OF_DAY, deltaHours)
+        }
+        applyDateTime(
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH) + 1,
+            cal.get(Calendar.DAY_OF_MONTH),
+            cal.get(Calendar.HOUR_OF_DAY),
+            cal.get(Calendar.MINUTE)
+        )
+    }
+
+    val openDatePicker = {
+        DatePickerDialog(
+            context,
+            { _, year, monthZeroBased, dayOfMonth ->
+                applyDateTime(year, monthZeroBased + 1, dayOfMonth, data.target_hour, data.target_minute)
+            },
+            data.target_year,
+            (data.target_month - 1).coerceIn(0, 11),
+            data.target_day.coerceIn(1, 31)
+        ).show()
+    }
+
+    val openTimePicker = {
+        TimePickerDialog(
+            context,
+            { _, hourOfDay, minute ->
+                applyDateTime(data.target_year, data.target_month, data.target_day, hourOfDay, minute)
+            },
+            data.target_hour.coerceIn(0, 23),
+            data.target_minute.coerceIn(0, 59),
+            true
+        ).show()
+    }
+
+    val setToNow = {
+        val now = Calendar.getInstance()
+        applyDateTime(
+            now.get(Calendar.YEAR),
+            now.get(Calendar.MONTH) + 1,
+            now.get(Calendar.DAY_OF_MONTH),
+            now.get(Calendar.HOUR_OF_DAY),
+            now.get(Calendar.MINUTE)
+        )
+    }
+
+    val timestampStr = String.format(
+        Locale.US,
+        "%04d-%02d-%02d %02d:%02d LOCAL",
+        data.target_year,
+        data.target_month,
+        data.target_day,
+        data.target_hour,
+        data.target_minute
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        AstroPanelCard(
+            title = "Transit Ephemeris Controls",
+            subtitle = timestampStr
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                TransitActionChip("NOW") { setToNow() }
+                TransitActionChip("DATE...") { openDatePicker() }
+                TransitActionChip("TIME...") { openTimePicker() }
+                TransitActionChip("-1D") { shiftDays(-1) }
+                TransitActionChip("+1D") { shiftDays(1) }
+                TransitActionChip("-1H") { shiftHours(-1) }
+                TransitActionChip("+1H") { shiftHours(1) }
+            }
+        }
+
+        AstroPanelCard(
+            title = "Active Transits to Natal (Orb ≤ 2.0°)",
+            contentPadding = PaddingValues(0.dp)
+        ) {
+            if (data.transits.isEmpty()) {
+                Box(modifier = Modifier.padding(12.dp)) {
+                    Text("No active major transits within 2.0° orb.", fontSize = 12.sp, color = TextSecondary)
+                }
+            } else {
+                val cols = listOf(
+                    TableColSpec("TRANSIT", 1.3f, TextAlign.Start, monospace = true),
+                    TableColSpec("ASPECT", 1.0f, TextAlign.Center, monospace = true),
+                    TableColSpec("NATAL", 1.3f, TextAlign.Start, monospace = true),
+                    TableColSpec("ORB", 0.8f, TextAlign.End, monospace = true)
+                )
+                AstroTableHeader(cols)
+                data.transits.forEachIndexed { idx, t ->
+                    val aspColor = when {
+                        isHardAspect(t.aspect_type) -> CrimsonAlert
+                        isSoftAspect(t.aspect_type) -> CelestialBlue
+                        else -> TextPrimary
+                    }
+                    AstroTableRow(
+                        columns = cols,
+                        striped = idx % 2 == 1,
+                        cells = listOf(
+                            TableCellData("${bodyCode(t.transiting_planet)} ${formatLongitudeSignDeg(t.transiting_longitude)}", TextPrimary, FontWeight.Bold),
+                            TableCellData(aspectShortCode(t.aspect_type), aspColor, FontWeight.Bold),
+                            TableCellData("${bodyCode(t.natal_planet)} ${formatLongitudeSignDeg(t.natal_longitude)}", TextSecondary),
+                            TableCellData(formatOrb(t.orb), TextPrimary, FontWeight.SemiBold)
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TransitActionChip(
+    label: String,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(SurfaceLight)
+            .border(1.dp, BorderColor, RoundedCornerShape(4.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 9.dp, vertical = 5.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = TextPrimary,
+            style = TabularMonoStyle,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun PrimaryDirectionsTabContent(data: PredictiveSuiteData) {
+    AstroPanelCard(
+        title = "Primary Directions (Naibod Key)",
+        contentPadding = PaddingValues(0.dp)
+    ) {
+        if (data.primary_directions.isEmpty()) {
+            Box(modifier = Modifier.padding(12.dp)) {
+                Text("No Primary Directions hits in current window.", fontSize = 12.sp, color = TextSecondary)
+            }
+        } else {
+            val cols = listOf(
+                TableColSpec("PROMITTOR", 0.95f, TextAlign.Start, monospace = true),
+                TableColSpec("ASPECT", 0.95f, TextAlign.Center, monospace = true),
+                TableColSpec("SIGNIFICATOR", 1.05f, TextAlign.Center, monospace = true),
+                TableColSpec("ARC", 0.85f, TextAlign.End, monospace = true),
+                TableColSpec("AGE", 0.85f, TextAlign.End, monospace = true)
+            )
+            AstroTableHeader(cols)
+            data.primary_directions.forEachIndexed { idx, pd ->
+                val aspColor = when {
+                    isHardAspect(pd.aspect_type) -> CrimsonAlert
+                    isSoftAspect(pd.aspect_type) -> CelestialBlue
+                    else -> TextPrimary
+                }
+                AstroTableRow(
+                    columns = cols,
+                    striped = idx % 2 == 1,
+                    cells = listOf(
+                        TableCellData(bodyCode(pd.promittor), TextPrimary, FontWeight.Bold),
+                        TableCellData(aspectShortCode(pd.aspect_type), aspColor, FontWeight.Bold),
+                        TableCellData(bodyCode(pd.significator), TextPrimary, FontWeight.SemiBold),
+                        TableCellData(String.format(Locale.US, "%05.2f°", pd.direction_arc_deg), TextSecondary),
+                        TableCellData(String.format(Locale.US, "%.1fY", pd.realization_age), CelestialBlue, FontWeight.Bold)
+                    )
+                )
             }
         }
     }
