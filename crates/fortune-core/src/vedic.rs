@@ -309,10 +309,10 @@ pub fn calculate_varga_sign_and_degree(sidereal_lon: f64, div: VargaDivision) ->
         }
         VargaDivision::D30 => {
             // Parashari Trimshamsha (BPHS Ch. 6): unequal 5-part planetary lordship segments
-            // Odd signs: 0..5 Mars (Aries=0), 5..10 Saturn (Aquarius=10), 10..18 Jupiter (Sagittarius=8),
-            //            18..25 Mercury (Gemini=2), 25..30 Venus (Taurus=1)
-            // Even signs: 0..5 Venus (Libra=6), 5..12 Mercury (Virgo=5), 12..20 Jupiter (Pisces=11),
-            //             20..25 Saturn (Capricorn=9), 25..30 Mars (Scorpio=7)
+            // Odd signs map to odd rashi of the lord: 0..5 Mars (Aries=0), 5..10 Saturn (Aquarius=10),
+            //            10..18 Jupiter (Sagittarius=8), 18..25 Mercury (Gemini=2), 25..30 Venus (Libra=6)
+            // Even signs map to even rashi of the lord: 0..5 Venus (Taurus=1), 5..12 Mercury (Virgo=5),
+            //            12..20 Jupiter (Pisces=11), 20..25 Saturn (Capricorn=9), 25..30 Mars (Scorpio=7)
             let (sign, seg_start, seg_span) = if sign_idx.is_multiple_of(2) {
                 if pos_in_sign < 5.0 - 1e-9 {
                     (0, 0.0, 5.0)
@@ -323,10 +323,10 @@ pub fn calculate_varga_sign_and_degree(sidereal_lon: f64, div: VargaDivision) ->
                 } else if pos_in_sign < 25.0 - 1e-9 {
                     (2, 18.0, 7.0)
                 } else {
-                    (1, 25.0, 5.0)
+                    (6, 25.0, 5.0)
                 }
             } else if pos_in_sign < 5.0 - 1e-9 {
-                (6, 0.0, 5.0)
+                (1, 0.0, 5.0)
             } else if pos_in_sign < 12.0 - 1e-9 {
                 (5, 5.0, 7.0)
             } else if pos_in_sign < 20.0 - 1e-9 {
@@ -1317,15 +1317,15 @@ mod tests {
         assert_eq!(calculate_varga_sign(60.5, VargaDivision::D27), 6); // Gemini -> Libra
         assert_eq!(calculate_varga_sign(90.5, VargaDivision::D27), 9); // Cancer -> Capricorn
 
-        // D30 Trimshamsha (Unequal 5 segments)
-        // Odd sign (Aries): 0..5->0, 5..10->10, 10..18->8, 18..25->2, 25..30->1
+        // D30 Trimshamsha (Unequal 5 segments: odd signs -> odd rashi of lord; even signs -> even rashi of lord)
+        // Odd sign (Aries): 0..5->0, 5..10->10, 10..18->8, 18..25->2, 25..30->6 (Libra)
         assert_eq!(calculate_varga_sign(2.5, VargaDivision::D30), 0);
         assert_eq!(calculate_varga_sign(7.5, VargaDivision::D30), 10);
         assert_eq!(calculate_varga_sign(14.0, VargaDivision::D30), 8);
         assert_eq!(calculate_varga_sign(21.0, VargaDivision::D30), 2);
-        assert_eq!(calculate_varga_sign(27.0, VargaDivision::D30), 1);
-        // Even sign (Taurus): 0..5->6, 5..12->5, 12..20->11, 20..25->9, 25..30->7
-        assert_eq!(calculate_varga_sign(32.5, VargaDivision::D30), 6);
+        assert_eq!(calculate_varga_sign(27.0, VargaDivision::D30), 6);
+        // Even sign (Taurus): 0..5->1 (Taurus), 5..12->5, 12..20->11, 20..25->9, 25..30->7
+        assert_eq!(calculate_varga_sign(32.5, VargaDivision::D30), 1);
         assert_eq!(calculate_varga_sign(38.0, VargaDivision::D30), 5);
         assert_eq!(calculate_varga_sign(46.0, VargaDivision::D30), 11);
         assert_eq!(calculate_varga_sign(52.0, VargaDivision::D30), 9);
