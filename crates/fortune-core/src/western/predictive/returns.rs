@@ -1,11 +1,12 @@
 use serde::{Deserialize, Serialize};
 use crate::ephemeris::{compute_ephemeris, find_solar_longitude_moment};
 use crate::timezone::{resolve_local_to_utc, resolve_local_to_utc_with_tz};
+use crate::western::aspects::is_aspect_applying;
 use vedaksha::ephem::julian::calendar_to_jd;
 use super::progressions::{PredictiveAspect, ProgressedBody};
 use super::{
-    body_from_name, find_aspect, format_jd_utc_seconds, get_body_tropical_lon, jd_to_calendar,
-    normalize_western_body_name, separation_error,
+    body_from_name, find_aspect_with_target, format_jd_utc_seconds, get_body_tropical_lon,
+    jd_to_calendar, normalize_western_body_name, separation_error,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -16,6 +17,8 @@ pub struct ReturnAspectContact {
     pub natal_longitude: f64,
     pub aspect_type: String,
     pub orb: f64,
+    #[serde(default)]
+    pub is_applying: bool,
 }
 
 pub fn compute_return_natal_aspects(
@@ -23,10 +26,23 @@ pub fn compute_return_natal_aspects(
     natal_points: &[(&str, f64)],
     max_orb: f64,
 ) -> Vec<ReturnAspectContact> {
+    let return_with_speeds: Vec<(&str, f64, f64)> = return_points
+        .iter()
+        .map(|&(name, lon)| (name, lon, 0.0))
+        .collect();
+    compute_return_natal_aspects_with_speeds(&return_with_speeds, natal_points, max_orb)
+}
+
+pub(crate) fn compute_return_natal_aspects_with_speeds(
+    return_points: &[(&str, f64, f64)],
+    natal_points: &[(&str, f64)],
+    max_orb: f64,
+) -> Vec<ReturnAspectContact> {
     let mut contacts = Vec::new();
-    for &(ret_name, ret_lon) in return_points {
+    for &(ret_name, ret_lon, ret_speed) in return_points {
         for &(nat_name, nat_lon) in natal_points {
-            if let Some((asp, orb)) = find_aspect(ret_lon, nat_lon, max_orb) {
+            if let Some((asp, target_angle, orb)) = find_aspect_with_target(ret_lon, nat_lon, max_orb) {
+                let is_applying = is_aspect_applying(ret_lon, ret_speed, nat_lon, 0.0, target_angle);
                 contacts.push(ReturnAspectContact {
                     return_point: normalize_western_body_name(ret_name),
                     return_longitude: ret_lon,
@@ -34,6 +50,7 @@ pub fn compute_return_natal_aspects(
                     natal_longitude: nat_lon,
                     aspect_type: asp.to_string(),
                     orb,
+                    is_applying,
                 });
             }
         }
@@ -154,12 +171,13 @@ pub fn calculate_solar_return_with_natal_sun_detailed_tz(
     let mut natal_aspects = Vec::new();
     if let Some(nat_pts) = natal_points {
         let mut ret_points = Vec::with_capacity(planets.len() + 2);
-        ret_points.push(("ASC", house_result.asc));
-        ret_points.push(("MC", house_result.mc));
-        for p in &planets {
-            ret_points.push((p.name.as_str(), p.progressed_longitude));
+        // Diurnal rotation of ASC/MC is ~361°/day
+        ret_points.push(("ASC", house_result.asc, 360.9856));
+        ret_points.push(("MC", house_result.mc, 360.9856));
+        for b in &final_ephem.bodies {
+            ret_points.push((b.name.as_str(), b.tropical_longitude, b.speed));
         }
-        natal_aspects = compute_return_natal_aspects(&ret_points, nat_pts, 2.0);
+        natal_aspects = compute_return_natal_aspects_with_speeds(&ret_points, nat_pts, 2.0);
     }
 
     Ok(SolarReturnResult {
@@ -430,23 +448,33 @@ pub(crate) fn calculate_planetary_return_from_natal(
         }
 
         let mut all_ret_points = Vec::with_capacity(ret_planets.len() + 2);
-        all_ret_points.push(("ASC", ret_house.asc));
-        all_ret_points.push(("MC", ret_house.mc));
-        for p in &ret_planets {
-            all_ret_points.push((p.name.as_str(), p.progressed_longitude));
+        all_ret_points.push(("ASC", ret_house.asc, 360.9856));
+        all_ret_points.push(("MC", ret_house.mc, 360.9856));
+        for b in &return_ephem.bodies {
+            all_ret_points.push((b.name.as_str(), b.tropical_longitude, b.speed));
         }
 
-        let natal_aspects = compute_return_natal_aspects(&all_ret_points, all_natal_points, orb_limit);
+        let natal_aspects = compute_return_natal_aspects_with_speeds(&all_ret_points, all_natal_points, orb_limit);
 
         let mut internal_aspects = Vec::new();
-        for i in 0..ret_planets.len() {
-            for j in (i + 1)..ret_planets.len() {
-                if let Some((asp, orb)) = find_aspect(ret_planets[i].progressed_longitude, ret_planets[j].progressed_longitude, orb_limit) {
+        for i in 0..return_ephem.bodies.len() {
+            for j in (i + 1)..return_ephem.bodies.len() {
+                let b1 = &return_ephem.bodies[i];
+                let b2 = &return_ephem.bodies[j];
+                if let Some((asp, target_angle, orb)) = find_aspect_with_target(b1.tropical_longitude, b2.tropical_longitude, orb_limit) {
+                    let is_applying = is_aspect_applying(
+                        b1.tropical_longitude,
+                        b1.speed,
+                        b2.tropical_longitude,
+                        b2.speed,
+                        target_angle,
+                    );
                     internal_aspects.push(PredictiveAspect {
-                        moving_body: ret_planets[i].name.clone(),
-                        natal_body: ret_planets[j].name.clone(),
+                        moving_body: normalize_western_body_name(&b1.name),
+                        natal_body: normalize_western_body_name(&b2.name),
                         aspect_type: asp.to_string(),
                         orb,
+                        is_applying,
                     });
                 }
             }

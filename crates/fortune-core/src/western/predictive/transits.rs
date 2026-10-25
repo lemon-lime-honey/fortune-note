@@ -1,10 +1,11 @@
 use serde::{Deserialize, Serialize};
 use crate::ephemeris::compute_ephemeris;
 use crate::timezone::resolve_local_to_utc_with_tz;
+use crate::western::aspects::is_aspect_applying;
 use vedaksha::ephem::julian::calendar_to_jd;
 use super::{
-    body_from_name, find_aspect, get_body_tropical_lon, jd_to_calendar,
-    normalize_western_body_name, separation_error,
+    body_from_name, find_aspect_with_target, get_body_tropical_lon, get_body_tropical_lon_and_speed,
+    jd_to_calendar, normalize_western_body_name, separation_error,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -15,6 +16,8 @@ pub struct TransitContact {
     pub natal_longitude: f64,
     pub aspect_type: String,
     pub orb: f64,
+    #[serde(default)]
+    pub is_applying: bool,
 }
 
 pub fn calculate_transits(
@@ -61,7 +64,14 @@ pub fn calculate_transits_with_tz(
     let mut contacts = Vec::new();
     for tb in &ephem.bodies {
         for &(natal_name, natal_lon) in natal_planets {
-            if let Some((asp, orb)) = find_aspect(tb.tropical_longitude, natal_lon, 2.0) {
+            if let Some((asp, target_angle, orb)) = find_aspect_with_target(tb.tropical_longitude, natal_lon, 2.0) {
+                let is_applying = is_aspect_applying(
+                    tb.tropical_longitude,
+                    tb.speed,
+                    natal_lon,
+                    0.0,
+                    target_angle,
+                );
                 contacts.push(TransitContact {
                     transiting_planet: normalize_western_body_name(&tb.name),
                     transiting_longitude: tb.tropical_longitude,
@@ -69,6 +79,7 @@ pub fn calculate_transits_with_tz(
                     natal_longitude: natal_lon,
                     aspect_type: asp.to_string(),
                     orb,
+                    is_applying,
                 });
             }
         }
@@ -412,12 +423,14 @@ pub fn find_in_orb_transit_days(
         let mut triggers = Vec::new();
 
         for (m_name, vbody) in &moving_parsed {
-            if let Ok(m_lon) = get_body_tropical_lon(*vbody, cur_jd) {
+            if let Ok((m_lon, m_speed)) = get_body_tropical_lon_and_speed(*vbody, cur_jd) {
                 for &(nat_name, nat_lon) in &filtered_natal {
                     for &(asp_name, targets) in &active_aspects {
                         for &target_sep in targets {
                             let err = separation_error(m_lon, nat_lon, target_sep).abs();
                             if err <= orb_limit {
+                                let base_angle = if target_sep > 180.0 { 360.0 - target_sep } else { target_sep };
+                                let is_applying = is_aspect_applying(m_lon, m_speed, nat_lon, 0.0, base_angle);
                                 triggers.push(TransitContact {
                                     transiting_planet: m_name.clone(),
                                     transiting_longitude: m_lon,
@@ -425,6 +438,7 @@ pub fn find_in_orb_transit_days(
                                     natal_longitude: nat_lon,
                                     aspect_type: asp_name.to_string(),
                                     orb: err,
+                                    is_applying,
                                 });
                             }
                         }
@@ -453,7 +467,8 @@ pub fn find_in_orb_transit_days(
                 let mut all_transits = Vec::new();
                 for b in &ephem.bodies {
                     for &(nat_name, nat_lon) in natal_points {
-                        if let Some((asp, orb)) = find_aspect(b.tropical_longitude, nat_lon, 2.0) {
+                        if let Some((asp, target_angle, orb)) = find_aspect_with_target(b.tropical_longitude, nat_lon, 2.0) {
+                            let is_applying = is_aspect_applying(b.tropical_longitude, b.speed, nat_lon, 0.0, target_angle);
                             all_transits.push(TransitContact {
                                 transiting_planet: normalize_western_body_name(&b.name),
                                 transiting_longitude: b.tropical_longitude,
@@ -461,6 +476,7 @@ pub fn find_in_orb_transit_days(
                                 natal_longitude: nat_lon,
                                 aspect_type: asp.to_string(),
                                 orb,
+                                is_applying,
                             });
                         }
                     }

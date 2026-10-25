@@ -83,7 +83,11 @@ pub(crate) fn format_jd_utc_seconds(jd: f64) -> String {
     format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02} UTC", y, m, d, h, min, s.floor() as u32)
 }
 
-pub(crate) fn find_aspect(lon1: f64, lon2: f64, max_orb: f64) -> Option<(&'static str, f64)> {
+pub(crate) fn find_aspect_with_target(
+    lon1: f64,
+    lon2: f64,
+    max_orb: f64,
+) -> Option<(&'static str, f64, f64)> {
     let diff = (lon1 - lon2).abs().rem_euclid(360.0);
     let shortest = if diff > 180.0 { 360.0 - diff } else { diff };
     let aspects = [
@@ -96,10 +100,23 @@ pub(crate) fn find_aspect(lon1: f64, lon2: f64, max_orb: f64) -> Option<(&'stati
     for (angle, name) in aspects {
         let orb = (shortest - angle).abs();
         if orb <= max_orb {
-            return Some((name, orb));
+            return Some((name, angle, orb));
         }
     }
     None
+}
+
+pub(crate) fn get_body_tropical_lon_and_speed(
+    body: vedaksha::ephem::bodies::Body,
+    jd: f64,
+) -> Result<(f64, f64), String> {
+    let provider = vedaksha::ephem::analytical::AnalyticalProvider;
+    let pos = vedaksha::ephem::coordinates::apparent_position(&provider, body, jd)
+        .map_err(|e| format!("Body position failed: {:?}", e))?;
+    Ok((
+        vedaksha::math::angle::normalize_degrees(pos.ecliptic.longitude.to_degrees()),
+        pos.longitude_speed,
+    ))
 }
 
 pub(crate) fn body_from_name(name: &str) -> Option<vedaksha::ephem::bodies::Body> {
@@ -199,36 +216,47 @@ pub fn calculate_predictive_suite_with_timezone(
     true_obliquity_deg: Option<f64>,
     timezone_id: Option<&str>,
 ) -> PredictiveSuite {
+    let birth_utc_jd = resolve_local_to_utc_with_tz(
+        birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_second,
+        latitude, longitude, timezone_id,
+    ).map(|tz_res| {
+        let frac = (tz_res.utc_hour as f64 + (tz_res.utc_minute as f64 + tz_res.utc_second / 60.0) / 60.0) / 24.0;
+        calendar_to_jd(tz_res.utc_year, tz_res.utc_month, tz_res.utc_day as f64 + frac)
+    }).unwrap_or_else(|_| calendar_to_jd(birth_year, birth_month, birth_day as f64));
+
+    let mut all_natal_points = Vec::with_capacity(natal_planets.len() + 2);
+    all_natal_points.push(("ASC", natal_ascendant));
+    all_natal_points.push(("MC", natal_midheaven));
+    for &(name, lon) in natal_planets {
+        if !name.eq_ignore_ascii_case("ASC") && !name.eq_ignore_ascii_case("MC") {
+            all_natal_points.push((name, lon));
+        }
+    }
+
     let profection = calculate_annual_profection(
         birth_year, birth_month, birth_day,
         target_year, target_month, target_day,
         natal_ascendant, natal_planets,
     );
-    let solar_arc = calculate_solar_arc_detailed(
-        birth_year, birth_month, birth_day,
+    let solar_arc = progressions::calculate_solar_arc_detailed_from_birth_jd(
+        birth_year, birth_month, birth_day, birth_utc_jd,
         target_year, target_month, target_day,
         natal_planets,
+        &all_natal_points,
     );
     let secondary = calculate_secondary_progressions_with_tz(
         birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_second,
         latitude, longitude,
         target_year, target_month, target_day,
-        natal_planets,
+        &all_natal_points,
         timezone_id,
     ).ok();
-
-    let mut all_natal_for_return = Vec::with_capacity(natal_planets.len() + 2);
-    all_natal_for_return.push(("ASC", natal_ascendant));
-    all_natal_for_return.push(("MC", natal_midheaven));
-    for &(name, lon) in natal_planets {
-        all_natal_for_return.push((name, lon));
-    }
 
     let natal_sun_lon = natal_planets.iter().find(|(name, _)| *name == "Sun").map(|(_, lon)| *lon);
     let solar_return = if let Some(sun_lon) = natal_sun_lon {
         calculate_solar_return_with_natal_sun_detailed_tz(
             birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_second,
-            latitude, longitude, target_year, sun_lon, house_system, Some(&all_natal_for_return), timezone_id,
+            latitude, longitude, target_year, sun_lon, house_system, Some(&all_natal_points), timezone_id,
         ).ok()
     } else {
         calculate_solar_return(
@@ -238,13 +266,6 @@ pub fn calculate_predictive_suite_with_timezone(
     };
 
     let h_sys = house_system.unwrap_or(vedaksha::astro::houses::HouseSystem::Regiomontanus);
-    let birth_utc_jd = resolve_local_to_utc_with_tz(
-        birth_year, birth_month, birth_day, birth_hour, birth_minute, birth_second,
-        latitude, longitude, timezone_id,
-    ).map(|tz_res| {
-        let frac = (tz_res.utc_hour as f64 + (tz_res.utc_minute as f64 + tz_res.utc_second / 60.0) / 60.0) / 24.0;
-        calendar_to_jd(tz_res.utc_year, tz_res.utc_month, tz_res.utc_day as f64 + frac)
-    }).unwrap_or_else(|_| calendar_to_jd(birth_year, birth_month, birth_day as f64));
 
     let mut planetary_returns = Vec::new();
     for body_name in ["Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn"] {
@@ -259,7 +280,7 @@ pub fn calculate_predictive_suite_with_timezone(
             target_year,
             body_name,
             natal_lon,
-            &all_natal_for_return,
+            &all_natal_points,
             h_sys,
             2.0,
         ) {
@@ -272,7 +293,7 @@ pub fn calculate_predictive_suite_with_timezone(
 
     let transits = calculate_transits_with_tz(
         target_year, target_month, target_day, actual_target_hour, actual_target_minute,
-        latitude, longitude, natal_planets, timezone_id,
+        latitude, longitude, &all_natal_points, timezone_id,
     ).unwrap_or_default();
 
     let age = if (target_month, target_day) >= (birth_month, birth_day) {

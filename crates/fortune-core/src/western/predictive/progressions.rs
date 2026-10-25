@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
 use crate::ephemeris::compute_ephemeris;
 use crate::timezone::resolve_local_to_utc_with_tz;
+use crate::western::aspects::is_aspect_applying;
 use vedaksha::ephem::julian::calendar_to_jd;
-use super::{find_aspect, get_body_tropical_lon, jd_to_calendar, normalize_western_body_name};
+use super::{find_aspect_with_target, get_body_tropical_lon_and_speed, jd_to_calendar, normalize_western_body_name};
 
 // ---------------------------------------------------------------------------
 // 2. Solar Arc Directions
@@ -23,6 +24,8 @@ pub struct PredictiveAspect {
     pub natal_body: String,
     pub aspect_type: String,
     pub orb: f64,
+    #[serde(default)]
+    pub is_applying: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,15 +35,15 @@ pub struct SolarArcResult {
     pub contacts: Vec<PredictiveAspect>,
 }
 
-pub fn calculate_solar_arc(
+fn compute_elapsed_years_and_prog_jd(
     birth_year: i32,
     birth_month: u32,
     birth_day: u32,
+    birth_utc_jd: f64,
     target_year: i32,
     target_month: u32,
     target_day: u32,
-    natal_planets: &[(&str, f64)],
-) -> (f64, Vec<SolarArcBody>) {
+) -> (f64, f64) {
     let (last_bday_year, next_bday_year, completed_years) = if (target_month, target_day) >= (birth_month, birth_day) {
         (target_year, target_year + 1, (target_year - birth_year).max(0) as f64)
     } else {
@@ -54,24 +57,60 @@ pub fn calculate_solar_arc(
     let year_span = (next_bday_jd - last_bday_jd).max(1.0);
     let year_fraction = ((target_day_jd - last_bday_jd) / year_span).clamp(0.0, 1.0);
     let elapsed_years = completed_years + year_fraction;
+    let prog_jd = birth_utc_jd + elapsed_years;
+    (elapsed_years, prog_jd)
+}
 
+pub fn calculate_solar_arc(
+    birth_year: i32,
+    birth_month: u32,
+    birth_day: u32,
+    target_year: i32,
+    target_month: u32,
+    target_day: u32,
+    natal_planets: &[(&str, f64)],
+) -> (f64, Vec<SolarArcBody>) {
     let birth_jd = calendar_to_jd(birth_year, birth_month, birth_day as f64);
-    let prog_jd = birth_jd + elapsed_years;
+    let (arc, _, directed) = calculate_solar_arc_from_birth_jd(
+        birth_year, birth_month, birth_day, birth_jd,
+        target_year, target_month, target_day, natal_planets,
+    );
+    (arc, directed)
+}
+
+pub(crate) fn calculate_solar_arc_from_birth_jd(
+    birth_year: i32,
+    birth_month: u32,
+    birth_day: u32,
+    birth_utc_jd: f64,
+    target_year: i32,
+    target_month: u32,
+    target_day: u32,
+    natal_planets: &[(&str, f64)],
+) -> (f64, f64, Vec<SolarArcBody>) {
+    let (elapsed_years, prog_jd) = compute_elapsed_years_and_prog_jd(
+        birth_year, birth_month, birth_day, birth_utc_jd,
+        target_year, target_month, target_day,
+    );
 
     let natal_sun_lon = natal_planets
         .iter()
         .find(|(name, _)| *name == "Sun")
         .map(|(_, lon)| *lon);
 
-    let arc = match (natal_sun_lon, get_body_tropical_lon(vedaksha::ephem::bodies::Body::Sun, prog_jd)) {
-        (Some(natal_sun), Ok(prog_sun)) => (prog_sun - natal_sun).rem_euclid(360.0),
-        _ => (elapsed_years * (59.0 / 60.0 + 8.0 / 3600.0)).rem_euclid(360.0),
+    let naibod_rate = 59.0 / 60.0 + 8.0 / 3600.0;
+    let (arc, sun_prog_speed) = match (
+        natal_sun_lon,
+        get_body_tropical_lon_and_speed(vedaksha::ephem::bodies::Body::Sun, prog_jd),
+    ) {
+        (Some(natal_sun), Ok((prog_sun, spd))) => ((prog_sun - natal_sun).rem_euclid(360.0), spd),
+        _ => ((elapsed_years * naibod_rate).rem_euclid(360.0), naibod_rate),
     };
 
     let directed = natal_planets.iter().map(|&(name, lon)| {
         let dir_lon = (lon + arc).rem_euclid(360.0);
         let sign_index = (dir_lon / 30.0).floor() as u8 % 12;
-        let sign_degree = dir_lon - (sign_index as f64 * 30.0);
+        let sign_degree = (dir_lon - (sign_index as f64 * 30.0)).clamp(0.0, 29.999999999);
 
         SolarArcBody {
             name: normalize_western_body_name(name),
@@ -82,7 +121,7 @@ pub fn calculate_solar_arc(
         }
     }).collect();
 
-    (arc, directed)
+    (arc, sun_prog_speed, directed)
 }
 
 pub fn calculate_solar_arc_detailed(
@@ -94,21 +133,51 @@ pub fn calculate_solar_arc_detailed(
     target_day: u32,
     natal_planets: &[(&str, f64)],
 ) -> SolarArcResult {
-    let (arc, directed_planets) = calculate_solar_arc(
-        birth_year, birth_month, birth_day,
+    let birth_jd = calendar_to_jd(birth_year, birth_month, birth_day as f64);
+    calculate_solar_arc_detailed_from_birth_jd(
+        birth_year, birth_month, birth_day, birth_jd,
+        target_year, target_month, target_day, natal_planets, natal_planets,
+    )
+}
+
+pub(crate) fn calculate_solar_arc_detailed_from_birth_jd(
+    birth_year: i32,
+    birth_month: u32,
+    birth_day: u32,
+    birth_utc_jd: f64,
+    target_year: i32,
+    target_month: u32,
+    target_day: u32,
+    directed_targets: &[(&str, f64)],
+    natal_targets: &[(&str, f64)],
+) -> SolarArcResult {
+    let (arc, sun_prog_speed, directed_planets) = calculate_solar_arc_from_birth_jd(
+        birth_year, birth_month, birth_day, birth_utc_jd,
         target_year, target_month, target_day,
-        natal_planets,
+        directed_targets,
     );
 
     let mut contacts = Vec::new();
     for dp in &directed_planets {
-        for &(natal_name, natal_lon) in natal_planets {
-            if let Some((asp, orb)) = find_aspect(dp.directed_longitude, natal_lon, 1.0) {
+        for &(natal_name, natal_lon) in natal_targets {
+            let norm_natal = normalize_western_body_name(natal_name);
+            if dp.name == norm_natal && arc < 1.0 {
+                continue;
+            }
+            if let Some((asp, target_angle, orb)) = find_aspect_with_target(dp.directed_longitude, natal_lon, 1.0) {
+                let is_applying = is_aspect_applying(
+                    dp.directed_longitude,
+                    sun_prog_speed,
+                    natal_lon,
+                    0.0,
+                    target_angle,
+                );
                 contacts.push(PredictiveAspect {
                     moving_body: format!("Dir {}", dp.name),
-                    natal_body: format!("Nat {}", normalize_western_body_name(natal_name)),
+                    natal_body: format!("Nat {}", norm_natal),
                     aspect_type: asp.to_string(),
                     orb,
+                    is_applying,
                 });
             }
         }
@@ -188,40 +257,32 @@ pub fn calculate_secondary_progressions_with_tz(
 
     // Standard secondary progression: 1 Ephemeris Day = 1 Tropical/Solar Year
     // Day-for-a-Year milestone mapping aligned to completed birthday years + intra-year fraction
-    let (last_bday_year, next_bday_year, completed_years) = if (target_month, target_day) >= (birth_month, birth_day) {
-        (target_year, target_year + 1, (target_year - birth_year).max(0) as f64)
-    } else {
-        (target_year - 1, target_year, (target_year - birth_year - 1).max(0) as f64)
-    };
-
-    let last_bday_jd = calendar_to_jd(last_bday_year, birth_month, birth_day as f64);
-    let next_bday_jd = calendar_to_jd(next_bday_year, birth_month, birth_day as f64);
-    let target_day_jd = calendar_to_jd(target_year, target_month, target_day as f64);
-
-    let year_span = (next_bday_jd - last_bday_jd).max(1.0);
-    let year_fraction = ((target_day_jd - last_bday_jd) / year_span).clamp(0.0, 1.0);
-
-    let elapsed_years = completed_years + year_fraction;
-    let progressed_jd = birth_utc_jd + elapsed_years;
+    let (elapsed_years, progressed_jd) = compute_elapsed_years_and_prog_jd(
+        birth_year, birth_month, birth_day, birth_utc_jd,
+        target_year, target_month, target_day,
+    );
     let (py, pm, pd, ph, pmin, ps) = jd_to_calendar(progressed_jd);
 
     let ephem = compute_ephemeris(py, pm, pd, ph, pmin, ps, latitude, longitude)
         .map_err(|e| format!("Secondary progression ephemeris failed: {}", e))?;
 
     let mut planets = Vec::new();
+    let mut planet_speeds = Vec::new();
     let mut prog_sun_lon = 0.0;
     let mut prog_moon_lon = 0.0;
 
     for b in &ephem.bodies {
         let lon = b.tropical_longitude;
         let sign_index = (lon / 30.0).floor() as u8 % 12;
-        let sign_degree = lon - (sign_index as f64 * 30.0);
+        let sign_degree = (lon - (sign_index as f64 * 30.0)).clamp(0.0, 29.999999999);
 
         if b.name == "Sun" { prog_sun_lon = lon; }
         if b.name == "Moon" { prog_moon_lon = lon; }
 
+        let norm_name = normalize_western_body_name(&b.name);
+        planet_speeds.push((norm_name.clone(), lon, b.speed));
         planets.push(ProgressedBody {
-            name: normalize_western_body_name(&b.name),
+            name: norm_name,
             progressed_longitude: lon,
             sign_index,
             sign_degree,
@@ -243,14 +304,16 @@ pub fn calculate_secondary_progressions_with_tz(
     }.to_string();
 
     let mut contacts = Vec::new();
-    for pb in &planets {
+    for (pb_name, pb_lon, pb_speed) in &planet_speeds {
         for &(natal_name, natal_lon) in natal_planets {
-            if let Some((asp, orb)) = find_aspect(pb.progressed_longitude, natal_lon, 1.0) {
+            if let Some((asp, target_angle, orb)) = find_aspect_with_target(*pb_lon, natal_lon, 1.0) {
+                let is_applying = is_aspect_applying(*pb_lon, *pb_speed, natal_lon, 0.0, target_angle);
                 contacts.push(PredictiveAspect {
-                    moving_body: format!("Prog {}", pb.name),
+                    moving_body: format!("Prog {}", pb_name),
                     natal_body: format!("Nat {}", normalize_western_body_name(natal_name)),
                     aspect_type: asp.to_string(),
                     orb,
+                    is_applying,
                 });
             }
         }
