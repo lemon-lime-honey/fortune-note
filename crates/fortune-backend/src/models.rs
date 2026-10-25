@@ -10,6 +10,8 @@ pub struct Profile {
     pub birth_day: u32,
     pub birth_hour: u32,
     pub birth_minute: u32,
+    #[serde(default)]
+    pub birth_second: f64,
     pub latitude: f64,
     pub longitude: f64,
     pub timezone_id: String,
@@ -27,6 +29,8 @@ pub struct CreateProfileParams {
     pub birth_day: u32,
     pub birth_hour: u32,
     pub birth_minute: u32,
+    #[serde(default)]
+    pub birth_second: f64,
     pub latitude: f64,
     pub longitude: f64,
     pub timezone_id: Option<String>,
@@ -42,6 +46,8 @@ pub struct UpdateProfileParams {
     pub birth_day: u32,
     pub birth_hour: u32,
     pub birth_minute: u32,
+    #[serde(default)]
+    pub birth_second: f64,
     pub latitude: f64,
     pub longitude: f64,
     pub timezone_id: Option<String>,

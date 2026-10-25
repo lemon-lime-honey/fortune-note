@@ -104,6 +104,21 @@ fn apply_migrations(conn: &Connection) -> Result<()> {
         )?;
     }
 
+    if current_version < 2 {
+        conn.execute_batch(
+            r#"
+            BEGIN TRANSACTION;
+
+            ALTER TABLE profiles ADD COLUMN birth_second REAL NOT NULL DEFAULT 0.0;
+
+            INSERT INTO schema_migrations (version, applied_at)
+            VALUES (2, datetime('now'));
+
+            COMMIT;
+            "#,
+        )?;
+    }
+
     Ok(())
 }
 
@@ -119,6 +134,6 @@ mod tests {
         let count: i64 = conn
             .query_row("SELECT count(*) FROM schema_migrations", [], |row| row.get(0))
             .expect("query should succeed");
-        assert_eq!(count, 1);
+        assert_eq!(count, 2);
     }
 }

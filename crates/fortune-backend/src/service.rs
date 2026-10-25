@@ -58,6 +58,12 @@ impl FortuneBackendService {
             ));
         }
 
+        if !(0.0..60.0).contains(&params.birth_second) || !params.birth_second.is_finite() {
+            return Err(FortuneBackendError::ValidationError(
+                "Birth second must be between 0.0 and 59.999".to_string(),
+            ));
+        }
+
         let timezone_id = params.timezone_id.unwrap_or_else(|| {
             lookup_timezone_id(params.latitude, params.longitude)
                 .unwrap_or_else(|_| "UTC".to_string())
@@ -73,6 +79,7 @@ impl FortuneBackendService {
             birth_day: params.birth_day,
             birth_hour: params.birth_hour,
             birth_minute: params.birth_minute,
+            birth_second: params.birth_second,
             latitude: params.latitude,
             longitude: params.longitude,
             timezone_id,
@@ -138,6 +145,12 @@ impl FortuneBackendService {
             ));
         }
 
+        if !(0.0..60.0).contains(&params.birth_second) || !params.birth_second.is_finite() {
+            return Err(FortuneBackendError::ValidationError(
+                "Birth second must be between 0.0 and 59.999".to_string(),
+            ));
+        }
+
         let timezone_id = params.timezone_id.unwrap_or_else(|| {
             lookup_timezone_id(params.latitude, params.longitude)
                 .unwrap_or_else(|_| existing.timezone_id.clone())
@@ -152,6 +165,7 @@ impl FortuneBackendService {
             birth_day: params.birth_day,
             birth_hour: params.birth_hour,
             birth_minute: params.birth_minute,
+            birth_second: params.birth_second,
             latitude: params.latitude,
             longitude: params.longitude,
             timezone_id,
@@ -205,7 +219,7 @@ impl FortuneBackendService {
             day: profile.birth_day,
             hour: profile.birth_hour,
             minute: profile.birth_minute,
-            second: 0.0,
+            second: profile.birth_second,
             latitude: profile.latitude,
             longitude: profile.longitude,
             gender,
@@ -238,7 +252,7 @@ impl FortuneBackendService {
             day: profile.birth_day,
             hour: profile.birth_hour,
             minute: profile.birth_minute,
-            second: 0.0,
+            second: profile.birth_second,
             latitude: profile.latitude,
             longitude: profile.longitude,
             gender,
@@ -274,7 +288,7 @@ impl FortuneBackendService {
             day: profile.birth_day,
             hour: profile.birth_hour,
             minute: profile.birth_minute,
-            second: 0.0,
+            second: profile.birth_second,
             latitude: profile.latitude,
             longitude: profile.longitude,
             gender,
@@ -307,7 +321,7 @@ impl FortuneBackendService {
             day: profile.birth_day,
             hour: profile.birth_hour,
             minute: profile.birth_minute,
-            second: 0.0,
+            second: profile.birth_second,
             latitude: profile.latitude,
             longitude: profile.longitude,
             gender,
@@ -368,7 +382,7 @@ impl FortuneBackendService {
             profile.birth_day,
             profile.birth_hour,
             profile.birth_minute,
-            0.0,
+            profile.birth_second,
             &profile.timezone_id,
         )
         .map_err(|e| FortuneBackendError::CalculationError(format!("Timezone resolution error: {}", e)))?;
@@ -412,7 +426,7 @@ impl FortuneBackendService {
             profile.birth_day,
             profile.birth_hour,
             profile.birth_minute,
-            0.0,
+            profile.birth_second,
             profile.latitude,
             profile.longitude,
             target_year,
@@ -788,6 +802,7 @@ mod tests {
                 birth_day: 25,
                 birth_hour: 14,
                 birth_minute: 30,
+                birth_second: 15.0,
                 latitude: 37.5665,
                 longitude: 126.9780,
                 timezone_id: None,
@@ -796,11 +811,13 @@ mod tests {
             .expect("profile creation failed");
 
         assert_eq!(profile.timezone_id, "Asia/Seoul");
+        assert!((profile.birth_second - 15.0).abs() < 1e-6);
 
         let chart = service
             .calculate_profile_chart(&profile.id)
             .expect("chart calculation failed");
         assert_eq!(chart.saju.daeun_periods.len(), 10);
+        assert!((chart.utc_second - 15.0).abs() < 1e-6);
 
         // Verify decoupled domain calculations
         let saju_out = service
@@ -816,7 +833,7 @@ mod tests {
         let vedic_out = service
             .calculate_profile_vedic(&profile.id)
             .expect("decoupled vedic failed");
-        assert_eq!(vedic_out.vedic.vargas.len(), 11);
+        assert_eq!(vedic_out.vedic.vargas.len(), 19);
 
         let saju_md = service
             .export_profile_saju_markdown(&profile.id)
@@ -899,6 +916,7 @@ mod tests {
                 birth_day: 15,
                 birth_hour: 8,
                 birth_minute: 20,
+                birth_second: 0.0,
                 latitude: 37.5665,
                 longitude: 126.9780,
                 timezone_id: None,
@@ -964,6 +982,7 @@ mod tests {
                 birth_day: 10,
                 birth_hour: 15,
                 birth_minute: 45,
+                birth_second: 0.0,
                 latitude: 37.5665,
                 longitude: 126.9780,
                 timezone_id: Some("Asia/Seoul".to_string()),
@@ -1027,6 +1046,7 @@ mod tests {
                 birth_day: 15,
                 birth_hour: 9,
                 birth_minute: 30,
+                birth_second: 0.0,
                 latitude: 37.5665,
                 longitude: 126.9780,
                 timezone_id: Some("Asia/Seoul".to_string()),
@@ -1065,6 +1085,7 @@ mod tests {
                 birth_day: 15,
                 birth_hour: 10,
                 birth_minute: 0,
+                birth_second: 0.0,
                 latitude: 37.5665,
                 longitude: 126.9780,
                 timezone_id: Some("Asia/Seoul".to_string()),
@@ -1139,6 +1160,7 @@ mod tests {
                 birth_day: 12,
                 birth_hour: 8,
                 birth_minute: 0,
+                birth_second: 0.0,
                 latitude: 37.5665,
                 longitude: 126.9780,
                 timezone_id: None,

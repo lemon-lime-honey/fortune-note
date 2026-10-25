@@ -27,9 +27,9 @@ impl ProfileRepository {
             r#"
             INSERT INTO profiles (
                 id, name, gender, birth_year, birth_month, birth_day,
-                birth_hour, birth_minute, latitude, longitude, timezone_id,
+                birth_hour, birth_minute, birth_second, latitude, longitude, timezone_id,
                 notes, created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
             "#,
             params![
                 profile.id,
@@ -40,6 +40,7 @@ impl ProfileRepository {
                 profile.birth_day,
                 profile.birth_hour,
                 profile.birth_minute,
+                profile.birth_second,
                 profile.latitude,
                 profile.longitude,
                 profile.timezone_id,
@@ -55,7 +56,7 @@ impl ProfileRepository {
         let mut stmt = conn.prepare(
             r#"
             SELECT id, name, gender, birth_year, birth_month, birth_day,
-                   birth_hour, birth_minute, latitude, longitude, timezone_id,
+                   birth_hour, birth_minute, birth_second, latitude, longitude, timezone_id,
                    notes, created_at, updated_at
             FROM profiles
             WHERE id = ?1
@@ -73,12 +74,13 @@ impl ProfileRepository {
                 birth_day: row.get(5)?,
                 birth_hour: row.get(6)?,
                 birth_minute: row.get(7)?,
-                latitude: row.get(8)?,
-                longitude: row.get(9)?,
-                timezone_id: row.get(10)?,
-                notes: row.get(11)?,
-                created_at: row.get(12)?,
-                updated_at: row.get(13)?,
+                birth_second: row.get(8)?,
+                latitude: row.get(9)?,
+                longitude: row.get(10)?,
+                timezone_id: row.get(11)?,
+                notes: row.get(12)?,
+                created_at: row.get(13)?,
+                updated_at: row.get(14)?,
             }))
         } else {
             Ok(None)
@@ -92,7 +94,7 @@ impl ProfileRepository {
                 let mut stmt = conn.prepare(
                     r#"
                     SELECT id, name, gender, birth_year, birth_month, birth_day,
-                           birth_hour, birth_minute, latitude, longitude, timezone_id,
+                           birth_hour, birth_minute, birth_second, latitude, longitude, timezone_id,
                            notes, created_at, updated_at
                     FROM profiles
                     WHERE name LIKE ?1 OR notes LIKE ?1
@@ -109,12 +111,13 @@ impl ProfileRepository {
                         birth_day: row.get(5)?,
                         birth_hour: row.get(6)?,
                         birth_minute: row.get(7)?,
-                        latitude: row.get(8)?,
-                        longitude: row.get(9)?,
-                        timezone_id: row.get(10)?,
-                        notes: row.get(11)?,
-                        created_at: row.get(12)?,
-                        updated_at: row.get(13)?,
+                        birth_second: row.get(8)?,
+                        latitude: row.get(9)?,
+                        longitude: row.get(10)?,
+                        timezone_id: row.get(11)?,
+                        notes: row.get(12)?,
+                        created_at: row.get(13)?,
+                        updated_at: row.get(14)?,
                     })
                 })?;
                 let mut list = Vec::new();
@@ -126,7 +129,7 @@ impl ProfileRepository {
             _ => {
                 r#"
                 SELECT id, name, gender, birth_year, birth_month, birth_day,
-                       birth_hour, birth_minute, latitude, longitude, timezone_id,
+                       birth_hour, birth_minute, birth_second, latitude, longitude, timezone_id,
                        notes, created_at, updated_at
                 FROM profiles
                 ORDER BY created_at DESC
@@ -145,12 +148,13 @@ impl ProfileRepository {
                 birth_day: row.get(5)?,
                 birth_hour: row.get(6)?,
                 birth_minute: row.get(7)?,
-                latitude: row.get(8)?,
-                longitude: row.get(9)?,
-                timezone_id: row.get(10)?,
-                notes: row.get(11)?,
-                created_at: row.get(12)?,
-                updated_at: row.get(13)?,
+                birth_second: row.get(8)?,
+                latitude: row.get(9)?,
+                longitude: row.get(10)?,
+                timezone_id: row.get(11)?,
+                notes: row.get(12)?,
+                created_at: row.get(13)?,
+                updated_at: row.get(14)?,
             })
         })?;
 
@@ -166,10 +170,10 @@ impl ProfileRepository {
             r#"
             UPDATE profiles
             SET name = ?1, gender = ?2, birth_year = ?3, birth_month = ?4,
-                birth_day = ?5, birth_hour = ?6, birth_minute = ?7,
-                latitude = ?8, longitude = ?9, timezone_id = ?10,
-                notes = ?11, updated_at = ?12
-            WHERE id = ?13
+                birth_day = ?5, birth_hour = ?6, birth_minute = ?7, birth_second = ?8,
+                latitude = ?9, longitude = ?10, timezone_id = ?11,
+                notes = ?12, updated_at = ?13
+            WHERE id = ?14
             "#,
             params![
                 profile.name,
@@ -179,6 +183,7 @@ impl ProfileRepository {
                 profile.birth_day,
                 profile.birth_hour,
                 profile.birth_minute,
+                profile.birth_second,
                 profile.latitude,
                 profile.longitude,
                 profile.timezone_id,
@@ -447,6 +452,7 @@ mod tests {
             birth_day: 15,
             birth_hour: 9,
             birth_minute: 30,
+            birth_second: 15.0,
             latitude: 37.5665,
             longitude: 126.9780,
             timezone_id: "Asia/Seoul".to_string(),
@@ -461,6 +467,7 @@ mod tests {
             .expect("query failed")
             .expect("should find profile");
         assert_eq!(found.name, "홍길동");
+        assert!((found.birth_second - 15.0).abs() < 1e-6);
 
         let list = ProfileRepository::list_all(&conn, Some("길동")).expect("search failed");
         assert_eq!(list.len(), 1);

@@ -17,8 +17,13 @@ fn append_profile_meta(out: &mut String, profile: &Profile, chart: &FortuneCalcu
     out.push_str("## 1. 인물 기본 정보\n");
     out.push_str(&format!("- 성별: {}\n", if profile.gender == "male" { "남성" } else { "여성" }));
     out.push_str(&format!(
-        "- 출생 일시: {:04}-{:02}-{:02} {:02}:{:02} (현지 기준)\n",
-        profile.birth_year, profile.birth_month, profile.birth_day, profile.birth_hour, profile.birth_minute
+        "- 출생 일시: {:04}-{:02}-{:02} {:02}:{:02}:{:02} (현지 기준)\n",
+        profile.birth_year,
+        profile.birth_month,
+        profile.birth_day,
+        profile.birth_hour,
+        profile.birth_minute,
+        profile.birth_second as u32
     ));
     out.push_str(&format!("- 관측 위치: 위도 {:.4}°, 경도 {:.4}°\n", profile.latitude, profile.longitude));
     out.push_str(&format!(
@@ -406,26 +411,118 @@ pub fn format_profile_western_markdown(profile: &Profile, chart: &FortuneCalcula
     out
 }
 
-/// 베다 점성술 전용 마크다운 리포트 및 프롬프트 생성
-pub fn format_profile_vedic_markdown(profile: &Profile, chart: &FortuneCalculationOutput) -> String {
-    let mut out = String::new();
-    append_profile_meta(&mut out, profile, chart, "베다 점성술 분석 데이터");
-
-    out.push_str("## 2. 라시 차트 및 분점도 (Vedic Sidereal & Vargas)\n");
+fn append_vedic_details(out: &mut String, chart: &FortuneCalculationOutput, is_prashna: bool) {
+    if is_prashna {
+        out.push_str("## 2. Prashna Chart Placements (Vedic Sidereal)\n");
+    } else {
+        out.push_str("## 2. 라시 차트 및 분점도 (Vedic Sidereal & Vargas)\n");
+    }
     let lagna_sign_idx = chart.vedic.lagna_sign as usize % 12;
+    let lagna_label = if is_prashna { "Prashna Lagna" } else { "Lagna" };
     out.push_str(&format!(
-        "- Lagna: {:.2}° ({})\n",
-        chart.vedic.lagna_sidereal, VEDIC_SIGNS[lagna_sign_idx]
+        "- {}: {:.2}° ({})\n",
+        lagna_label, chart.vedic.lagna_sidereal, VEDIC_SIGNS[lagna_sign_idx]
     ));
     out.push_str("- D1 Rasi Placements:\n");
     for p in &chart.vedic.planets {
         let sign_name = VEDIC_SIGNS[p.sign_index as usize % 12];
         let retro_str = if p.is_retrograde { " [Rx]" } else { "" };
+        let comb_str = if p.combustion != "None" && !p.combustion.is_empty() {
+            format!(" [{}]", p.combustion)
+        } else {
+            String::new()
+        };
         out.push_str(&format!(
-            "  * {}: {:.2}° ({}, {} Pada {}){}\n",
-            p.name, p.sidereal_longitude, sign_name, p.nakshatra_name, p.nakshatra_pada, retro_str
+            "  * {}: {:.2}° (H{}, {}, {} Pada {}, Dignity: {}){}{}\n",
+            p.name,
+            p.sidereal_longitude,
+            p.house,
+            sign_name,
+            p.nakshatra_name,
+            p.nakshatra_pada,
+            p.dignity,
+            retro_str,
+            comb_str
         ));
     }
+
+    let pan = &chart.vedic.panchanga;
+    if !pan.tithi_name.is_empty() {
+        out.push_str("- Panchanga (5 Limbs of Time):\n");
+        out.push_str(&format!(
+            "  * Tithi: {} (#{}, {})\n",
+            pan.tithi_name, pan.tithi_number, pan.paksha
+        ));
+        out.push_str(&format!("  * Vara: {} (Lord: {})\n", pan.vara_name, pan.vara_lord));
+        out.push_str(&format!(
+            "  * Nakshatra: {} Pada {} (Lord: {})\n",
+            pan.nakshatra_name, pan.nakshatra_pada, pan.nakshatra_lord
+        ));
+        out.push_str(&format!("  * Yoga: {}\n", pan.yoga_name));
+        out.push_str(&format!("  * Karana: {}\n", pan.karana_name));
+    }
+
+    if !chart.vedic.chara_karakas.is_empty() {
+        out.push_str("- Jaimini Chara Karakas (8-Karaka Scheme):\n");
+        for ck in &chart.vedic.chara_karakas {
+            out.push_str(&format!(
+                "  * {}: {} ({:.2}°)\n",
+                ck.karaka, ck.planet, ck.effective_degree
+            ));
+        }
+    }
+
+    if !chart.vedic.arudha_padas.is_empty() {
+        out.push_str("- Arudha Padas (BPHS Ch. 29):\n");
+        for ap in &chart.vedic.arudha_padas {
+            out.push_str(&format!(
+                "  * {} ({}): {} (H{} from Lagna)\n",
+                ap.code, ap.name, ap.sign_name, ap.house_from_lagna
+            ));
+        }
+    }
+
+    let active_drishti: Vec<_> = chart
+        .vedic
+        .drishti
+        .iter()
+        .filter(|d| !d.aspected_planets.is_empty())
+        .collect();
+    if !active_drishti.is_empty() {
+        out.push_str("- Graha Drishti (Planetary Aspects on Planets):\n");
+        for d in active_drishti {
+            let target_sign_name = VEDIC_SIGNS[d.target_sign as usize % 12];
+            out.push_str(&format!(
+                "  * {} (H{}) -> {}th Drishti on H{} ({}): {}\n",
+                d.from_planet,
+                d.from_house,
+                d.aspect_offset,
+                d.target_house,
+                target_sign_name,
+                d.aspected_planets.join(", ")
+            ));
+        }
+    }
+
+    if chart.vedic.ashtakavarga.total_bindus > 0 {
+        out.push_str("- Ashtakavarga (Sarvashtakavarga & Bhinna Totals):\n");
+        let mut sav_parts = Vec::with_capacity(12);
+        for (idx, &pts) in chart.vedic.ashtakavarga.sarva.iter().enumerate() {
+            sav_parts.push(format!("{}: {}", VEDIC_SIGNS[idx], pts));
+        }
+        out.push_str(&format!(
+            "  * Sarvashtakavarga (Total {}): {}\n",
+            chart.vedic.ashtakavarga.total_bindus,
+            sav_parts.join(", ")
+        ));
+        for row in &chart.vedic.ashtakavarga.bhinna {
+            out.push_str(&format!(
+                "  * Bhinna {} (Total {}): {:?}\n",
+                row.planet, row.total, row.bindus
+            ));
+        }
+    }
+
     out.push_str("- Divisional Charts (Vargas):\n");
     for (division, v) in &chart.vedic.vargas {
         let sign_name = VEDIC_SIGNS[v.lagna_sign as usize % 12];
@@ -459,7 +556,13 @@ pub fn format_profile_vedic_markdown(profile: &Profile, chart: &FortuneCalculati
         }
     }
     out.push('\n');
+}
 
+/// 베다 점성술 전용 마크다운 리포트 및 프롬프트 생성
+pub fn format_profile_vedic_markdown(profile: &Profile, chart: &FortuneCalculationOutput) -> String {
+    let mut out = String::new();
+    append_profile_meta(&mut out, profile, chart, "베다 점성술 분석 데이터");
+    append_vedic_details(&mut out, chart, false);
     out
 }
 
@@ -492,22 +595,6 @@ pub fn format_horary_western_markdown(horary: &HoraryQuestion, chart: &FortuneCa
 pub fn format_prashna_vedic_markdown(horary: &HoraryQuestion, chart: &FortuneCalculationOutput) -> String {
     let mut out = String::new();
     append_horary_meta(&mut out, horary, chart, "프라슈나 질의 분석 데이터 (Vedic Sidereal)");
-
-    out.push_str("## 2. Prashna Chart Placements (Vedic Sidereal)\n");
-    let lagna_sign_idx = chart.vedic.lagna_sign as usize % 12;
-    out.push_str(&format!(
-        "- Prashna Lagna: {:.2}° ({})\n",
-        chart.vedic.lagna_sidereal, VEDIC_SIGNS[lagna_sign_idx]
-    ));
-    for p in &chart.vedic.planets {
-        let sign_name = VEDIC_SIGNS[p.sign_index as usize % 12];
-        let retro = if p.is_retrograde { " [Rx]" } else { "" };
-        out.push_str(&format!(
-            "- {}: {:.2}° ({}, {} Pada {}){}\n",
-            p.name, p.sidereal_longitude, sign_name, p.nakshatra_name, p.nakshatra_pada, retro
-        ));
-    }
-    out.push('\n');
-
+    append_vedic_details(&mut out, chart, true);
     out
 }
