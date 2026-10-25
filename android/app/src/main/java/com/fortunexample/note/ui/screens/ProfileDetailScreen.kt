@@ -476,7 +476,7 @@ private fun WesternDomainContent(
                     0 -> WesternPlacementsSubSection(w)
                     1 -> WesternAspectsSubSection(w)
                     2 -> {
-                        if (w.traditional != null) {
+                        if (w.traditional != null || w.hellenistic != null) {
                             WesternTraditionalSection(
                                 data = w.traditional,
                                 hellenistic = w.hellenistic,
@@ -705,30 +705,6 @@ private fun VedicDomainContent(
             val vargaTitle = VARGA_DEFINITIONS.find { it.first == selectedVarga }?.let { "${it.first} · ${it.second}" } ?: selectedVarga
 
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                // Top Varga Selector Bar (Quick D1/D9/D10/D60 + 19-Varga Grid Trigger)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf("D1", "D9", "D10", "D12", "D60").forEach { key ->
-                            val isSel = selectedVarga == key
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(if (isSel) AccentPrimary else SurfaceLight)
-                                    .border(1.dp, if (isSel) AccentPrimary else BorderColor, RoundedCornerShape(4.dp))
-                                    .clickable {
-                                        if (isSel) onOpenVargaPicker() else {
-                                            // Direct quick switch handled via parent or modal
-                                        }
-                                    }
-                            )
-                        }
-                    }
-                }
-
                 // Clean Varga Header + Modal Picker Button
                 Surface(
                     shape = RoundedCornerShape(6.dp),
@@ -810,9 +786,12 @@ private fun VedicPlacementsSubSection(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         // 1. D1 Rasi Full Sidereal Table
+        val ayanamshaInfo = if (v.ayanamsha_deg > 0.0) {
+            " · ${v.ayanamsha_name} ${String.format(Locale.US, "%.2f°", v.ayanamsha_deg)}"
+        } else ""
         AstroPanelCard(
             title = "Sidereal Graha Placements (D1 Rasi)",
-            subtitle = "Lagna: ${vedicRasiCode(v.lagna_sign)} ${formatDegMin(v.lagna_sidereal % 30.0)}",
+            subtitle = "Lagna: ${vedicRasiCode(v.lagna_sign)} ${formatDegMin(v.lagna_sidereal % 30.0)}$ayanamshaInfo",
             contentPadding = PaddingValues(0.dp)
         ) {
             val cols = listOf(
@@ -857,7 +836,7 @@ private fun VedicPlacementsSubSection(
             }
         }
 
-        // 2. If a non-D1 Varga is selected, show its exact placements table too
+        // 2. If a non-D1 Varga is selected, show its exact placements table (sign & bhava only, no artificial degree)
         if (selectedVarga != "D1" && activeVargaChart != null) {
             AstroPanelCard(
                 title = "$selectedVarga Divisional Placements",
@@ -865,10 +844,9 @@ private fun VedicPlacementsSubSection(
                 contentPadding = PaddingValues(0.dp)
             ) {
                 val cols = listOf(
-                    TableColSpec("GRAHA", 1.0f, TextAlign.Start, monospace = true),
-                    TableColSpec("RASI", 1.5f, TextAlign.Start, monospace = true),
-                    TableColSpec("V-DEG", 1.0f, TextAlign.End, monospace = true),
-                    TableColSpec("BHAVA", 0.8f, TextAlign.End, monospace = true)
+                    TableColSpec("GRAHA", 1.1f, TextAlign.Start, monospace = true),
+                    TableColSpec("DIVISIONAL RASI", 1.9f, TextAlign.Start, monospace = true),
+                    TableColSpec("BHAVA", 0.9f, TextAlign.End, monospace = true)
                 )
                 AstroTableHeader(cols)
                 activeVargaChart.placements.forEachIndexed { idx, vp ->
@@ -878,7 +856,6 @@ private fun VedicPlacementsSubSection(
                         cells = listOf(
                             TableCellData(vedicGrahaCode(vp.planet_name), TextPrimary, FontWeight.Bold),
                             TableCellData(vedicRasiCode(vp.sign_index), TextPrimary),
-                            TableCellData(formatDegMin(vp.sign_degree), TextSecondary),
                             TableCellData("H${vp.house}", CelestialBlue, FontWeight.Bold)
                         )
                     )
@@ -952,10 +929,10 @@ private fun VedicPanchangaKarakasSubSection(v: VedicChartData) {
             }
         }
 
-        // 2. Jaimini Chara Karakas (8 Karakas)
+        // 2. Jaimini Chara Karakas (7 Karakas)
         if (v.chara_karakas.isNotEmpty()) {
             AstroPanelCard(
-                title = "Jaimini Chara Karakas (8-Karaka Scheme)",
+                title = "Jaimini Chara Karakas (7-Karaka Scheme)",
                 contentPadding = PaddingValues(0.dp)
             ) {
                 val cols = listOf(
@@ -1000,25 +977,30 @@ private fun VedicPadasDrishtiSubSection(v: VedicChartData) {
             }
         }
 
-        // 2. Graha Drishti (Full Aspects)
-        val activeDrishti = v.drishti.filter { it.aspected_planets.isNotEmpty() }
+        // 2. Graha Drishti (Full Aspects incl. Special Bhava Aspects)
+        val notableDrishti = v.drishti.filter { it.aspected_planets.isNotEmpty() || it.aspect_offset != 7 }
         AstroPanelCard(
-            title = "Graha Drishti (Parashari Full Aspects)",
+            title = "Graha Drishti (Parashari Full & Special Aspects)",
             contentPadding = PaddingValues(0.dp)
         ) {
-            if (activeDrishti.isEmpty()) {
+            if (notableDrishti.isEmpty()) {
                 Box(modifier = Modifier.padding(12.dp)) {
-                    Text("No active Graha-to-Graha Drishti.", fontSize = 12.sp, color = TextSecondary)
+                    Text("No active Graha Drishti.", fontSize = 12.sp, color = TextSecondary)
                 }
             } else {
                 val cols = listOf(
                     TableColSpec("SOURCE", 0.95f, TextAlign.Start, monospace = true),
                     TableColSpec("DRISHTI", 0.85f, TextAlign.Center, monospace = true),
                     TableColSpec("TARGET BHAVA", 1.15f, TextAlign.Center, monospace = true),
-                    TableColSpec("ASPECTED GRAHAS", 1.35f, TextAlign.End, monospace = true)
+                    TableColSpec("OCCUPANTS", 1.35f, TextAlign.End, monospace = true)
                 )
                 AstroTableHeader(cols)
-                activeDrishti.forEachIndexed { idx, d ->
+                notableDrishti.forEachIndexed { idx, d ->
+                    val occText = if (d.aspected_planets.isEmpty()) {
+                        "- (EMPTY)"
+                    } else {
+                        d.aspected_planets.joinToString(" ") { vedicGrahaCode(it) }
+                    }
                     AstroTableRow(
                         columns = cols,
                         striped = idx % 2 == 1,
@@ -1026,7 +1008,11 @@ private fun VedicPadasDrishtiSubSection(v: VedicChartData) {
                             TableCellData("${vedicGrahaCode(d.from_planet)} (H${d.from_house})", TextPrimary, FontWeight.Bold),
                             TableCellData("${d.aspect_offset}TH", CelestialBlue, FontWeight.Bold),
                             TableCellData("H${d.target_house}·${signCode(d.target_sign)}", TextSecondary),
-                            TableCellData(d.aspected_planets.joinToString(" ") { vedicGrahaCode(it) }, TextPrimary, FontWeight.SemiBold)
+                            TableCellData(
+                                text = occText,
+                                color = if (d.aspected_planets.isEmpty()) TextSecondary else TextPrimary,
+                                fontWeight = if (d.aspected_planets.isEmpty()) FontWeight.Normal else FontWeight.SemiBold
+                            )
                         )
                     )
                 }

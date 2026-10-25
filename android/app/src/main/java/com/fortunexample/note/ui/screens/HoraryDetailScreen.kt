@@ -223,7 +223,7 @@ fun HoraryDetailScreen(
                             0 -> WesternPlacementsSubSection(w)
                             1 -> WesternAspectsSubSection(w)
                             2 -> {
-                                if (w.traditional != null) {
+                                if (w.traditional != null || w.hellenistic != null) {
                                     WesternTraditionalSection(
                                         data = w.traditional,
                                         hellenistic = w.hellenistic,
@@ -301,24 +301,29 @@ fun HoraryDetailScreen(
                                 }
                             }
                             2 -> {
-                                val activeDrishti = v.drishti.filter { it.aspected_planets.isNotEmpty() }
+                                val notableDrishti = v.drishti.filter { it.aspected_planets.isNotEmpty() || it.aspect_offset != 7 }
                                 AstroPanelCard(
                                     title = "Prashna Graha Drishti",
                                     contentPadding = PaddingValues(0.dp)
                                 ) {
-                                    if (activeDrishti.isEmpty()) {
+                                    if (notableDrishti.isEmpty()) {
                                         Box(modifier = Modifier.padding(12.dp)) {
-                                            Text("No active Graha-to-Graha Drishti.", fontSize = 12.sp, color = TextSecondary)
+                                            Text("No active Graha Drishti.", fontSize = 12.sp, color = TextSecondary)
                                         }
                                     } else {
                                         val cols = listOf(
                                             TableColSpec("SOURCE", 0.95f, TextAlign.Start, monospace = true),
                                             TableColSpec("DRISHTI", 0.85f, TextAlign.Center, monospace = true),
                                             TableColSpec("TARGET", 1.15f, TextAlign.Center, monospace = true),
-                                            TableColSpec("GRAHAS", 1.35f, TextAlign.End, monospace = true)
+                                            TableColSpec("OCCUPANTS", 1.35f, TextAlign.End, monospace = true)
                                         )
                                         AstroTableHeader(cols)
-                                        activeDrishti.forEachIndexed { idx, d ->
+                                        notableDrishti.forEachIndexed { idx, d ->
+                                            val occText = if (d.aspected_planets.isEmpty()) {
+                                                "- (EMPTY)"
+                                            } else {
+                                                d.aspected_planets.joinToString(" ") { vedicGrahaCode(it) }
+                                            }
                                             AstroTableRow(
                                                 columns = cols,
                                                 striped = idx % 2 == 1,
@@ -326,7 +331,11 @@ fun HoraryDetailScreen(
                                                     TableCellData("${vedicGrahaCode(d.from_planet)} (H${d.from_house})", TextPrimary, FontWeight.Bold),
                                                     TableCellData("${d.aspect_offset}TH", CelestialBlue, FontWeight.Bold),
                                                     TableCellData("H${d.target_house}·${signCode(d.target_sign)}", TextSecondary),
-                                                    TableCellData(d.aspected_planets.joinToString(" ") { vedicGrahaCode(it) }, TextPrimary, FontWeight.SemiBold)
+                                                    TableCellData(
+                                                        text = occText,
+                                                        color = if (d.aspected_planets.isEmpty()) TextSecondary else TextPrimary,
+                                                        fontWeight = if (d.aspected_planets.isEmpty()) FontWeight.Normal else FontWeight.SemiBold
+                                                    )
                                                 )
                                             )
                                         }

@@ -656,7 +656,9 @@ data class VedicChartData(
     val drishti: List<VedicDrishtiData> = emptyList(),
     val arudha_padas: List<VedicArudhaPadaData> = emptyList(),
     val ashtakavarga: VedicAshtakavargaData = VedicAshtakavargaData(),
-    val panchanga: VedicPanchangaData = VedicPanchangaData()
+    val panchanga: VedicPanchangaData = VedicPanchangaData(),
+    val ayanamsha_name: String = "True Lahiri (Chitra Paksha)",
+    val ayanamsha_deg: Double = 0.0
 )
 
 @Serializable

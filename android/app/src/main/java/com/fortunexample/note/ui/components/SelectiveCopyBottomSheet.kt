@@ -497,6 +497,9 @@ private fun generateSelectiveMarkdown(
                 if (incVedicRasi) {
                     val lagnaSign = VEDIC_SIGNS.getOrElse(v.lagna_sign % 12) { "" }
                     sb.append("## 2. 라시 차트 (Vedic Sidereal Placements)\n")
+                    if (v.ayanamsha_deg > 0.0) {
+                        sb.append("- Ayanamsha: ${v.ayanamsha_name} (${String.format("%.4f°", v.ayanamsha_deg)})\n")
+                    }
                     sb.append("- Lagna: ${String.format("%.2f°", v.lagna_sidereal)} ($lagnaSign)\n")
                     v.planets.forEach { p ->
                         val sign = VEDIC_SIGNS.getOrElse(p.sign_index % 12) { "" }
@@ -517,7 +520,7 @@ private fun generateSelectiveMarkdown(
                         sb.append("  * Yoga: ${pan.yoga_name} | Karana: ${pan.karana_name}\n")
                     }
                     if (v.chara_karakas.isNotEmpty()) {
-                        sb.append("- Jaimini Chara Karakas:\n")
+                        sb.append("- Jaimini Chara Karakas (7-Karaka Scheme):\n")
                         v.chara_karakas.forEach { ck ->
                             sb.append("  * ${ck.karaka}: ${ck.planet} (${String.format("%.2f°", ck.effective_degree)})\n")
                         }
@@ -528,12 +531,13 @@ private fun generateSelectiveMarkdown(
                             sb.append("  * ${ap.code} (${ap.name}): ${ap.sign_name} (H${ap.house_from_lagna})\n")
                         }
                     }
-                    val activeDrishti = v.drishti.filter { it.aspected_planets.isNotEmpty() }
-                    if (activeDrishti.isNotEmpty()) {
-                        sb.append("- Graha Drishti (Full Aspects):\n")
-                        activeDrishti.forEach { d ->
+                    val notableDrishti = v.drishti.filter { it.aspected_planets.isNotEmpty() || it.aspect_offset != 7 }
+                    if (notableDrishti.isNotEmpty()) {
+                        sb.append("- Graha Drishti (Full & Special Aspects):\n")
+                        notableDrishti.forEach { d ->
                             val tSign = VEDIC_SIGNS.getOrElse(d.target_sign % 12) { "" }
-                            sb.append("  * ${d.from_planet} (H${d.from_house}) -> ${d.aspect_offset}th on H${d.target_house} ($tSign): ${d.aspected_planets.joinToString(", ")}\n")
+                            val occ = if (d.aspected_planets.isEmpty()) "Empty Bhava" else d.aspected_planets.joinToString(", ")
+                            sb.append("  * ${d.from_planet} (H${d.from_house}) -> ${d.aspect_offset}th on H${d.target_house} ($tSign): $occ\n")
                         }
                     }
                     if (v.ashtakavarga.total_bindus > 0) {
@@ -548,7 +552,11 @@ private fun generateSelectiveMarkdown(
                         sb.append("- $key: Lagna $lSign\n")
                         val pl = chart.placements.map { p ->
                             val pSign = VEDIC_SIGNS.getOrElse(p.sign_index % 12) { "" }
-                            "${p.planet_name}: H${p.house} $pSign ${String.format("%.1f°", p.sign_degree)}"
+                            if (key == "D1") {
+                                "${p.planet_name}: H${p.house} $pSign ${String.format("%.2f°", p.sign_degree)}"
+                            } else {
+                                "${p.planet_name}: H${p.house} $pSign"
+                            }
                         }
                         if (pl.isNotEmpty()) {
                             sb.append("  * ${pl.joinToString(", ")}\n")

@@ -59,18 +59,22 @@ fun SectionCopyButton(
 
 @Composable
 fun WesternTraditionalSection(
-    data: WesternTraditionalData,
+    data: WesternTraditionalData?,
     hellenistic: HellenisticData? = null,
     isHorary: Boolean = false
 ) {
     var selectedSubTab by remember { mutableIntStateOf(0) }
     val subTabs = buildList {
-        add("Dignities")
-        add("Hours & Moon")
-        add("Receptions & Cusps")
-        add("Lots & Stars")
+        if (data != null) {
+            add("Dignities")
+            add("Hours & Moon")
+            add("Receptions & Cusps")
+            add("Lots & Stars")
+        }
         if (hellenistic != null) add("Hellenistic")
     }
+
+    if (subTabs.isEmpty()) return
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -82,12 +86,13 @@ fun WesternTraditionalSection(
             onSelect = { selectedSubTab = it }
         )
 
-        when (selectedSubTab.coerceIn(0, subTabs.lastIndex)) {
-            0 -> DignitiesMatrixSubSection(data)
-            1 -> HoursAndMoonSubSection(data, isHorary)
-            2 -> ReceptionsAndCuspsSubSection(data)
-            3 -> LotsAndStarsSubSection(data)
-            4 -> if (hellenistic != null) HellenisticSubSection(hellenistic)
+        val currentLabel = subTabs[selectedSubTab.coerceIn(0, subTabs.lastIndex)]
+        when (currentLabel) {
+            "Dignities" -> if (data != null) DignitiesMatrixSubSection(data)
+            "Hours & Moon" -> if (data != null) HoursAndMoonSubSection(data, isHorary)
+            "Receptions & Cusps" -> if (data != null) ReceptionsAndCuspsSubSection(data)
+            "Lots & Stars" -> if (data != null) LotsAndStarsSubSection(data)
+            "Hellenistic" -> if (hellenistic != null) HellenisticSubSection(hellenistic)
         }
     }
 }
@@ -593,10 +598,11 @@ private fun HellenisticSubSection(h: HellenisticData) {
                 contentPadding = PaddingValues(0.dp)
             ) {
                 val cols = listOf(
-                    TableColSpec("LOT", 1.7f, TextAlign.Start),
-                    TableColSpec("POSITION", 1.3f, TextAlign.Start, monospace = true),
+                    TableColSpec("LOT", 1.5f, TextAlign.Start),
+                    TableColSpec("POSITION", 1.25f, TextAlign.Start, monospace = true),
                     TableColSpec("H", 0.55f, TextAlign.Center, monospace = true),
-                    TableColSpec("LORD", 0.8f, TextAlign.End, monospace = true)
+                    TableColSpec("LORD", 0.75f, TextAlign.Center, monospace = true),
+                    TableColSpec("FORMULA", 1.4f, TextAlign.End, monospace = true)
                 )
                 AstroTableHeader(cols)
                 h.lots.forEachIndexed { idx, lot ->
@@ -607,7 +613,8 @@ private fun HellenisticSubSection(h: HellenisticData) {
                             TableCellData(lot.name, TextPrimary, FontWeight.SemiBold),
                             TableCellData(formatSignAndDeg(lot.sign_index, lot.sign_degree), TextPrimary),
                             TableCellData("${lot.house_number}", TextSecondary),
-                            TableCellData(bodyCode(lot.ruler), CelestialBlue, FontWeight.Bold)
+                            TableCellData(bodyCode(lot.ruler), CelestialBlue, FontWeight.Bold),
+                            TableCellData(lot.formula.ifBlank { "-" }, TextSecondary)
                         )
                     )
                 }
