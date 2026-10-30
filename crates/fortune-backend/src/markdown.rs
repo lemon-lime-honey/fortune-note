@@ -411,6 +411,24 @@ pub fn format_profile_western_markdown(profile: &Profile, chart: &FortuneCalcula
     out
 }
 
+fn jd_to_date_string(jd: f64) -> String {
+    let z = (jd + 0.5).floor() as i64;
+    let a = if z < 2_299_161 {
+        z
+    } else {
+        let alpha = ((z as f64 - 1_867_216.25) / 36_524.25).floor() as i64;
+        z + 1 + alpha - (alpha / 4)
+    };
+    let b = a + 1524;
+    let c = ((b as f64 - 122.1) / 365.25).floor() as i64;
+    let d = (365.25 * c as f64).floor() as i64;
+    let e = ((b - d) as f64 / 30.6001).floor() as i64;
+    let day = b - d - (30.6001 * e as f64).floor() as i64;
+    let month = if e < 14 { e - 1 } else { e - 13 };
+    let year = if month > 2 { c - 4716 } else { c - 4715 };
+    format!("{:04}-{:02}-{:02}", year, month, day)
+}
+
 fn append_vedic_details(out: &mut String, chart: &FortuneCalculationOutput, is_prashna: bool) {
     if is_prashna {
         out.push_str("## 2. Prashna Chart Placements (Vedic Sidereal)\n");
@@ -437,11 +455,12 @@ fn append_vedic_details(out: &mut String, chart: &FortuneCalculationOutput, is_p
             String::new()
         };
         out.push_str(&format!(
-            "  * {}: {:.2}° (H{}, {}, {} Pada {}, Dignity: {}){}{}\n",
+            "  * {}: {:.2}° (H{}, {} {:.2}°, {} Pada {}, Dignity: {}){}{}\n",
             p.name,
             p.sidereal_longitude,
             p.house,
             sign_name,
+            p.sign_degree,
             p.nakshatra_name,
             p.nakshatra_pada,
             p.dignity,
@@ -466,7 +485,7 @@ fn append_vedic_details(out: &mut String, chart: &FortuneCalculationOutput, is_p
         out.push_str(&format!("  * Karana: {}\n", pan.karana_name));
     }
 
-    if !chart.vedic.chara_karakas.is_empty() {
+    if !is_prashna && !chart.vedic.chara_karakas.is_empty() {
         out.push_str("- Jaimini Chara Karakas (7-Karaka Scheme):\n");
         for ck in &chart.vedic.chara_karakas {
             out.push_str(&format!(
@@ -513,7 +532,7 @@ fn append_vedic_details(out: &mut String, chart: &FortuneCalculationOutput, is_p
         }
     }
 
-    if chart.vedic.ashtakavarga.total_bindus > 0 {
+    if !is_prashna && chart.vedic.ashtakavarga.total_bindus > 0 {
         out.push_str("- Ashtakavarga (Sarvashtakavarga & Bhinna Totals):\n");
         let mut sav_parts = Vec::with_capacity(12);
         for (idx, &pts) in chart.vedic.ashtakavarga.sarva.iter().enumerate() {
@@ -534,6 +553,16 @@ fn append_vedic_details(out: &mut String, chart: &FortuneCalculationOutput, is_p
 
     out.push_str("- Divisional Charts (Vargas):\n");
     for (division, v) in &chart.vedic.vargas {
+        if is_prashna
+            && !matches!(
+                *division,
+                fortune_core::VargaDivision::D1
+                    | fortune_core::VargaDivision::D3
+                    | fortune_core::VargaDivision::D9
+            )
+        {
+            continue;
+        }
         let sign_name = VEDIC_SIGNS[v.lagna_sign as usize % 12];
         out.push_str(&format!(
             "  * {}: Lagna {}\n",
@@ -558,17 +587,24 @@ fn append_vedic_details(out: &mut String, chart: &FortuneCalculationOutput, is_p
             out.push_str(&format!("    - Placements: {}\n", placements_str.join(", ")));
         }
     }
-    out.push_str("- Vimshottari Dasha Sequence:\n");
-    for d in &chart.vedic.vimshottari_dashas {
-        out.push_str(&format!(
-            "  * Mahadasha {}: JD {:.1} ~ JD {:.1}\n",
-            d.lord, d.start_jd, d.end_jd
-        ));
-        for sub in &d.sub_periods {
+
+    if !is_prashna {
+        out.push_str("- Vimshottari Dasha Sequence:\n");
+        for d in &chart.vedic.vimshottari_dashas {
             out.push_str(&format!(
-                "    - Antardasha {}: JD {:.1} ~ JD {:.1}\n",
-                sub.lord, sub.start_jd, sub.end_jd
+                "  * Mahadasha {}: {} ~ {}\n",
+                d.lord,
+                jd_to_date_string(d.start_jd),
+                jd_to_date_string(d.end_jd)
             ));
+            for sub in &d.sub_periods {
+                out.push_str(&format!(
+                    "    - Antardasha {}: {} ~ {}\n",
+                    sub.lord,
+                    jd_to_date_string(sub.start_jd),
+                    jd_to_date_string(sub.end_jd)
+                ));
+            }
         }
     }
     out.push('\n');
