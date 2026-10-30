@@ -290,10 +290,14 @@ pub fn calculate_varga_sign_and_degree(sidereal_lon: f64, div: VargaDivision) ->
         }
         VargaDivision::D24 => {
             // Parashari Chaturvimshamsha / Siddhamsha (BPHS Ch. 6): 1°15' divisions (0..23)
-            // Odd signs start from Leo (4); Even signs start from Cancer (3), both counting forward
+            // Odd signs start from Leo (4) counting forward; Even signs start from Cancer (3) counting backward (reverse)
             let (part, degree) = uniform_varga_part_and_degree(pos_in_sign, 24);
-            let start = if sign_idx.is_multiple_of(2) { 4 } else { 3 };
-            ((start + part) % 12, degree)
+            let sign = if sign_idx.is_multiple_of(2) {
+                (4 + part) % 12
+            } else {
+                (3 + 24 - part) % 12
+            };
+            (sign, degree)
         }
         VargaDivision::D27 => {
             // Parashari Saptavimshamsha / Bhamsha (BPHS Ch. 6): 1°06'40" divisions (0..26)
@@ -878,7 +882,6 @@ pub fn calculate_vedic(ephem: &EphemerisSnapshot, latitude: f64) -> VedicChart {
     let mut sun_tropical_lon = 0.0;
     let mut sun_sidereal_lon = 0.0;
     let mut moon_sidereal_lon = 0.0;
-    let mut rahu_sidereal_lon = 0.0;
     let mut planet_signs: HashMap<Graha, u8> = HashMap::new();
     let mut planet_lons: HashMap<Graha, f64> = HashMap::new();
 
@@ -890,8 +893,6 @@ pub fn calculate_vedic(ephem: &EphemerisSnapshot, latitude: f64) -> VedicChart {
             sun_sidereal_lon = sid_lon;
         } else if b.name == "Moon" {
             moon_sidereal_lon = sid_lon;
-        } else if b.name == "Rahu" {
-            rahu_sidereal_lon = sid_lon;
         }
         if let Some(g) = parse_graha(&b.name) {
             planet_signs.insert(g, sign_idx);
@@ -938,31 +939,14 @@ pub fn calculate_vedic(ephem: &EphemerisSnapshot, latitude: f64) -> VedicChart {
         });
     }
 
-    // 3. Compute the 19 supported divisional charts (with Rahu-Ketu 1-7 opposition enforced)
+    // 3. Compute the 19 supported divisional charts from each planet's true sidereal longitude
     let mut vargas = BTreeMap::new();
     for div in VargaDivision::ALL {
         let (v_lagna, _) = calculate_varga_sign_and_degree(lagna_sidereal, div);
-        let (rahu_v_sign, rahu_v_deg) = calculate_varga_sign_and_degree(rahu_sidereal_lon, div);
 
         let mut placements = Vec::with_capacity(planets.len());
         for p in &planets {
-            let (p_sign, p_degree) = if p.name == "Ketu" {
-                let opp_sign = match div {
-                    // In D2 Hora, only Cancer (3) and Leo (4) exist; Ketu occupies the opposite Hora from Rahu
-                    VargaDivision::D2 => {
-                        if rahu_v_sign == 4 {
-                            3
-                        } else {
-                            4
-                        }
-                    }
-                    // In all 12-sign divisional charts, Ketu is strictly 7th (opposite) from Rahu
-                    _ => (rahu_v_sign + 6) % 12,
-                };
-                (opp_sign, rahu_v_deg)
-            } else {
-                calculate_varga_sign_and_degree(p.sidereal_longitude, div)
-            };
+            let (p_sign, p_degree) = calculate_varga_sign_and_degree(p.sidereal_longitude, div);
             let house = ((p_sign as i16 - v_lagna as i16 + 12) % 12 + 1) as u8;
 
             placements.push(VargaPlacement {
@@ -1202,7 +1186,7 @@ mod tests {
 
         let chart = calculate_vedic(&ephem, 28.6139);
 
-        // Verify all 19 supported Varga divisions and Rahu-Ketu opposition in every varga
+        // Verify all 19 supported Varga divisions and mathematical Rahu-Ketu varga placements
         assert_eq!(chart.vargas.len(), 19);
         for div in VargaDivision::ALL {
             let v_chart = chart.vargas.get(&div).expect("varga must exist");
@@ -1211,15 +1195,41 @@ mod tests {
 
             let rahu_p = v_chart.placements.iter().find(|p| p.planet_name == "Rahu").unwrap();
             let ketu_p = v_chart.placements.iter().find(|p| p.planet_name == "Ketu").unwrap();
-            if div == VargaDivision::D2 {
-                assert_ne!(rahu_p.sign_index, ketu_p.sign_index, "D2 Rahu and Ketu must occupy opposite Horas");
-            } else {
-                assert_eq!(
-                    (rahu_p.sign_index + 6) % 12,
-                    ketu_p.sign_index,
-                    "Rahu and Ketu must be 180 deg (7th sign) apart in {:?}",
-                    div
-                );
+            match div {
+                // Symmetric vargas preserve the 180° (1-7) Rahu-Ketu axis
+                VargaDivision::D1
+                | VargaDivision::D3
+                | VargaDivision::D4
+                | VargaDivision::D7
+                | VargaDivision::D9
+                | VargaDivision::D10
+                | VargaDivision::D11
+                | VargaDivision::D12
+                | VargaDivision::D27
+                | VargaDivision::D60 => {
+                    assert_eq!(
+                        (rahu_p.sign_index + 6) % 12,
+                        ketu_p.sign_index,
+                        "Rahu and Ketu must be 7th apart in symmetric {:?}",
+                        div
+                    );
+                }
+                // Asymmetric vargas map 180°-apart longitudes (same parity/modality/pos_in_sign) to the same sign
+                VargaDivision::D2
+                | VargaDivision::D6
+                | VargaDivision::D8
+                | VargaDivision::D16
+                | VargaDivision::D20
+                | VargaDivision::D24
+                | VargaDivision::D30
+                | VargaDivision::D40
+                | VargaDivision::D45 => {
+                    assert_eq!(
+                        rahu_p.sign_index, ketu_p.sign_index,
+                        "Rahu and Ketu must share the same mathematical varga sign in asymmetric {:?}",
+                        div
+                    );
+                }
             }
         }
 
@@ -1346,11 +1356,13 @@ mod tests {
         assert_eq!(calculate_varga_sign(31.0, VargaDivision::D20), 8); // Taurus -> Sagittarius
         assert_eq!(calculate_varga_sign(61.0, VargaDivision::D20), 4); // Gemini -> Leo
 
-        // D24 Chaturvimshamsha (Odd: Leo 4, Even: Cancer 3, forward)
-        assert_eq!(calculate_varga_sign(0.5, VargaDivision::D24), 4); // Aries part 0 -> Leo
-        assert_eq!(calculate_varga_sign(2.0, VargaDivision::D24), 5); // Aries part 1 -> Virgo
-        assert_eq!(calculate_varga_sign(30.5, VargaDivision::D24), 3); // Taurus part 0 -> Cancer
-        assert_eq!(calculate_varga_sign(32.0, VargaDivision::D24), 4); // Taurus part 1 -> Leo
+        // D24 Chaturvimshamsha (Odd: Leo 4 forward; Even: Cancer 3 backward)
+        assert_eq!(calculate_varga_sign(0.5, VargaDivision::D24), 4); // Aries part 0 -> Leo (4)
+        assert_eq!(calculate_varga_sign(2.0, VargaDivision::D24), 5); // Aries part 1 -> Virgo (5)
+        assert_eq!(calculate_varga_sign(30.5, VargaDivision::D24), 3); // Taurus part 0 -> Cancer (3)
+        assert_eq!(calculate_varga_sign(32.0, VargaDivision::D24), 2); // Taurus part 1 -> Gemini (2)
+        assert_eq!(calculate_varga_sign(35.5, VargaDivision::D24), 11); // Taurus part 4 -> Pisces (11)
+        assert_eq!(calculate_varga_sign(59.5, VargaDivision::D24), 4); // Taurus part 23 -> Leo (4)
 
         // D27 Saptavimshamsha (Fire: Aries 0, Earth: Cancer 3, Air: Libra 6, Water: Cap 9)
         assert_eq!(calculate_varga_sign(0.5, VargaDivision::D27), 0); // Aries -> Aries
