@@ -506,7 +506,7 @@ private fun generateSelectiveMarkdown(
                         val rx = if (p.is_retrograde) " [Rx]" else ""
                         val comb = if (p.combustion != "None" && p.combustion.isNotEmpty()) " [${p.combustion}]" else ""
                         val dig = if (p.dignity.isNotEmpty()) ", Dignity: ${p.dignity}" else ""
-                        sb.append("  * ${p.name}: ${String.format("%.2f°", p.sidereal_longitude)} (H${p.house}, $sign, ${p.nakshatra_name} Pada ${p.nakshatra_pada}$dig)$rx$comb\n")
+                        sb.append("  * ${p.name}: ${String.format("%.2f°", p.sidereal_longitude)} (H${p.house}, $sign ${String.format("%.2f°", p.sign_degree)}, ${p.nakshatra_name} Pada ${p.nakshatra_pada}$dig)$rx$comb\n")
                     }
                 }
                 if (incVedicIndicators) {

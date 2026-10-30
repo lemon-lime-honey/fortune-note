@@ -804,12 +804,29 @@ private fun VedicPlacementsSubSection(
             AstroTableHeader(cols)
 
             v.planets.forEachIndexed { idx, p ->
+                val dignityCode = when (p.dignity) {
+                    "Exalted" -> "EXLT"
+                    "Moolatrikona" -> "MOOL"
+                    "Own Sign", "OwnSign" -> "OWN"
+                    "Great Friend" -> "GFRN"
+                    "Friend" -> "FRND"
+                    "Enemy" -> "ENMY"
+                    "Great Enemy" -> "GENM"
+                    "Debilitated" -> "DEBL"
+                    else -> p.dignity.take(4).trim().uppercase(Locale.US)
+                }
                 val statusTag = buildList {
                     if (p.dignity.isNotBlank() && p.dignity != "Neutral") {
-                        add(p.dignity.take(4).uppercase(Locale.US))
+                        add(dignityCode)
                     }
                     if (p.combustion != "None" && p.combustion.isNotBlank()) {
-                        add(if (p.combustion == "Cazimi") "CAZ" else "CMB")
+                        add(
+                            when (p.combustion) {
+                                "Cazimi" -> "CAZ"
+                                "DeeplyCombust" -> "DCMB"
+                                else -> "CMB"
+                            }
+                        )
                     }
                     if (p.is_retrograde && p.name != "Rahu" && p.name != "Ketu") {
                         add("RX")
@@ -817,8 +834,8 @@ private fun VedicPlacementsSubSection(
                 }.joinToString("·").ifEmpty { "NORM" }
 
                 val statusColor = when {
-                    p.dignity == "Exalted" || p.dignity == "Moolatrikona" || p.dignity == "OwnSign" -> CelestialBlue
-                    p.dignity == "Debilitated" || p.combustion == "Combust" -> CrimsonAlert
+                    p.dignity == "Exalted" || p.dignity == "Moolatrikona" || p.dignity == "Own Sign" || p.dignity == "OwnSign" -> CelestialBlue
+                    p.dignity == "Debilitated" || p.combustion == "Combust" || p.combustion == "DeeplyCombust" -> CrimsonAlert
                     else -> TextSecondary
                 }
 

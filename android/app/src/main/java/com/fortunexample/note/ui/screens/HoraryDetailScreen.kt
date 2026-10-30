@@ -258,17 +258,40 @@ fun HoraryDetailScreen(
                                     )
                                     AstroTableHeader(cols)
                                     v.planets.forEachIndexed { idx, p ->
+                                        val dignityCode = when (p.dignity) {
+                                            "Exalted" -> "EXLT"
+                                            "Moolatrikona" -> "MOOL"
+                                            "Own Sign", "OwnSign" -> "OWN"
+                                            "Great Friend" -> "GFRN"
+                                            "Friend" -> "FRND"
+                                            "Enemy" -> "ENMY"
+                                            "Great Enemy" -> "GENM"
+                                            "Debilitated" -> "DEBL"
+                                            else -> p.dignity.take(4).trim().uppercase(Locale.US)
+                                        }
                                         val statusTag = buildList {
                                             if (p.dignity.isNotBlank() && p.dignity != "Neutral") {
-                                                add(p.dignity.take(4).uppercase(Locale.US))
+                                                add(dignityCode)
                                             }
                                             if (p.combustion != "None" && p.combustion.isNotBlank()) {
-                                                add(if (p.combustion == "Cazimi") "CAZ" else "CMB")
+                                                add(
+                                                    when (p.combustion) {
+                                                        "Cazimi" -> "CAZ"
+                                                        "DeeplyCombust" -> "DCMB"
+                                                        else -> "CMB"
+                                                    }
+                                                )
                                             }
                                             if (p.is_retrograde && p.name != "Rahu" && p.name != "Ketu") {
                                                 add("RX")
                                             }
                                         }.joinToString("·").ifEmpty { "NORM" }
+
+                                        val statusColor = when {
+                                            p.dignity == "Exalted" || p.dignity == "Moolatrikona" || p.dignity == "Own Sign" || p.dignity == "OwnSign" -> CelestialBlue
+                                            p.dignity == "Debilitated" || p.combustion == "Combust" || p.combustion == "DeeplyCombust" -> CrimsonAlert
+                                            else -> TextSecondary
+                                        }
 
                                         AstroTableRow(
                                             columns = cols,
@@ -278,25 +301,87 @@ fun HoraryDetailScreen(
                                                 TableCellData(formatSignAndDeg(p.sign_index, p.sign_degree), TextPrimary),
                                                 TableCellData("${p.house}", TextSecondary),
                                                 TableCellData("${p.nakshatra_name.take(8)} P${p.nakshatra_pada}", TextSecondary),
-                                                TableCellData(statusTag, TextSecondary, FontWeight.Bold)
+                                                TableCellData(statusTag, statusColor, FontWeight.Bold)
                                             )
                                         )
                                     }
                                 }
                             }
                             1 -> {
-                                if (v.arudha_padas.isNotEmpty()) {
-                                    AstroPanelCard(title = "Prashna Arudha Padas") {
-                                        val tiles = v.arudha_padas.map { ap ->
-                                            val isPrimary = ap.code == "AL" || ap.code == "UL"
-                                            MetricTileItem(
-                                                tag = ap.code,
-                                                primary = signCode(ap.sign_index),
-                                                secondary = "H${ap.house_from_lagna}",
-                                                highlightColor = if (isPrimary) CelestialBlue else null
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    val pan = v.panchanga
+                                    if (pan.tithi_name.isNotEmpty()) {
+                                        AstroPanelCard(
+                                            title = "Prashna Panchanga",
+                                            contentPadding = PaddingValues(0.dp)
+                                        ) {
+                                            val cols = listOf(
+                                                TableColSpec("LIMB", 1.1f, TextAlign.Start, monospace = true),
+                                                TableColSpec("VALUE", 1.9f, TextAlign.Start),
+                                                TableColSpec("META / LORD", 1.2f, TextAlign.End, monospace = true)
+                                            )
+                                            AstroTableHeader(cols)
+                                            AstroTableRow(
+                                                columns = cols,
+                                                striped = false,
+                                                cells = listOf(
+                                                    TableCellData("TITHI", TextSecondary, FontWeight.Bold),
+                                                    TableCellData(pan.tithi_name, TextPrimary, FontWeight.SemiBold),
+                                                    TableCellData("#${pan.tithi_number} · ${pan.paksha.take(6).uppercase(Locale.US)}", CelestialBlue)
+                                                )
+                                            )
+                                            AstroTableRow(
+                                                columns = cols,
+                                                striped = true,
+                                                cells = listOf(
+                                                    TableCellData("VARA", TextSecondary, FontWeight.Bold),
+                                                    TableCellData(pan.vara_name, TextPrimary, FontWeight.SemiBold),
+                                                    TableCellData("LORD ${vedicGrahaCode(pan.vara_lord)}", TextSecondary)
+                                                )
+                                            )
+                                            AstroTableRow(
+                                                columns = cols,
+                                                striped = false,
+                                                cells = listOf(
+                                                    TableCellData("NAKSHATRA", TextSecondary, FontWeight.Bold),
+                                                    TableCellData("${pan.nakshatra_name} (Pada ${pan.nakshatra_pada})", TextPrimary, FontWeight.SemiBold),
+                                                    TableCellData("LORD ${vedicGrahaCode(pan.nakshatra_lord)}", CelestialBlue)
+                                                )
+                                            )
+                                            AstroTableRow(
+                                                columns = cols,
+                                                striped = true,
+                                                cells = listOf(
+                                                    TableCellData("YOGA", TextSecondary, FontWeight.Bold),
+                                                    TableCellData(pan.yoga_name, TextPrimary, FontWeight.SemiBold),
+                                                    TableCellData("-", TextSecondary)
+                                                )
+                                            )
+                                            AstroTableRow(
+                                                columns = cols,
+                                                striped = false,
+                                                cells = listOf(
+                                                    TableCellData("KARANA", TextSecondary, FontWeight.Bold),
+                                                    TableCellData(pan.karana_name, TextPrimary, FontWeight.SemiBold),
+                                                    TableCellData("-", TextSecondary)
+                                                )
                                             )
                                         }
-                                        CompactMetricGrid(items = tiles, columns = 4)
+                                    }
+
+                                    if (v.arudha_padas.isNotEmpty()) {
+                                        AstroPanelCard(title = "Prashna Arudha Padas") {
+                                            val tiles = v.arudha_padas.map { ap ->
+                                                val isPrimary = ap.code == "AL" || ap.code == "UL"
+                                                MetricTileItem(
+                                                    tag = ap.code,
+                                                    primary = signCode(ap.sign_index),
+                                                    secondary = "H${ap.house_from_lagna}",
+                                                    highlightColor = if (isPrimary) CelestialBlue else null
+                                                )
+                                            }
+                                            CompactMetricGrid(items = tiles, columns = 4)
+                                        }
                                     }
                                 }
                             }
