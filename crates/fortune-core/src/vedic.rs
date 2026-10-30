@@ -592,8 +592,8 @@ fn natural_relationship(planet: Graha, other: Graha) -> i8 {
             _ => -1,
         },
         Graha::Ketu => match other {
-            Graha::Mars | Graha::Venus | Graha::Saturn => 1,
-            Graha::Mercury | Graha::Jupiter => 0,
+            Graha::Mercury | Graha::Venus | Graha::Saturn => 1,
+            Graha::Jupiter => 0,
             _ => -1,
         },
     }
@@ -746,7 +746,7 @@ fn compute_vedic_dignity(
             if sign_index == 8 {
                 return "Moolatrikona".to_string();
             }
-            if sign_index == 7 {
+            if sign_index == 11 {
                 return "Own Sign".to_string();
             }
         }
@@ -824,7 +824,11 @@ fn arudha_sign_lord(
         let lon = planet_lons.get(&g).copied().unwrap_or(0.0);
         let deg = normalize_degrees(lon) % 30.0;
         if matches!(g, Graha::Rahu | Graha::Ketu) {
-            30.0 - deg
+            if deg < 1e-9 {
+                0.0
+            } else {
+                30.0 - deg
+            }
         } else {
             deg
         }
@@ -871,6 +875,7 @@ pub fn calculate_vedic(ephem: &EphemerisSnapshot, latitude: f64) -> VedicChart {
     });
 
     // Pre-collect planet longitudes, signs, and retrograde states for dignity & combustion
+    let mut sun_tropical_lon = 0.0;
     let mut sun_sidereal_lon = 0.0;
     let mut moon_sidereal_lon = 0.0;
     let mut rahu_sidereal_lon = 0.0;
@@ -881,6 +886,7 @@ pub fn calculate_vedic(ephem: &EphemerisSnapshot, latitude: f64) -> VedicChart {
         let sid_lon = normalize_degrees(b.sidereal_longitude);
         let sign_idx = ((sid_lon / 30.0).floor() as u8).min(11);
         if b.name == "Sun" {
+            sun_tropical_lon = normalize_degrees(b.tropical_longitude);
             sun_sidereal_lon = sid_lon;
         } else if b.name == "Moon" {
             moon_sidereal_lon = sid_lon;
@@ -1102,8 +1108,43 @@ pub fn calculate_vedic(ephem: &EphemerisSnapshot, latitude: f64) -> VedicChart {
         TITHI_NAMES[tithi_idx].to_string()
     };
 
-    // Weekday from Julian Day (0 = Monday .. 6 = Sunday for (jd + 0.5).floor() % 7)
-    let weekday_idx = ((ephem.jd_ut1 + 0.5).floor() as i64).rem_euclid(7) as u8;
+    // Local Suryodaya (sunrise) Vara calculation:
+    // Compute local solar hour angle H = RAMC - Alpha_Sun and semi-diurnal arc for standard sunrise (-50').
+    let sun_lon_rad = sun_tropical_lon.to_radians();
+    let eps_rad = ephem.true_obliquity_deg.to_radians();
+    let lat_rad = latitude.to_radians();
+    let sin_delta = eps_rad.sin() * sun_lon_rad.sin();
+    let cos_delta = (1.0 - sin_delta * sin_delta).max(0.0).sqrt();
+    let alpha_deg = (eps_rad.cos() * sun_lon_rad.sin())
+        .atan2(sun_lon_rad.cos())
+        .to_degrees()
+        .rem_euclid(360.0);
+
+    let h0_rad = (-0.833_333_3_f64).to_radians();
+    let cos_h0 = if lat_rad.cos() * cos_delta > 1e-7 {
+        (h0_rad.sin() - lat_rad.sin() * sin_delta) / (lat_rad.cos() * cos_delta)
+    } else {
+        0.0
+    };
+    let mut h = (ephem.ramc - alpha_deg).rem_euclid(360.0);
+    if h > 180.0 {
+        h -= 360.0;
+    }
+    let day_shift = if (-1.0..=1.0).contains(&cos_h0) {
+        let semi_diurnal_deg = cos_h0.acos().to_degrees();
+        if h < -semi_diurnal_deg {
+            -1i64
+        } else {
+            0i64
+        }
+    } else {
+        0i64
+    };
+
+    // Local solar noon JD rolls over at local solar midnight (+ 0.5), giving 0 = Monday .. 6 = Sunday.
+    let local_noon_jd = ephem.jd_ut1 - (h / 360.0);
+    let base_weekday = ((local_noon_jd + 0.5).floor() as i64).rem_euclid(7);
+    let weekday_idx = (base_weekday + day_shift).rem_euclid(7) as u8;
     let (vara_name, vara_lord) = match weekday_idx {
         0 => ("Somavara (Monday)", "Moon"),
         1 => ("Mangalavara (Tuesday)", "Mars"),
@@ -1344,5 +1385,45 @@ mod tests {
         assert_eq!(calculate_varga_sign(0.2, VargaDivision::D60), 0); // Aries part 0 -> Aries
         assert_eq!(calculate_varga_sign(0.7, VargaDivision::D60), 1); // Aries part 1 -> Taurus
         assert_eq!(calculate_varga_sign(30.2, VargaDivision::D60), 1); // Taurus part 0 -> Taurus
+    }
+
+    #[test]
+    fn test_panchanga_vara_and_ketu_dignity() {
+        // 1. Ketu in Pisces (11) should be Own Sign, in Scorpio (7) Exalted
+        let planet_signs = HashMap::new();
+        assert_eq!(
+            compute_vedic_dignity(Graha::Ketu, 7, 10.0, &planet_signs),
+            "Exalted"
+        );
+        assert_eq!(
+            compute_vedic_dignity(Graha::Ketu, 11, 10.0, &planet_signs),
+            "Own Sign"
+        );
+
+        // 2. Arudha lord tie-breaker at exact 0.0 degree boundary for Rahu/Ketu
+        let mut signs = HashMap::new();
+        signs.insert(Graha::Mars, 0);
+        signs.insert(Graha::Ketu, 2);
+        let mut lons = HashMap::new();
+        lons.insert(Graha::Mars, 15.0);
+        lons.insert(Graha::Ketu, 60.0); // exact 0.0° Gemini -> eff_deg must be 0.0, not 30.0
+        assert_eq!(arudha_sign_lord(7, &signs, &lons), Graha::Mars);
+
+        // 3. Panchanga Vara in Seoul (37.5665 N, 126.9780 E, UTC+9):
+        // 2024-03-20 04:00 KST = 2024-03-19 19:00 UTC -> local civil Wednesday predawn (before sunrise),
+        // so Vedic Suryodaya Vara must still be Tuesday (Mangalavara).
+        let ephem_predawn = compute_ephemeris(2024, 3, 19, 19, 0, 0.0, 37.5665, 126.9780)
+            .expect("ephem predawn should succeed");
+        let chart_predawn = calculate_vedic(&ephem_predawn, 37.5665);
+        assert_eq!(chart_predawn.panchanga.vara_name, "Mangalavara (Tuesday)");
+        assert_eq!(chart_predawn.panchanga.vara_lord, "Mars");
+
+        // 2024-03-20 07:30 KST = 2024-03-19 22:30 UTC -> after Seoul sunrise on Wednesday,
+        // even though UTC date is still Tuesday (2024-03-19), Vedic Vara must be Wednesday (Budhavara).
+        let ephem_morning = compute_ephemeris(2024, 3, 19, 22, 30, 0.0, 37.5665, 126.9780)
+            .expect("ephem morning should succeed");
+        let chart_morning = calculate_vedic(&ephem_morning, 37.5665);
+        assert_eq!(chart_morning.panchanga.vara_name, "Budhavara (Wednesday)");
+        assert_eq!(chart_morning.panchanga.vara_lord, "Mercury");
     }
 }
