@@ -79,6 +79,13 @@ pub fn find_mutual_receptions(
             let p1_has_major = p1_has_dom || p1_has_exalt;
             let p2_has_major = p2_has_dom || p2_has_exalt;
 
+            // Lilly CA p. 111-112: A single Term or Face alone is too weak to constitute
+            // an effective mutual reception; when neither planet holds a major dignity (Domicile/Exaltation),
+            // each side must hold at least 2 minor dignities (or Triplicity + Term/Face) to form a valid Minor reception.
+            if !p1_has_major && !p2_has_major && (p1_in_p2.len() < 2 || p2_in_p1.len() < 2) {
+                continue;
+            }
+
             let reception_type = if p1_has_dom && p2_has_dom {
                 "Domicile".to_string()
             } else if p1_has_exalt && p2_has_exalt {

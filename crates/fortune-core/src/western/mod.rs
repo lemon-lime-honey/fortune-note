@@ -165,6 +165,28 @@ pub fn determine_house(lon: f64, cusps: &[f64; 12]) -> u8 {
     1 // Fallback
 }
 
+/// Determine traditional house placement applying William Lilly's 5-Degree Rule (CA p. 115)
+/// for quadrant / Equal house systems (in Whole Sign, strict sign boundaries apply).
+pub fn determine_house_traditional(
+    lon: f64,
+    cusps: &[f64; 12],
+    system: WesternHouseSystem,
+) -> u8 {
+    let base_house = determine_house(lon, cusps);
+    if system == WesternHouseSystem::WholeSign {
+        return base_house;
+    }
+
+    let next_idx = (base_house as usize) % 12;
+    let next_cusp = cusps[next_idx];
+    let dist_to_next = (next_cusp - lon).rem_euclid(360.0);
+    if dist_to_next <= 5.0 {
+        (next_idx + 1) as u8
+    } else {
+        base_house
+    }
+}
+
 /// Default conjunction orb for traditional fixed stars (degrees).
 pub const DEFAULT_FIXED_STAR_MAX_ORB: f64 = 1.5;
 
@@ -314,7 +336,7 @@ pub fn calculate_western_with_mode(
     // 3. Traditional Domain Layer: Always compute traditional data; additionally compute Hellenistic data when Whole Sign is selected
     let saturn_house = ephem.bodies.iter()
         .find(|b| b.name == "Saturn")
-        .map_or(1, |b| determine_house(b.tropical_longitude, &cusps));
+        .map_or(1, |b| determine_house_traditional(b.tropical_longitude, &cusps, system));
 
     let north_node_lon = ephem.bodies.iter().find(|b| b.name == "Rahu").map_or(0.0, |b| b.tropical_longitude);
     let south_node_lon = ephem.bodies.iter().find(|b| b.name == "Ketu").map_or(180.0, |b| b.tropical_longitude);
@@ -325,19 +347,33 @@ pub fn calculate_western_with_mode(
     let jupiter_lon = ephem.bodies.iter().find(|b| b.name == "Jupiter").map_or(0.0, |b| b.tropical_longitude);
     let saturn_lon = ephem.bodies.iter().find(|b| b.name == "Saturn").map_or(0.0, |b| b.tropical_longitude);
 
-    // 3.1 Dignities
+    // 3.0 Fixed Stars (computed first so Regulus, Spica, and Algol conjunctions feed into Lilly accidental dignity scoring)
+    let fixed_stars = fixed_stars::calculate_traditional_fixed_stars(ephem.jd_tt, latitude, ephem.true_obliquity_deg);
+    let dsc = (ascendant + 180.0).rem_euclid(360.0);
+    let ic = (midheaven + 180.0).rem_euclid(360.0);
+    let mut star_check_bodies = planet_pos_tuples.clone();
+    star_check_bodies.push(("Ascendant", ascendant));
+    star_check_bodies.push(("Midheaven", midheaven));
+    star_check_bodies.push(("Descendant", dsc));
+    star_check_bodies.push(("Immum Coeli", ic));
+    let fixed_star_conjunctions = fixed_stars::detect_fixed_star_conjunctions(&fixed_stars, &star_check_bodies, DEFAULT_FIXED_STAR_MAX_ORB);
+
+    // 3.1 Dignities (with Lilly 5-Degree Rule for quadrant house systems and full CA p. 115 context)
     let mut planet_dignities = Vec::new();
     for p in &planets {
         if let Some(cp) = dignity::ClassicalPlanet::from_name(&p.name) {
-            planet_dignities.push(dignity::calculate_planet_dignity(
+            let trad_house = determine_house_traditional(p.longitude, &cusps, system);
+            planet_dignities.push(dignity::calculate_planet_dignity_with_context(
                 cp,
                 p.longitude,
                 p.speed,
-                p.house_number,
+                trad_house,
                 sun_lon,
                 is_day_chart,
                 north_node_lon,
                 south_node_lon,
+                &planet_pos_tuples,
+                &fixed_star_conjunctions,
             ));
         }
     }
@@ -418,17 +454,6 @@ pub fn calculate_western_with_mode(
             is_male,
         )
     };
-
-    // 3.9 Fixed Stars
-    let fixed_stars = fixed_stars::calculate_traditional_fixed_stars(ephem.jd_tt, latitude, ephem.true_obliquity_deg);
-    let dsc = (ascendant + 180.0).rem_euclid(360.0);
-    let ic = (midheaven + 180.0).rem_euclid(360.0);
-    let mut star_check_bodies = planet_pos_tuples.clone();
-    star_check_bodies.push(("Ascendant", ascendant));
-    star_check_bodies.push(("Midheaven", midheaven));
-    star_check_bodies.push(("Descendant", dsc));
-    star_check_bodies.push(("Immum Coeli", ic));
-    let fixed_star_conjunctions = fixed_stars::detect_fixed_star_conjunctions(&fixed_stars, &star_check_bodies, DEFAULT_FIXED_STAR_MAX_ORB);
 
     // 3.10 Prenatal Syzygy (SAN)
     let prenatal_syzygy = syzygy::calculate_prenatal_syzygy_with_coords(ephem.jd_ut1, sun_lon, moon_lon).ok();

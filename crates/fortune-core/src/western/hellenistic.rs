@@ -29,6 +29,14 @@ pub struct HellenisticPlanetCondition {
     pub condition_label: String, // "Domicile", "Exaltation", "Fall", or "Peregrine"
     #[serde(default)]
     pub bound_ruler: String,
+    #[serde(default)]
+    pub triplicity_day_ruler: String,
+    #[serde(default)]
+    pub triplicity_night_ruler: String,
+    #[serde(default)]
+    pub triplicity_participating_ruler: String,
+    #[serde(default)]
+    pub is_in_triplicity: bool,
 }
 
 /// Independent angle points in Hellenistic Whole Sign framework.
@@ -127,6 +135,8 @@ pub fn calculate_hellenistic_data(
             };
 
             let bound_ruler = super::dignity::egyptian_term(sign_index, sign_degree).name().to_string();
+            let (t_day, t_night, t_part) = super::dignity::dorothean_triplicity_rulers(sign_index);
+            let is_in_triplicity = cp == t_day || cp == t_night || cp == t_part;
 
             planet_conditions.push(HellenisticPlanetCondition {
                 name: name.to_string(),
@@ -140,6 +150,10 @@ pub fn calculate_hellenistic_data(
                 is_ruler_of_asc,
                 condition_label,
                 bound_ruler,
+                triplicity_day_ruler: t_day.name().to_string(),
+                triplicity_night_ruler: t_night.name().to_string(),
+                triplicity_participating_ruler: t_part.name().to_string(),
+                is_in_triplicity,
             });
         }
     }

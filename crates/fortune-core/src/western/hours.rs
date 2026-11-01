@@ -249,15 +249,16 @@ pub fn calculate_planetary_hours(
 }
 
 fn are_same_nature(p1: ClassicalPlanet, p2: ClassicalPlanet) -> bool {
-    // Hot & Dry: Sun, Mars
-    // Cold & Moist: Moon, Venus
-    // Cold & Dry: Saturn, Mercury
-    // Hot & Moist: Jupiter
+    // William Lilly (Christian Astrology, p. 121):
+    // - Hot & Dry: Sun, Mars
+    // - Hot & Moist: Jupiter, Venus
+    // - Cold & Dry: Saturn, Mercury
+    // - Cold & Moist: Moon
     let nature = |p: ClassicalPlanet| match p {
         ClassicalPlanet::Sun | ClassicalPlanet::Mars => 1,
-        ClassicalPlanet::Moon | ClassicalPlanet::Venus => 2,
+        ClassicalPlanet::Jupiter | ClassicalPlanet::Venus => 2,
         ClassicalPlanet::Saturn | ClassicalPlanet::Mercury => 3,
-        ClassicalPlanet::Jupiter => 4,
+        ClassicalPlanet::Moon => 4,
     };
     nature(p1) == nature(p2)
 }

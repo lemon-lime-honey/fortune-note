@@ -17,7 +17,10 @@ pub use primary_directions::{
     ascensional_difference, calculate_primary_directions, ecliptic_to_equatorial,
     oblique_ascension, PrimaryDirectionContact,
 };
-pub use profection::{calculate_annual_profection, AnnualProfectionResult};
+pub use profection::{
+    calculate_annual_profection, calculate_zodiacal_releasing, zr_sign_minor_years,
+    AnnualProfectionResult, ZodiacalReleasingResult, ZrPeriod,
+};
 pub use progressions::{
     calculate_secondary_progressions, calculate_secondary_progressions_with_tz,
     calculate_solar_arc, calculate_solar_arc_detailed, PredictiveAspect, ProgressedBody,
