@@ -24,9 +24,9 @@ pub use saju::{
 pub use timezone::{lookup_timezone_id, resolve_local_to_utc, resolve_with_timezone, TimezoneResolution};
 pub use vedic::{
     calculate_varga_sign, calculate_varga_sign_and_degree, calculate_vedic,
-    BhinnaAshtakavargaRow, DashaPeriodInfo, VargaChart, VargaDivision, VargaPlacement,
-    VedicArudhaPada, VedicAshtakavarga, VedicChart, VedicDrishtiInfo, VedicKarakaInfo,
-    VedicPanchanga, VedicPlanet,
+    calculate_vedic_with_options, BhinnaAshtakavargaRow, DashaPeriodInfo, DashaYearType,
+    VargaChart, VargaDivision, VargaPlacement, VedicArudhaPada, VedicAshtakavarga, VedicChart,
+    VedicDrishtiInfo, VedicKarakaInfo, VedicOptions, VedicPanchanga, VedicPlanet,
 };
 pub use western::{
     calculate_western, calculate_western_with_mode, WesternAspect, WesternChart,

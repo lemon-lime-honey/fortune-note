@@ -5,8 +5,8 @@
 //! - 19 divisional charts (Shodashavarga + D6, D8, D11) with varga lagnas and planetary houses
 //! - 27 Nakshatras with 4 Padas
 //! - Classical Parashari planetary dignities (Panchadha Maitri, Exaltation, Moolatrikona, Own Sign, Debilitation) and Combustion
-//! - Jaimini 8 Chara Karakas, BPHS Graha Drishti, 12 Arudha Padas, Ashtakavarga (Bhinna & Sarva), and 5-limb Panchanga
-//! - Vimshottari Dasha hierarchy (Maha and Antar periods)
+//! - Classical 7 Chara Karakas, BPHS Graha Drishti, 12 Arudha Padas, Ashtakavarga (Bhinna & Sarva), and 5-limb Panchanga
+//! - Vimshottari Dasha hierarchy (Maha and Antar periods, supporting both 365.2425-day Solar and 360-day Savana years)
 
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
@@ -16,13 +16,29 @@ use vedaksha::vedic::arudha::{arudha_pada, ArudhaException};
 use vedaksha::vedic::ashtakavarga::{
     bhinna_ashtakavarga, sarvashtakavarga, BhinnaAshtakavargaInput,
 };
-use vedaksha::vedic::combustion::{combustion_state, CombustionState};
 use vedaksha::vedic::dasha::vimshottari::{compute_vimshottari, DashaPeriod};
 use vedaksha::vedic::graha::Graha;
 use vedaksha::vedic::nakshatra::Nakshatra;
 use vedaksha::vedic::panchanga::{compute_karana, compute_panchanga_yoga};
 
 use crate::ephemeris::EphemerisSnapshot;
+
+/// Year length basis for Vimshottari Dasha calculations (BPHS / Saravali vs Modern Solar).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum DashaYearType {
+    /// Modern astronomical solar year (~365.2425 days).
+    #[default]
+    Solar365_2425,
+    /// Classical Savana year (360 days = 12 months × 30 days per BPHS / Saravali Ch. 7).
+    Savana360,
+}
+
+/// Configuration options for Vedic chart calculation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct VedicOptions {
+    #[serde(default)]
+    pub dasha_year_type: DashaYearType,
+}
 
 const RASHI_NAMES: [&str; 12] = [
     "Mesha (Aries)",
@@ -289,13 +305,13 @@ pub fn calculate_varga_sign_and_degree(sidereal_lon: f64, div: VargaDivision) ->
             ((start + part) % 12, degree)
         }
         VargaDivision::D24 => {
-            // Parashari Chaturvimshamsha / Siddhamsha (BPHS Ch. 6): 1°15' divisions (0..23)
-            // Odd signs start from Leo (4) counting forward; Even signs start from Cancer (3) counting backward (reverse)
+            // Parashari Chaturvimshamsha / Siddhamsha (BPHS Ch. 6 & Saravali): 1°15' divisions (0..23)
+            // Odd signs start from Leo (4) counting forward; Even signs start from Cancer (3) counting forward
             let (part, degree) = uniform_varga_part_and_degree(pos_in_sign, 24);
             let sign = if sign_idx.is_multiple_of(2) {
                 (4 + part) % 12
             } else {
-                (3 + 24 - part) % 12
+                (3 + part) % 12
             };
             (sign, degree)
         }
@@ -741,16 +757,13 @@ fn compute_vedic_dignity(
             }
         }
         Graha::Ketu => {
-            if sign_index == 7 {
+            if sign_index == 8 {
                 return "Exalted".to_string();
             }
-            if sign_index == 1 {
+            if sign_index == 1 || sign_index == 2 {
                 return "Debilitated".to_string();
             }
-            if sign_index == 8 {
-                return "Moolatrikona".to_string();
-            }
-            if sign_index == 11 {
+            if sign_index == 7 {
                 return "Own Sign".to_string();
             }
         }
@@ -777,6 +790,63 @@ fn compute_vedic_dignity(
     }
 }
 
+/// Classical Vedic combustion (Moudhya) evaluation per BPHS & Saravali Ch. 36:
+/// - Moon: <= 12°
+/// - Mars: Direct <= 17°, Retrograde <= 8°
+/// - Mercury: Direct <= 14°, Retrograde <= 12°
+/// - Jupiter: <= 11°
+/// - Venus: Direct <= 10°, Retrograde <= 8° (Saravali Ch. 36: retains rays/strength even when combust)
+/// - Saturn: <= 16° (Saravali Ch. 36: retains rays/strength even when combust)
+fn compute_classical_vedic_combustion(
+    graha: Graha,
+    sid_lon: f64,
+    sun_sid_lon: f64,
+    is_retrograde: bool,
+) -> String {
+    if matches!(graha, Graha::Sun | Graha::Rahu | Graha::Ketu) {
+        return "None".to_string();
+    }
+    let diff = (normalize_degrees(sid_lon) - normalize_degrees(sun_sid_lon)).abs();
+    let sep = if diff > 180.0 { 360.0 - diff } else { diff };
+
+    let max_orb = match graha {
+        Graha::Moon => 12.0,
+        Graha::Mars => if is_retrograde { 8.0 } else { 17.0 },
+        Graha::Mercury => if is_retrograde { 12.0 } else { 14.0 },
+        Graha::Jupiter => 11.0,
+        Graha::Venus => if is_retrograde { 8.0 } else { 10.0 },
+        Graha::Saturn => 16.0,
+        _ => 0.0,
+    };
+
+    if sep <= max_orb {
+        if matches!(graha, Graha::Venus | Graha::Saturn) {
+            "Combust (Unimpaired per Saravali)".to_string()
+        } else if sep <= 1.0 {
+            "DeeplyCombust".to_string()
+        } else {
+            "Combust".to_string()
+        }
+    } else {
+        "None".to_string()
+    }
+}
+
+fn dignity_rank(dignity_label: &str) -> i8 {
+    match dignity_label {
+        "Exalted" => 5,
+        "Moolatrikona" => 4,
+        "Own Sign" => 3,
+        "Great Friend" => 2,
+        "Friend" => 1,
+        "Neutral" => 0,
+        "Enemy" => -1,
+        "Great Enemy" => -2,
+        "Debilitated" => -3,
+        _ => 0,
+    }
+}
+
 const SEVEN_KARAKA_LABELS: [&str; 7] = [
     "Atmakaraka (AK)",
     "Amatyakaraka (AmK)",
@@ -787,7 +857,7 @@ const SEVEN_KARAKA_LABELS: [&str; 7] = [
     "Darakaraka (DK)",
 ];
 
-/// Resolves the effective Arudha lord of a Rasi (0..11), applying Jaimini co-lordship
+/// Resolves the effective Arudha lord of a Rasi (0..11), applying Jaimini/Parashari co-lordship
 /// rules for Scorpio (`sign_index == 7`: Mars vs Ketu) and Aquarius (`sign_index == 10`: Saturn vs Rahu).
 fn arudha_sign_lord(
     sign_index: u8,
@@ -823,7 +893,19 @@ fn arudha_sign_lord(
         return lord_b;
     }
 
-    // 3. Tie-breaker: higher effective degree in sign (for Rahu/Ketu, 30.0 - degree_in_sign).
+    // 3. Compare planetary dignity strength (Exalted > Moolatrikona > Own Sign > Friendly).
+    let deg_a = normalize_degrees(planet_lons.get(&lord_a).copied().unwrap_or(0.0)) % 30.0;
+    let deg_b = normalize_degrees(planet_lons.get(&lord_b).copied().unwrap_or(0.0)) % 30.0;
+    let dig_a = dignity_rank(&compute_vedic_dignity(lord_a, sign_a, deg_a, planet_signs));
+    let dig_b = dignity_rank(&compute_vedic_dignity(lord_b, sign_b, deg_b, planet_signs));
+    if dig_a > dig_b {
+        return lord_a;
+    }
+    if dig_b > dig_a {
+        return lord_b;
+    }
+
+    // 4. Tie-breaker: higher effective degree in sign (for Rahu/Ketu, 30.0 - degree_in_sign).
     let eff_deg = |g: Graha| -> f64 {
         let lon = planet_lons.get(&g).copied().unwrap_or(0.0);
         let deg = normalize_degrees(lon) % 30.0;
@@ -861,8 +943,30 @@ fn arudha_name(bhava: u8) -> (&'static str, &'static str) {
     }
 }
 
-/// Calculate Vedic chart from an ephemeris snapshot and observer latitude.
+fn scale_dasha_period(p: &DashaPeriodInfo, birth_jd: f64, scale: f64) -> DashaPeriodInfo {
+    DashaPeriodInfo {
+        lord: p.lord.clone(),
+        start_jd: birth_jd + (p.start_jd - birth_jd) * scale,
+        end_jd: birth_jd + (p.end_jd - birth_jd) * scale,
+        sub_periods: p
+            .sub_periods
+            .iter()
+            .map(|sub| scale_dasha_period(sub, birth_jd, scale))
+            .collect(),
+    }
+}
+
+/// Calculate Vedic chart from an ephemeris snapshot and observer latitude (using default Solar 365.2425-day Dasha years).
 pub fn calculate_vedic(ephem: &EphemerisSnapshot, latitude: f64) -> VedicChart {
+    calculate_vedic_with_options(ephem, latitude, VedicOptions::default())
+}
+
+/// Calculate Vedic chart with explicit configuration options (such as Savana 360-day vs Solar 365.2425-day Dasha years).
+pub fn calculate_vedic_with_options(
+    ephem: &EphemerisSnapshot,
+    latitude: f64,
+    options: VedicOptions,
+) -> VedicChart {
     // 1. Calculate Sidereal Lagna using WholeSign framework
     let house_result = compute_houses(
         ephem.ramc,
@@ -914,11 +1018,7 @@ pub fn calculate_vedic(ephem: &EphemerisSnapshot, latitude: f64) -> VedicChart {
 
         let (dignity, combustion) = if let Some(g) = parse_graha(&b.name) {
             let dig = compute_vedic_dignity(g, sign_index, sign_degree, &planet_signs);
-            let comb = match combustion_state(g, sid_lon, sun_sidereal_lon, b.is_retrograde) {
-                CombustionState::None => "None".to_string(),
-                CombustionState::Combust => "Combust".to_string(),
-                CombustionState::DeeplyCombust => "DeeplyCombust".to_string(),
-            };
+            let comb = compute_classical_vedic_combustion(g, sid_lon, sun_sidereal_lon, b.is_retrograde);
             (dig, comb)
         } else {
             ("Neutral".to_string(), "None".to_string())
@@ -939,14 +1039,21 @@ pub fn calculate_vedic(ephem: &EphemerisSnapshot, latitude: f64) -> VedicChart {
         });
     }
 
-    // 3. Compute the 19 supported divisional charts from each planet's true sidereal longitude
+    // 3. Compute the 19 supported divisional charts from each planet's true sidereal longitude,
+    // preserving the 180° (1-7) Rahu-Ketu axis across all 12-sign vargas (BPHS standard; D2 Hora only uses Cancer/Leo).
+    let rahu_sid_lon = planet_lons.get(&Graha::Rahu).copied().unwrap_or(0.0);
     let mut vargas = BTreeMap::new();
     for div in VargaDivision::ALL {
         let (v_lagna, _) = calculate_varga_sign_and_degree(lagna_sidereal, div);
+        let (rahu_v_sign, rahu_v_deg) = calculate_varga_sign_and_degree(rahu_sid_lon, div);
 
         let mut placements = Vec::with_capacity(planets.len());
         for p in &planets {
-            let (p_sign, p_degree) = calculate_varga_sign_and_degree(p.sidereal_longitude, div);
+            let (p_sign, p_degree) = if p.name == "Ketu" && div != VargaDivision::D2 {
+                ((rahu_v_sign + 6) % 12, rahu_v_deg)
+            } else {
+                calculate_varga_sign_and_degree(p.sidereal_longitude, div)
+            };
             let house = ((p_sign as i16 - v_lagna as i16 + 12) % 12 + 1) as u8;
 
             placements.push(VargaPlacement {
@@ -967,13 +1074,24 @@ pub fn calculate_vedic(ephem: &EphemerisSnapshot, latitude: f64) -> VedicChart {
         );
     }
 
-    // 4. Compute Vimshottari Dasha (Maha and Antar levels)
+    // 4. Compute Vimshottari Dasha (Maha and Antar levels) with configurable year length
     let dasha_tree = compute_vimshottari(moon_sidereal_lon, ephem.jd_ut1, 2);
-    let vimshottari_dashas = dasha_tree
+    let base_dashas: Vec<DashaPeriodInfo> = dasha_tree
         .maha_dashas
         .iter()
         .map(DashaPeriodInfo::from)
         .collect();
+    let vimshottari_dashas = match options.dasha_year_type {
+        DashaYearType::Solar365_2425 => base_dashas,
+        DashaYearType::Savana360 => {
+            // Scale JD offsets from birth_jd by 360.0 / 365.2425 (or actual full-cycle ratio)
+            let scale = 360.0 / 365.2425;
+            base_dashas
+                .iter()
+                .map(|d| scale_dasha_period(d, ephem.jd_ut1, scale))
+                .collect()
+        }
+    };
 
     // 5. Compute Classical 7 Chara Karakas (Sun..Saturn sorted descending by sign_degree)
     let mut seven_candidates: Vec<(&str, f64)> = planets
@@ -1195,41 +1313,18 @@ mod tests {
 
             let rahu_p = v_chart.placements.iter().find(|p| p.planet_name == "Rahu").unwrap();
             let ketu_p = v_chart.placements.iter().find(|p| p.planet_name == "Ketu").unwrap();
-            match div {
-                // Symmetric vargas preserve the 180° (1-7) Rahu-Ketu axis
-                VargaDivision::D1
-                | VargaDivision::D3
-                | VargaDivision::D4
-                | VargaDivision::D7
-                | VargaDivision::D9
-                | VargaDivision::D10
-                | VargaDivision::D11
-                | VargaDivision::D12
-                | VargaDivision::D27
-                | VargaDivision::D60 => {
-                    assert_eq!(
-                        (rahu_p.sign_index + 6) % 12,
-                        ketu_p.sign_index,
-                        "Rahu and Ketu must be 7th apart in symmetric {:?}",
-                        div
-                    );
-                }
-                // Asymmetric vargas map 180°-apart longitudes (same parity/modality/pos_in_sign) to the same sign
-                VargaDivision::D2
-                | VargaDivision::D6
-                | VargaDivision::D8
-                | VargaDivision::D16
-                | VargaDivision::D20
-                | VargaDivision::D24
-                | VargaDivision::D30
-                | VargaDivision::D40
-                | VargaDivision::D45 => {
-                    assert_eq!(
-                        rahu_p.sign_index, ketu_p.sign_index,
-                        "Rahu and Ketu must share the same mathematical varga sign in asymmetric {:?}",
-                        div
-                    );
-                }
+            if div == VargaDivision::D2 {
+                // D2 Hora only uses Cancer (3) and Leo (4)
+                assert!(matches!(rahu_p.sign_index, 3 | 4));
+                assert!(matches!(ketu_p.sign_index, 3 | 4));
+            } else {
+                // All 12-sign Parashari vargas preserve the 180° (1-7) Rahu-Ketu axis
+                assert_eq!(
+                    (rahu_p.sign_index + 6) % 12,
+                    ketu_p.sign_index,
+                    "Rahu and Ketu must be 7th apart in {:?}",
+                    div
+                );
             }
         }
 
@@ -1356,13 +1451,13 @@ mod tests {
         assert_eq!(calculate_varga_sign(31.0, VargaDivision::D20), 8); // Taurus -> Sagittarius
         assert_eq!(calculate_varga_sign(61.0, VargaDivision::D20), 4); // Gemini -> Leo
 
-        // D24 Chaturvimshamsha (Odd: Leo 4 forward; Even: Cancer 3 backward)
+        // D24 Chaturvimshamsha (BPHS & Saravali: Odd: Leo 4 forward; Even: Cancer 3 forward)
         assert_eq!(calculate_varga_sign(0.5, VargaDivision::D24), 4); // Aries part 0 -> Leo (4)
         assert_eq!(calculate_varga_sign(2.0, VargaDivision::D24), 5); // Aries part 1 -> Virgo (5)
         assert_eq!(calculate_varga_sign(30.5, VargaDivision::D24), 3); // Taurus part 0 -> Cancer (3)
-        assert_eq!(calculate_varga_sign(32.0, VargaDivision::D24), 2); // Taurus part 1 -> Gemini (2)
-        assert_eq!(calculate_varga_sign(35.5, VargaDivision::D24), 11); // Taurus part 4 -> Pisces (11)
-        assert_eq!(calculate_varga_sign(59.5, VargaDivision::D24), 4); // Taurus part 23 -> Leo (4)
+        assert_eq!(calculate_varga_sign(32.0, VargaDivision::D24), 4); // Taurus part 1 -> Leo (4)
+        assert_eq!(calculate_varga_sign(35.5, VargaDivision::D24), 7); // Taurus part 4 -> Scorpio (7)
+        assert_eq!(calculate_varga_sign(59.5, VargaDivision::D24), 2); // Taurus part 23 -> Gemini (2)
 
         // D27 Saptavimshamsha (Fire: Aries 0, Earth: Cancer 3, Air: Libra 6, Water: Cap 9)
         assert_eq!(calculate_varga_sign(0.5, VargaDivision::D27), 0); // Aries -> Aries
@@ -1401,14 +1496,14 @@ mod tests {
 
     #[test]
     fn test_panchanga_vara_and_ketu_dignity() {
-        // 1. Ketu in Pisces (11) should be Own Sign, in Scorpio (7) Exalted
+        // 1. Ketu in Scorpio (7) should be Own Sign, in Sagittarius (8) Exalted
         let planet_signs = HashMap::new();
         assert_eq!(
-            compute_vedic_dignity(Graha::Ketu, 7, 10.0, &planet_signs),
+            compute_vedic_dignity(Graha::Ketu, 8, 10.0, &planet_signs),
             "Exalted"
         );
         assert_eq!(
-            compute_vedic_dignity(Graha::Ketu, 11, 10.0, &planet_signs),
+            compute_vedic_dignity(Graha::Ketu, 7, 10.0, &planet_signs),
             "Own Sign"
         );
 
@@ -1420,6 +1515,19 @@ mod tests {
         lons.insert(Graha::Mars, 15.0);
         lons.insert(Graha::Ketu, 60.0); // exact 0.0° Gemini -> eff_deg must be 0.0, not 30.0
         assert_eq!(arudha_sign_lord(7, &signs, &lons), Graha::Mars);
+
+        // 2b. Classical combustion: Retrograde Mars at 10° from Sun is NOT combust (limit 8°),
+        // while Direct Mars at 10° IS combust (limit 17°). Venus/Saturn combust are marked Unimpaired per Saravali.
+        assert_eq!(compute_classical_vedic_combustion(Graha::Mars, 20.0, 10.0, true), "None");
+        assert_eq!(compute_classical_vedic_combustion(Graha::Mars, 20.0, 10.0, false), "Combust");
+        assert_eq!(
+            compute_classical_vedic_combustion(Graha::Venus, 15.0, 10.0, false),
+            "Combust (Unimpaired per Saravali)"
+        );
+        assert_eq!(
+            compute_classical_vedic_combustion(Graha::Saturn, 22.0, 10.0, false),
+            "Combust (Unimpaired per Saravali)"
+        );
 
         // 3. Panchanga Vara in Seoul (37.5665 N, 126.9780 E, UTC+9):
         // 2024-03-20 04:00 KST = 2024-03-19 19:00 UTC -> local civil Wednesday predawn (before sunrise),
@@ -1437,5 +1545,21 @@ mod tests {
         let chart_morning = calculate_vedic(&ephem_morning, 37.5665);
         assert_eq!(chart_morning.panchanga.vara_name, "Budhavara (Wednesday)");
         assert_eq!(chart_morning.panchanga.vara_lord, "Mercury");
+
+        // 4. Savana360 vs Solar365_2425 Dasha year scaling
+        let chart_savana = calculate_vedic_with_options(
+            &ephem_morning,
+            37.5665,
+            VedicOptions {
+                dasha_year_type: DashaYearType::Savana360,
+            },
+        );
+        let solar_d1_span = chart_morning.vimshottari_dashas[1].end_jd - chart_morning.vimshottari_dashas[1].start_jd;
+        let savana_d1_span = chart_savana.vimshottari_dashas[1].end_jd - chart_savana.vimshottari_dashas[1].start_jd;
+        let expected_ratio = 360.0 / 365.2425;
+        assert!(
+            ((savana_d1_span / solar_d1_span) - expected_ratio).abs() < 1e-6,
+            "Savana 360-day Dasha period must scale by 360.0 / 365.2425"
+        );
     }
 }
