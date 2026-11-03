@@ -379,6 +379,7 @@ fun ProfileDetailScreen(
             profile = profile,
             saju = sajuOutput?.saju,
             western = westernOutput?.western,
+            predictive = predictiveData,
             vedic = vedicOutput?.vedic,
             timezoneId = sajuOutput?.timezone_id ?: westernOutput?.timezone_id ?: vedicOutput?.timezone_id ?: profile.timezone_id,
             utcOffsetHours = sajuOutput?.utc_offset_hours ?: westernOutput?.utc_offset_hours ?: vedicOutput?.utc_offset_hours ?: 9.0,
@@ -408,10 +409,13 @@ private fun WesternDomainContent(
     onDateTimeChange: (Int, Int, Int, Int?, Int?) -> Unit,
     onRetry: () -> Unit
 ) {
-    val houseSystems = listOf("Regiomontanus", "Placidus", "WholeSign", "Equal", "Koch", "Campanus")
+    val traditionSystems = listOf(
+        "WholeSign" to "헬레니즘 · WHOLE SIGN",
+        "Regiomontanus" to "중세 · REGIOMONTANUS"
+    )
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        // House system selector bar
+        // Tradition & House system selector bar (strictly Hellenistic Whole Sign vs Medieval Regiomontanus)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -420,14 +424,14 @@ private fun WesternDomainContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "HOUSE SYSTEM",
+                text = "TRADITION",
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
                 color = TextSecondary,
                 style = TabularMonoStyle,
                 modifier = Modifier.padding(end = 4.dp)
             )
-            houseSystems.forEach { hSys ->
+            traditionSystems.forEach { (hSys, label) ->
                 val isSelected = selectedHouse.equals(hSys, ignoreCase = true)
                 Box(
                     modifier = Modifier
@@ -435,10 +439,10 @@ private fun WesternDomainContent(
                         .background(if (isSelected) AccentPrimary else SurfaceLight)
                         .border(1.dp, if (isSelected) AccentPrimary else BorderColor, RoundedCornerShape(4.dp))
                         .clickable { onSelectHouse(hSys) }
-                        .padding(horizontal = 9.dp, vertical = 5.dp)
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
                     Text(
-                        text = hSys.uppercase(Locale.US),
+                        text = label,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (isSelected) BackgroundWhite else TextSecondary,
@@ -453,13 +457,15 @@ private fun WesternDomainContent(
             error != null -> DomainErrorCard(message = error, onRetry = onRetry)
             westernOutput != null -> {
                 val w = westernOutput.western
+                val isWholeSign = selectedHouse.equals("WholeSign", ignoreCase = true) ||
+                    w.house_system?.lowercase() in listOf("wholesign", "whole_sign", "whole", "hellenistic")
 
                 // Chart Wheel + Angles Summary Strip
                 WesternChartWheel(data = w)
 
                 val angleItems = listOf(
                     MetricTileItem("ASC", formatLongitudeSignDeg(w.ascendant), "H1", CrimsonAlert),
-                    MetricTileItem("MC", formatLongitudeSignDeg(w.midheaven), "H10", CelestialBlue),
+                    MetricTileItem("MC", formatLongitudeSignDeg(w.midheaven), if (isWholeSign && w.hellenistic != null) "H${w.hellenistic.angles.midheaven_house}" else "H10", CelestialBlue),
                     MetricTileItem("DSC", formatLongitudeSignDeg((w.ascendant + 180.0) % 360.0), "H7"),
                     MetricTileItem("IC", formatLongitudeSignDeg((w.midheaven + 180.0) % 360.0), "H4")
                 )
@@ -467,7 +473,12 @@ private fun WesternDomainContent(
 
                 // Sub-tabs to eliminate endless scrolling
                 AstroSubTabBar(
-                    tabs = listOf("Placements", "Aspects", "Traditional", "Predictive"),
+                    tabs = listOf(
+                        "Placements",
+                        "Aspects",
+                        if (isWholeSign) "Hellenistic" else "Medieval",
+                        "Predictive"
+                    ),
                     selectedIndex = selectedSubTab,
                     onSelect = onSelectSubTab
                 )
@@ -476,15 +487,17 @@ private fun WesternDomainContent(
                     0 -> WesternPlacementsSubSection(w)
                     1 -> WesternAspectsSubSection(w)
                     2 -> {
-                        if (w.traditional != null || w.hellenistic != null) {
+                        val activeTrad = if (isWholeSign) null else w.traditional
+                        val activeHell = if (isWholeSign) w.hellenistic else null
+                        if (activeTrad != null || activeHell != null) {
                             WesternTraditionalSection(
-                                data = w.traditional,
-                                hellenistic = w.hellenistic,
+                                data = activeTrad,
+                                hellenistic = activeHell,
                                 isHorary = false
                             )
                         } else {
-                            AstroPanelCard(title = "Traditional Analysis") {
-                                Text("Traditional data unavailable.", fontSize = 12.sp, color = TextSecondary)
+                            AstroPanelCard(title = if (isWholeSign) "Hellenistic Analysis" else "Medieval Analysis") {
+                                Text("Analysis data unavailable.", fontSize = 12.sp, color = TextSecondary)
                             }
                         }
                     }
@@ -602,7 +615,12 @@ fun WesternPlacementsSubSection(w: WesternChartData) {
 
 @Composable
 fun WesternAspectsSubSection(w: WesternChartData) {
-    val tradAspects = w.traditional?.traditional_aspects ?: emptyList()
+    val isWholeSign = w.house_system?.lowercase() in listOf("wholesign", "whole_sign", "whole", "hellenistic")
+    val tradAspects = if (isWholeSign) {
+        w.hellenistic?.aspects ?: emptyList()
+    } else {
+        w.traditional?.traditional_aspects ?: emptyList()
+    }
 
     AstroPanelCard(
         title = "Planetary Aspects",

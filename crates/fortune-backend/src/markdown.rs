@@ -155,8 +155,94 @@ fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput, is
     }
     out.push('\n');
 
-    if let Some(ref trad) = chart.western.traditional {
-        out.push_str("## 3. William Lilly Traditional Analysis\n");
+    if is_whole_sign {
+        if let Some(ref h) = chart.western.hellenistic {
+            out.push_str("## 3. Hellenistic Traditional Analysis (Whole Sign)\n");
+
+            out.push_str("### Independent Angles & Planetary Action Points\n");
+            let asc_sign = ZODIAC_SIGNS[h.angles.ascendant_sign as usize % 12];
+            let mc_sign = ZODIAC_SIGNS[h.angles.midheaven_sign as usize % 12];
+            let mc_house_note = if h.angles.is_mc_in_10th {
+                "House 10 (Culmination)".to_string()
+            } else {
+                format!("House {:02} (Special Action Point)", h.angles.midheaven_house)
+            };
+            out.push_str(&format!("- Ascendant (ASC): {:.2}° ({})\n", h.angles.ascendant_degree, asc_sign));
+            out.push_str(&format!("- Midheaven (MC): {:.2}° ({}) - {}\n", h.angles.midheaven_degree, mc_sign, mc_house_note));
+
+            out.push_str("\n### Qualitative Planet Conditions, Egyptian Bounds & Dorothean Triplicity\n");
+            out.push_str("| Planet | Status | House | Bound Ruler | Triplicity (Day/Night/Part) | In Triplicity | Lord of ASC |\n");
+            out.push_str("| :--- | :--- | :---: | :---: | :---: | :---: | :---: |\n");
+            for pc in &h.planet_conditions {
+                let asc_tag = if pc.is_ruler_of_asc { "Yes" } else { "-" };
+                let trip_tag = if pc.is_in_triplicity { "Yes" } else { "-" };
+                let bound = if pc.bound_ruler.is_empty() { "-" } else { pc.bound_ruler.as_str() };
+                let trip_rulers = if pc.triplicity_day_ruler.is_empty() {
+                    "-".to_string()
+                } else {
+                    format!("{}/{}/{}", pc.triplicity_day_ruler, pc.triplicity_night_ruler, pc.triplicity_participating_ruler)
+                };
+                out.push_str(&format!(
+                    "| **{}** | {} | H{:02} | {} | {} | {} | {} |\n",
+                    pc.name, pc.condition_label, pc.house_number, bound, trip_rulers, trip_tag, asc_tag
+                ));
+            }
+
+            if !h.lots.is_empty() {
+                out.push_str("\n### Hermetic Lots (Paulus Alexandrinus)\n");
+                for lot in &h.lots {
+                    let sign_name = ZODIAC_SIGNS[lot.sign_index as usize % 12];
+                    out.push_str(&format!(
+                        "- {}: {:.2}° ({}) - House {:02} (Ruler: {})\n",
+                        lot.name, lot.longitude, sign_name, lot.house_number, lot.ruler
+                    ));
+                }
+            }
+
+            if !h.aspects.is_empty() {
+                out.push_str("\n### Sign-Based Aspects & Degree Contacts\n");
+                for ta in &h.aspects {
+                    let dynamic_str = if ta.is_applying { "Applying" } else { "Separating" };
+                    let partile_str = if ta.is_partile { " [Partile <= 1°]" } else { "" };
+                    out.push_str(&format!(
+                        "- {} - {}: {} (Orb: {:.2}°){}, {}\n",
+                        ta.planet1, ta.planet2, ta.aspect_type, ta.orb, partile_str, dynamic_str
+                    ));
+                }
+            }
+
+            if let Some(ref san) = h.prenatal_syzygy {
+                let san_sign = ZODIAC_SIGNS[san.sign_index as usize % 12];
+                out.push_str("\n### Prenatal Syzygy (SAN)\n");
+                out.push_str(&format!(
+                    "- Type: {}, Longitude: {:.2}° ({}), Moment: {}\n",
+                    san.syzygy_type, san.longitude, san_sign, san.exact_datetime_utc
+                ));
+            }
+
+            if !h.fixed_star_conjunctions.is_empty() {
+                out.push_str("\n### Fixed Star Conjunctions (Orb ≤ 1.5°)\n");
+                for sc in &h.fixed_star_conjunctions {
+                    let status_tag = if sc.is_qualified {
+                        format!(" [Qualified: {}]", sc.qualification_reason)
+                    } else {
+                        format!(" [Filtered: {}]", sc.qualification_reason)
+                    };
+                    let vis_tag = if sc.is_visible {
+                        format!(" [Visible (Culm: {:+.1}°)]", sc.max_altitude)
+                    } else {
+                        format!(" [Below Horizon (Culm: {:+.1}°)]", sc.max_altitude)
+                    };
+                    out.push_str(&format!(
+                        "- {} ☌ {} (Orb: {:.2}°, Lat: {:+.1}°, Mag: {:.2}, Nature: {}){}{}: {}\n",
+                        sc.star_name, sc.body_name, sc.orb, sc.star_latitude, sc.star_magnitude, sc.nature, status_tag, vis_tag, sc.meaning
+                    ));
+                }
+            }
+            out.push('\n');
+        }
+    } else if let Some(ref trad) = chart.western.traditional {
+        out.push_str("## 3. Medieval Traditional Analysis (Regiomontanus)\n");
         if is_horary {
             out.push_str(&format!(
                 "- Planetary Hours: Day of {}, Hour of {} (Radicality: {} - {})\n",
@@ -202,8 +288,8 @@ fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput, is
             }
         }
 
-        out.push_str("\n### Essential Dignities & Lilly Scores\n");
-        out.push_str("| Planet | Longitude | House | Dignity Status | Essential | Accidental | Total Lilly Score |\n");
+        out.push_str("\n### Essential & Accidental Dignities\n");
+        out.push_str("| Planet | Longitude | House | Dignity Status | Essential | Accidental | Total Score |\n");
         out.push_str("| :--- | :--- | :---: | :--- | :---: | :---: | :---: |\n");
         for d in &trad.planet_dignities {
             let mut status = Vec::new();
@@ -323,91 +409,148 @@ fn append_western_details(out: &mut String, chart: &FortuneCalculationOutput, is
             }
         }
         out.push('\n');
-    } else if let Some(ref h) = chart.western.hellenistic {
-        out.push_str("## 3. Hellenistic Traditional Analysis (Whole Sign)\n");
-
-        out.push_str("### Independent Angles & Planetary Action Points\n");
-        let asc_sign = ZODIAC_SIGNS[h.angles.ascendant_sign as usize % 12];
-        let mc_sign = ZODIAC_SIGNS[h.angles.midheaven_sign as usize % 12];
-        let mc_house_note = if h.angles.is_mc_in_10th {
-            "House 10 (Culmination)".to_string()
-        } else {
-            format!("House {:02} (Special Action Point)", h.angles.midheaven_house)
-        };
-        out.push_str(&format!("- Ascendant (ASC): {:.2}° ({})\n", h.angles.ascendant_degree, asc_sign));
-        out.push_str(&format!("- Midheaven (MC): {:.2}° ({}) - {}\n", h.angles.midheaven_degree, mc_sign, mc_house_note));
-
-        out.push_str("\n### Qualitative Planet Conditions (Hellenistic States)\n");
-        out.push_str("| Planet | Status | House | Lord of ASC |\n");
-        out.push_str("| :--- | :--- | :---: | :---: |\n");
-        for pc in &h.planet_conditions {
-            let asc_tag = if pc.is_ruler_of_asc { "Yes" } else { "-" };
-            out.push_str(&format!(
-                "| **{}** | {} | H{:02} | {} |\n",
-                pc.name, pc.condition_label, pc.house_number, asc_tag
-            ));
-        }
-
-        if !h.lots.is_empty() {
-            out.push_str("\n### Hermetic Lots (Lots of Soul & Body)\n");
-            for lot in &h.lots {
-                let sign_name = ZODIAC_SIGNS[lot.sign_index as usize % 12];
-                out.push_str(&format!(
-                    "- {}: {:.2}° ({}) - House {:02} (Ruler: {})\n",
-                    lot.name, lot.longitude, sign_name, lot.house_number, lot.ruler
-                ));
-            }
-        }
-
-        if !h.aspects.is_empty() {
-            out.push_str("\n### Sign-Based Aspects & Degree Contacts\n");
-            for ta in &h.aspects {
-                let dynamic_str = if ta.is_applying { "Applying" } else { "Separating" };
-                let partile_str = if ta.is_partile { " [Partile <= 1°]" } else { "" };
-                out.push_str(&format!(
-                    "- {} - {}: {} (Orb: {:.2}°){}, {}\n",
-                    ta.planet1, ta.planet2, ta.aspect_type, ta.orb, partile_str, dynamic_str
-                ));
-            }
-        }
-
-        if let Some(ref san) = h.prenatal_syzygy {
-            let san_sign = ZODIAC_SIGNS[san.sign_index as usize % 12];
-            out.push_str("\n### Prenatal Syzygy (SAN)\n");
-            out.push_str(&format!(
-                "- Type: {}, Longitude: {:.2}° ({}), Moment: {}\n",
-                san.syzygy_type, san.longitude, san_sign, san.exact_datetime_utc
-            ));
-        }
-
-        if !h.fixed_star_conjunctions.is_empty() {
-            out.push_str("\n### Fixed Star Conjunctions (Orb ≤ 1.5°)\n");
-            for sc in &h.fixed_star_conjunctions {
-                let status_tag = if sc.is_qualified {
-                    format!(" [Qualified: {}]", sc.qualification_reason)
-                } else {
-                    format!(" [Filtered: {}]", sc.qualification_reason)
-                };
-                let vis_tag = if sc.is_visible {
-                    format!(" [Visible (Culm: {:+.1}°)]", sc.max_altitude)
-                } else {
-                    format!(" [Below Horizon (Culm: {:+.1}°)]", sc.max_altitude)
-                };
-                out.push_str(&format!(
-                    "- {} ☌ {} (Orb: {:.2}°, Lat: {:+.1}°, Mag: {:.2}, Nature: {}){}{}: {}\n",
-                    sc.star_name, sc.body_name, sc.orb, sc.star_latitude, sc.star_magnitude, sc.nature, status_tag, vis_tag, sc.meaning
-                ));
-            }
-        }
-        out.push('\n');
     }
+}
+
+pub fn append_western_predictive_details(
+    out: &mut String,
+    suite: &fortune_core::western::predictive::PredictiveSuite,
+) {
+    out.push_str(&format!(
+        "## 4. Predictive Astrology Analysis (Target: {:04}-{:02}-{:02} {:02}:{:02}, Age {})\n",
+        suite.target_year, suite.target_month, suite.target_day, suite.target_hour, suite.target_minute, suite.age
+    ));
+
+    // 1. Annual Profection
+    let prof = &suite.profection;
+    let occ_str = if prof.active_natal_planets.is_empty() {
+        "None".to_string()
+    } else {
+        prof.active_natal_planets.join(", ")
+    };
+    out.push_str("\n### Annual Profection\n");
+    out.push_str(&format!(
+        "- Target Year: {} (Age {})\n- Profected House: House {:02} ({})\n- Lord of the Year (Time Lord): {}\n- Natal Occupants in Profected House: {}\n",
+        prof.target_year, prof.target_age, prof.profected_house, prof.profected_sign_name, prof.lord_of_the_year, occ_str
+    ));
+
+    // 2. Solar & Planetary Returns
+    if !suite.planetary_returns.is_empty() {
+        out.push_str("\n### Solar & Planetary Returns\n");
+        for ret in &suite.planetary_returns {
+            let asc_sign = ZODIAC_SIGNS[(ret.ascendant / 30.0).floor() as usize % 12];
+            let mc_sign = ZODIAC_SIGNS[(ret.midheaven / 30.0).floor() as usize % 12];
+            out.push_str(&format!(
+                "- **{} Return ({})**: Exact Moment `{}` | Return ASC {:.2}° ({}), Return MC {:.2}° ({})\n",
+                ret.return_body, ret.target_year, ret.return_date_utc, ret.ascendant, asc_sign, ret.midheaven, mc_sign
+            ));
+            let mut pl_items = Vec::new();
+            for p in &ret.return_planets {
+                let s_name = ZODIAC_SIGNS[p.sign_index as usize % 12];
+                let h_num = fortune_core::western::determine_house(p.progressed_longitude, &ret.house_cusps);
+                let rx = if p.is_retrograde { " Rx" } else { "" };
+                pl_items.push(format!("{}: {:.2}° {} (H{:02}{})", p.name, p.sign_degree, s_name, h_num, rx));
+            }
+            if !pl_items.is_empty() {
+                out.push_str(&format!("  * Return Placements: {}\n", pl_items.join(", ")));
+            }
+            if !ret.natal_aspects.is_empty() {
+                let asp_items: Vec<String> = ret
+                    .natal_aspects
+                    .iter()
+                    .map(|a| format!("Return {} {} Natal {} (Orb {:.2}°)", a.return_point, a.aspect_type, a.natal_point, a.orb))
+                    .collect();
+                out.push_str(&format!("  * Return-to-Natal Aspects: {}\n", asp_items.join(", ")));
+            }
+        }
+    }
+
+    // 3. Solar Arc & Secondary Progressions
+    out.push_str(&format!(
+        "\n### Solar Arc Directions (Arc Offset: +{:.2}°)\n",
+        suite.solar_arc.arc_degrees
+    ));
+    for p in &suite.solar_arc.directed_planets {
+        let s_name = ZODIAC_SIGNS[p.sign_index as usize % 12];
+        out.push_str(&format!(
+            "- SA {}: {:.2}° ({}) [Natal: {:.2}°]\n",
+            p.name, p.sign_degree, s_name, p.natal_longitude
+        ));
+    }
+    if !suite.solar_arc.contacts.is_empty() {
+        out.push_str("- Solar Arc Contacts (Orb ≤ 1.5°):\n");
+        for c in &suite.solar_arc.contacts {
+            out.push_str(&format!(
+                "  * SA {} {} Natal {} (Orb: {:.2}°)\n",
+                c.moving_body, c.aspect_type, c.natal_body, c.orb
+            ));
+        }
+    }
+
+    if let Some(ref sp) = suite.secondary_progression {
+        out.push_str(&format!(
+            "\n### Secondary Progressions (Ephemeris Date: {}, Phase: {})\n",
+            sp.progressed_date_utc, sp.progressed_lunar_phase
+        ));
+        for p in &sp.planets {
+            let s_name = ZODIAC_SIGNS[p.sign_index as usize % 12];
+            let rx = if p.is_retrograde { " [Rx]" } else { "" };
+            out.push_str(&format!(
+                "- Progressed {}: {:.2}° ({}){}\n",
+                p.name, p.sign_degree, s_name, rx
+            ));
+        }
+        if !sp.contacts.is_empty() {
+            out.push_str("- Progressed-to-Natal Contacts (Orb ≤ 1.5°):\n");
+            for c in &sp.contacts {
+                out.push_str(&format!(
+                    "  * Progressed {} {} Natal {} (Orb: {:.2}°)\n",
+                    c.moving_body, c.aspect_type, c.natal_body, c.orb
+                ));
+            }
+        }
+    }
+
+    // 4. Transits & Primary Directions
+    if !suite.transits.is_empty() {
+        out.push_str("\n### Active Transits to Natal (Orb ≤ 2.0°)\n");
+        for t in &suite.transits {
+            out.push_str(&format!(
+                "- Transit {} ({:.2}°) {} Natal {} ({:.2}°) (Orb: {:.2}°)\n",
+                t.transiting_planet, t.transiting_longitude, t.aspect_type, t.natal_planet, t.natal_longitude, t.orb
+            ));
+        }
+    }
+
+    if !suite.primary_directions.is_empty() {
+        out.push_str("\n### Primary Directions (Naibod Key)\n");
+        for pd in &suite.primary_directions {
+            out.push_str(&format!(
+                "- {} {} {} (Arc: {:.2}°, Age: {:.1})\n",
+                pd.promittor, pd.aspect_type, pd.significator, pd.direction_arc_deg, pd.realization_age
+            ));
+        }
+    }
+    out.push('\n');
 }
 
 /// 서양 점성술 전용 마크다운 리포트 생성
 pub fn format_profile_western_markdown(profile: &Profile, chart: &FortuneCalculationOutput) -> String {
+    format_profile_western_markdown_with_predictive(profile, chart, None)
+}
+
+/// 서양 점성술 전용 마크다운 리포트 생성 (예측 기법 포함)
+pub fn format_profile_western_markdown_with_predictive(
+    profile: &Profile,
+    chart: &FortuneCalculationOutput,
+    suite: Option<&fortune_core::western::predictive::PredictiveSuite>,
+) -> String {
     let mut out = String::new();
     append_profile_meta(&mut out, profile, chart, "서양 점성술 (Western Tropical Natal Chart)");
     append_western_details(&mut out, chart, false);
+    if let Some(s) = suite {
+        append_western_predictive_details(&mut out, s);
+    }
     out
 }
 

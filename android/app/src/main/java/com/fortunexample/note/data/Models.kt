@@ -377,7 +377,11 @@ data class HellenisticPlanetConditionData(
     val is_in_fall: Boolean,
     val is_ruler_of_asc: Boolean,
     val condition_label: String,
-    val bound_ruler: String = ""
+    val bound_ruler: String = "",
+    val triplicity_day_ruler: String = "",
+    val triplicity_night_ruler: String = "",
+    val triplicity_participating_ruler: String = "",
+    val is_in_triplicity: Boolean = false
 )
 
 @Serializable

@@ -63,18 +63,19 @@ fun WesternTraditionalSection(
     hellenistic: HellenisticData? = null,
     isHorary: Boolean = false
 ) {
-    var selectedSubTab by remember { mutableIntStateOf(0) }
-    val subTabs = buildList {
-        if (data != null) {
-            add("Dignities")
-            add("Hours & Moon")
-            add("Receptions & Cusps")
-            add("Lots & Stars")
-        }
-        if (hellenistic != null) add("Hellenistic")
+    if (hellenistic != null) {
+        HellenisticSubSection(hellenistic)
+        return
     }
+    if (data == null) return
 
-    if (subTabs.isEmpty()) return
+    var selectedSubTab by remember { mutableIntStateOf(0) }
+    val subTabs = listOf(
+        "Dignities",
+        "Hours & Moon",
+        "Receptions & Cusps",
+        "Lots & Stars"
+    )
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -86,13 +87,11 @@ fun WesternTraditionalSection(
             onSelect = { selectedSubTab = it }
         )
 
-        val currentLabel = subTabs[selectedSubTab.coerceIn(0, subTabs.lastIndex)]
-        when (currentLabel) {
-            "Dignities" -> if (data != null) DignitiesMatrixSubSection(data)
-            "Hours & Moon" -> if (data != null) HoursAndMoonSubSection(data, isHorary)
-            "Receptions & Cusps" -> if (data != null) ReceptionsAndCuspsSubSection(data)
-            "Lots & Stars" -> if (data != null) LotsAndStarsSubSection(data)
-            "Hellenistic" -> if (hellenistic != null) HellenisticSubSection(hellenistic)
+        when (subTabs[selectedSubTab.coerceIn(0, subTabs.lastIndex)]) {
+            "Dignities" -> DignitiesMatrixSubSection(data)
+            "Hours & Moon" -> HoursAndMoonSubSection(data, isHorary)
+            "Receptions & Cusps" -> ReceptionsAndCuspsSubSection(data)
+            "Lots & Stars" -> LotsAndStarsSubSection(data)
         }
     }
 }
@@ -542,9 +541,18 @@ private fun LotsAndStarsSubSection(data: WesternTraditionalData) {
 
 @Composable
 private fun HellenisticSubSection(h: HellenisticData) {
+    var expandedStar by remember { mutableStateOf<String?>(null) }
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         // 1. Angles & Bounds
-        AstroPanelCard(title = "Hellenistic Angles (Whole Sign)") {
+        AstroPanelCard(
+            title = "Hellenistic Angles (Whole Sign)",
+            headerAction = {
+                SectionCopyButton("Hellenistic Angles") {
+                    "ASC: ${formatSignAndDeg(h.angles.ascendant_sign, h.angles.ascendant_degree)} (H1) | MC: ${formatSignAndDeg(h.angles.midheaven_sign, h.angles.midheaven_degree)} (H${h.angles.midheaven_house})"
+                }
+            }
+        ) {
             val tiles = listOf(
                 MetricTileItem("ASCENDANT", formatSignAndDeg(h.angles.ascendant_sign, h.angles.ascendant_degree), "H1"),
                 MetricTileItem("MIDHEAVEN", formatSignAndDeg(h.angles.midheaven_sign, h.angles.midheaven_degree), "H${h.angles.midheaven_house}"),
@@ -553,18 +561,31 @@ private fun HellenisticSubSection(h: HellenisticData) {
             CompactMetricGrid(items = tiles, columns = 3)
         }
 
-        // 2. Planet Conditions & Egyptian Bounds
+        // 2. Planet Conditions, Egyptian Bounds & Dorothean Triplicity
         if (h.planet_conditions.isNotEmpty()) {
             AstroPanelCard(
-                title = "Planetary Conditions & Egyptian Bounds",
-                contentPadding = PaddingValues(0.dp)
+                title = "Planetary Conditions, Egyptian Bounds & Triplicity",
+                contentPadding = PaddingValues(0.dp),
+                headerAction = {
+                    SectionCopyButton("Hellenistic Conditions") {
+                        buildString {
+                            appendLine("[Hellenistic Conditions, Bounds & Triplicity]")
+                            h.planet_conditions.forEach { pc ->
+                                val tripTag = if (pc.is_in_triplicity) " · In Triplicity" else ""
+                                val lordTag = if (pc.is_ruler_of_asc) " · Lord of ASC" else ""
+                                appendLine("${bodyCode(pc.name)} (${formatSignAndDeg(pc.sign_index, pc.sign_degree)}, H${pc.house_number}): ${pc.condition_label}, Bound ${bodyCode(pc.bound_ruler)}$tripTag$lordTag")
+                            }
+                        }.trimEnd()
+                    }
+                }
             ) {
                 val cols = listOf(
                     TableColSpec("BODY", 0.8f, TextAlign.Start, monospace = true),
-                    TableColSpec("POSITION", 1.3f, TextAlign.Start, monospace = true),
-                    TableColSpec("H", 0.5f, TextAlign.Center, monospace = true),
-                    TableColSpec("BOUND", 0.8f, TextAlign.Center, monospace = true),
-                    TableColSpec("CONDITION", 1.6f, TextAlign.End)
+                    TableColSpec("POSITION", 1.25f, TextAlign.Start, monospace = true),
+                    TableColSpec("H", 0.45f, TextAlign.Center, monospace = true),
+                    TableColSpec("BOUND", 0.7f, TextAlign.Center, monospace = true),
+                    TableColSpec("TRIP", 0.65f, TextAlign.Center, monospace = true),
+                    TableColSpec("CONDITION", 1.35f, TextAlign.End)
                 )
                 AstroTableHeader(cols)
                 h.planet_conditions.forEachIndexed { idx, pc ->
@@ -576,6 +597,11 @@ private fun HellenisticSubSection(h: HellenisticData) {
                             TableCellData(formatSignAndDeg(pc.sign_index, pc.sign_degree), TextPrimary),
                             TableCellData("${pc.house_number}", TextSecondary),
                             TableCellData(if (pc.bound_ruler.isNotBlank()) bodyCode(pc.bound_ruler) else "-", TextSecondary),
+                            TableCellData(
+                                text = if (pc.is_in_triplicity) "YES" else "-",
+                                color = if (pc.is_in_triplicity) CelestialBlue else TextSecondary,
+                                fontWeight = if (pc.is_in_triplicity) FontWeight.Bold else FontWeight.Normal
+                            ),
                             TableCellData(
                                 text = pc.condition_label.ifBlank { "Peregrine" },
                                 color = when {
@@ -594,8 +620,18 @@ private fun HellenisticSubSection(h: HellenisticData) {
         // 3. Hellenistic Lots
         if (h.lots.isNotEmpty()) {
             AstroPanelCard(
-                title = "Hellenistic Lots",
-                contentPadding = PaddingValues(0.dp)
+                title = "Hermetic Lots (Paulus Alexandrinus)",
+                contentPadding = PaddingValues(0.dp),
+                headerAction = {
+                    SectionCopyButton("Hermetic Lots") {
+                        buildString {
+                            appendLine("[Hermetic Lots]")
+                            h.lots.forEach { lot ->
+                                appendLine("${lot.name}: ${formatSignAndDeg(lot.sign_index, lot.sign_degree)} (H${lot.house_number}, Lord: ${bodyCode(lot.ruler)})")
+                            }
+                        }.trimEnd()
+                    }
+                }
             ) {
                 val cols = listOf(
                     TableColSpec("LOT", 1.5f, TextAlign.Start),
@@ -617,6 +653,80 @@ private fun HellenisticSubSection(h: HellenisticData) {
                             TableCellData(lot.formula.ifBlank { "-" }, TextSecondary)
                         )
                     )
+                }
+            }
+        }
+
+        // 4. Prenatal Syzygy (SAN)
+        h.prenatal_syzygy?.let { san ->
+            AstroPanelCard(title = "Prenatal Syzygy (SAN)") {
+                val tiles = listOf(
+                    MetricTileItem("TYPE", san.syzygy_type.uppercase(Locale.US)),
+                    MetricTileItem("DEGREE", formatSignAndDeg(san.sign_index, san.sign_degree)),
+                    MetricTileItem("UTC DATE", san.exact_datetime_utc.take(16))
+                )
+                CompactMetricGrid(items = tiles, columns = 3)
+            }
+        }
+
+        // 5. Fixed Star Conjunctions
+        AstroPanelCard(
+            title = "Fixed Star Conjunctions",
+            subtitle = "Tap row to view traditional nature & meaning",
+            contentPadding = PaddingValues(0.dp)
+        ) {
+            if (h.fixed_star_conjunctions.isEmpty()) {
+                Box(modifier = Modifier.padding(12.dp)) {
+                    Text("No active fixed star conjunctions within orb.", fontSize = 12.sp, color = TextSecondary)
+                }
+            } else {
+                val cols = listOf(
+                    TableColSpec("STAR", 1.5f, TextAlign.Start),
+                    TableColSpec("BODY", 0.75f, TextAlign.Center, monospace = true),
+                    TableColSpec("ORB", 0.85f, TextAlign.End, monospace = true),
+                    TableColSpec("NATURE", 0.95f, TextAlign.Center, monospace = true),
+                    TableColSpec("STATUS", 0.95f, TextAlign.End, monospace = true)
+                )
+                AstroTableHeader(cols)
+                h.fixed_star_conjunctions.forEachIndexed { idx, fsc ->
+                    val key = "${fsc.star_name}_${fsc.body_name}"
+                    val isExp = expandedStar == key
+                    AstroTableRow(
+                        columns = cols,
+                        striped = idx % 2 == 1,
+                        onClick = { expandedStar = if (isExp) null else key },
+                        cells = listOf(
+                            TableCellData(fsc.star_name, TextPrimary, FontWeight.Bold),
+                            TableCellData(bodyCode(fsc.body_name), CelestialBlue, FontWeight.Bold),
+                            TableCellData(formatOrb(fsc.orb), TextPrimary),
+                            TableCellData(fsc.nature, TextSecondary),
+                            TableCellData(
+                                text = if (fsc.is_qualified) "QUAL" else "FILT",
+                                color = if (fsc.is_qualified) CelestialBlue else TextSecondary,
+                                badgeColor = if (fsc.is_qualified) CelestialBlue else null
+                            )
+                        )
+                    )
+                    if (isExp) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(SurfaceLight)
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = "Mag ${fsc.star_magnitude} · Lat ${String.format(Locale.US, "%+.1f°", fsc.star_latitude)} · Max Alt ${String.format(Locale.US, "%+.1f°", fsc.max_altitude)}",
+                                fontSize = 10.sp,
+                                color = TextSecondary,
+                                style = TabularMonoStyle
+                            )
+                            if (fsc.meaning.isNotBlank()) {
+                                Text(text = fsc.meaning, fontSize = 11.sp, color = TextPrimary)
+                            }
+                        }
+                        HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+                    }
                 }
             }
         }

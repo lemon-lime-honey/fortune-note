@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fortunexample.note.data.PlanetaryReturnData
 import com.fortunexample.note.data.PredictiveSuiteData
 import com.fortunexample.note.data.ProfileDto
 import com.fortunexample.note.data.findHouseNumber
@@ -180,7 +181,14 @@ private fun ProfectionTabContent(data: PredictiveSuiteData) {
         title = "Annual Profection (${data.target_year})",
         headerAction = {
             SectionCopyButton("Annual Profection") {
-                "Year ${data.target_year} (Age ${prof.target_age}): H${prof.profected_house} ${signCode(prof.profected_sign_index)} · Lord: ${prof.lord_of_the_year}"
+                val occ = if (prof.active_natal_planets.isEmpty()) "None" else prof.active_natal_planets.joinToString(", ")
+                buildString {
+                    appendLine("[Annual Profection ${data.target_year}]")
+                    appendLine("- Target Age: ${prof.target_age}")
+                    appendLine("- Profected House: House ${prof.profected_house} (${prof.profected_sign_name})")
+                    appendLine("- Lord of the Year (Time Lord): ${prof.lord_of_the_year}")
+                    appendLine("- Natal Occupants in House ${prof.profected_house}: $occ")
+                }.trimEnd()
             }
         }
     ) {
@@ -205,7 +213,23 @@ private fun SolarArcTabContent(data: PredictiveSuiteData) {
         AstroPanelCard(
             title = "Solar Arc Contacts (Orb ≤ 1.5°)",
             subtitle = String.format(Locale.US, "Arc Offset: +%05.2f°", sa.arc_degrees),
-            contentPadding = PaddingValues(0.dp)
+            contentPadding = PaddingValues(0.dp),
+            headerAction = {
+                SectionCopyButton("Solar Arc") {
+                    buildString {
+                        appendLine(String.format(Locale.US, "[Solar Arc Directions (%d, Offset +%.2f°)]", data.target_year, sa.arc_degrees))
+                        sa.directed_planets.forEach { p ->
+                            appendLine("- SA ${p.name}: ${formatSignAndDeg(p.sign_index, p.sign_degree)} (Natal: ${formatLongitudeSignDeg(p.natal_longitude)})")
+                        }
+                        if (sa.contacts.isNotEmpty()) {
+                            appendLine("Contacts (Orb <= 1.5°):")
+                            sa.contacts.forEach { c ->
+                                appendLine("  * SA ${c.moving_body} ${c.aspect_type} Natal ${c.natal_body} (Orb ${formatOrb(c.orb)})")
+                            }
+                        }
+                    }.trimEnd()
+                }
+            }
         ) {
             if (sa.contacts.isEmpty()) {
                 Box(modifier = Modifier.padding(12.dp)) {
@@ -279,7 +303,25 @@ private fun SecondaryProgressionTabContent(data: PredictiveSuiteData) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         AstroPanelCard(
             title = "Secondary Progressions Summary",
-            subtitle = "Ephemeris Date: ${sp.progressed_date_utc}"
+            subtitle = "Ephemeris Date: ${sp.progressed_date_utc}",
+            headerAction = {
+                SectionCopyButton("Secondary Progressions") {
+                    buildString {
+                        appendLine("[Secondary Progressions (${sp.progressed_date_utc})]")
+                        appendLine("- Lunar Phase: ${sp.progressed_lunar_phase}")
+                        sp.planets.forEach { p ->
+                            val rx = if (p.is_retrograde) " [Rx]" else ""
+                            appendLine("- Progressed ${p.name}: ${formatSignAndDeg(p.sign_index, p.sign_degree)}$rx")
+                        }
+                        if (sp.contacts.isNotEmpty()) {
+                            appendLine("Contacts (Orb <= 1.5°):")
+                            sp.contacts.forEach { c ->
+                                appendLine("  * Progressed ${c.moving_body} ${c.aspect_type} Natal ${c.natal_body} (Orb ${formatOrb(c.orb)})")
+                            }
+                        }
+                    }.trimEnd()
+                }
+            }
         ) {
             val tiles = listOf(
                 MetricTileItem("LUNAR PHASE", sp.progressed_lunar_phase.uppercase(Locale.US)),
@@ -355,7 +397,31 @@ private fun SecondaryProgressionTabContent(data: PredictiveSuiteData) {
 
 @Composable
 private fun PlanetaryReturnsTabContent(data: PredictiveSuiteData) {
-    val returns = data.planetary_returns
+    val returns = remember(data) {
+        buildList {
+            val sr = data.solar_return
+            val hasSunInList = data.planetary_returns.any { it.return_body.equals("Sun", ignoreCase = true) }
+            if (sr != null && !hasSunInList) {
+                add(
+                    PlanetaryReturnData(
+                        target_year = sr.return_year,
+                        return_body = "Sun",
+                        return_date_utc = sr.return_date_utc,
+                        exact_jd_ut1 = sr.exact_jd_ut1,
+                        body_longitude = sr.sun_longitude,
+                        is_retrograde = false,
+                        speed = 1.0,
+                        ascendant = sr.ascendant,
+                        midheaven = sr.midheaven,
+                        house_cusps = sr.house_cusps,
+                        return_planets = sr.planets,
+                        natal_aspects = sr.natal_aspects
+                    )
+                )
+            }
+            addAll(data.planetary_returns)
+        }
+    }
     var selectedBodyIdx by remember { mutableIntStateOf(0) }
 
     if (returns.isEmpty()) {
@@ -377,7 +443,28 @@ private fun PlanetaryReturnsTabContent(data: PredictiveSuiteData) {
 
         AstroPanelCard(
             title = "${currentReturn.return_body} Return (${currentReturn.target_year})",
-            subtitle = "Exact UTC: ${currentReturn.return_date_utc}"
+            subtitle = "Exact UTC: ${currentReturn.return_date_utc}",
+            headerAction = {
+                SectionCopyButton("${currentReturn.return_body} Return") {
+                    buildString {
+                        appendLine("[${currentReturn.return_body} Return (${currentReturn.target_year})]")
+                        appendLine("- Exact UTC: ${currentReturn.return_date_utc}")
+                        appendLine("- Return ASC: ${formatLongitudeSignDeg(currentReturn.ascendant)} | Return MC: ${formatLongitudeSignDeg(currentReturn.midheaven)}")
+                        appendLine("- Return Placements:")
+                        currentReturn.return_planets.forEach { p ->
+                            val hNum = findHouseNumber(p.progressed_longitude, currentReturn.house_cusps)
+                            val rx = if (p.is_retrograde) " [Rx]" else ""
+                            appendLine("  * ${p.name}: ${formatSignAndDeg(p.sign_index, p.sign_degree)} (H$hNum)$rx")
+                        }
+                        if (currentReturn.natal_aspects.isNotEmpty()) {
+                            appendLine("- Return-to-Natal Aspects:")
+                            currentReturn.natal_aspects.forEach { a ->
+                                appendLine("  * Return ${a.return_point} ${a.aspect_type} Natal ${a.natal_point} (Orb ${formatOrb(a.orb)})")
+                            }
+                        }
+                    }.trimEnd()
+                }
+            }
         ) {
             val tiles = listOf(
                 MetricTileItem("RETURN ASC", formatLongitudeSignDeg(currentReturn.ascendant), "H1", CrimsonAlert),
@@ -572,7 +659,21 @@ private fun TransitsTabContent(
 
         AstroPanelCard(
             title = "Active Transits to Natal (Orb ≤ 2.0°)",
-            contentPadding = PaddingValues(0.dp)
+            contentPadding = PaddingValues(0.dp),
+            headerAction = {
+                SectionCopyButton("Active Transits") {
+                    buildString {
+                        appendLine("[Active Transits ($timestampStr)]")
+                        if (data.transits.isEmpty()) {
+                            appendLine("No active major transits within 2.0° orb.")
+                        } else {
+                            data.transits.forEach { t ->
+                                appendLine("- Transit ${t.transiting_planet} (${formatLongitudeSignDeg(t.transiting_longitude)}) ${t.aspect_type} Natal ${t.natal_planet} (${formatLongitudeSignDeg(t.natal_longitude)}) (Orb ${formatOrb(t.orb)})")
+                            }
+                        }
+                    }.trimEnd()
+                }
+            }
         ) {
             if (data.transits.isEmpty()) {
                 Box(modifier = Modifier.padding(12.dp)) {
@@ -637,7 +738,21 @@ private fun TransitActionChip(
 private fun PrimaryDirectionsTabContent(data: PredictiveSuiteData) {
     AstroPanelCard(
         title = "Primary Directions (Naibod Key)",
-        contentPadding = PaddingValues(0.dp)
+        contentPadding = PaddingValues(0.dp),
+        headerAction = {
+            SectionCopyButton("Primary Directions") {
+                buildString {
+                    appendLine("[Primary Directions (Naibod Key, Target Year ${data.target_year})]")
+                    if (data.primary_directions.isEmpty()) {
+                        appendLine("No Primary Directions hits in current window.")
+                    } else {
+                        data.primary_directions.forEach { pd ->
+                            appendLine(String.format(Locale.US, "- %s %s %s (Arc %.2f°, Age %.1fY)", pd.promittor, pd.aspect_type, pd.significator, pd.direction_arc_deg, pd.realization_age))
+                        }
+                    }
+                }.trimEnd()
+            }
+        }
     ) {
         if (data.primary_directions.isEmpty()) {
             Box(modifier = Modifier.padding(12.dp)) {

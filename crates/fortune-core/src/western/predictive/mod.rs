@@ -271,7 +271,7 @@ pub fn calculate_predictive_suite_with_timezone(
     let h_sys = house_system.unwrap_or(vedaksha::astro::houses::HouseSystem::Regiomontanus);
 
     let mut planetary_returns = Vec::new();
-    for body_name in ["Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn"] {
+    for body_name in ["Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn"] {
         let Some(&(_, natal_lon)) = natal_planets.iter().find(|(n, _)| n.eq_ignore_ascii_case(body_name)) else {
             continue;
         };

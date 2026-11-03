@@ -45,7 +45,7 @@ fn print_usage_and_exit() -> ! {
     eprintln!("  <gender>       : 'male' / '남' or 'female' / '여' (affects Part of Marriage)");
     eprintln!();
     eprintln!("Optional Arguments:");
-    eprintln!("  [house_system] : 'regiomontanus' (default), 'placidus', 'koch', 'equal', 'wholesign', 'campanus'");
+    eprintln!("  [house_system] : 'regiomontanus' / 'medieval' (default), 'wholesign' / 'hellenistic'");
     std::process::exit(1);
 }
 
@@ -120,12 +120,8 @@ fn main() {
 
     let house_system = if args.len() == 10 {
         match args[9].trim().to_lowercase().as_str() {
-            "regiomontanus" | "regio" => WesternHouseSystem::Regiomontanus,
-            "placidus" => WesternHouseSystem::Placidus,
-            "koch" => WesternHouseSystem::Koch,
-            "equal" => WesternHouseSystem::Equal,
-            "wholesign" | "whole_sign" | "whole" => WesternHouseSystem::WholeSign,
-            "campanus" => WesternHouseSystem::Campanus,
+            "regiomontanus" | "regio" | "medieval" => WesternHouseSystem::Regiomontanus,
+            "wholesign" | "whole_sign" | "whole" | "hellenistic" => WesternHouseSystem::WholeSign,
             other => {
                 eprintln!("Error: Unknown house system '{}'. Using Regiomontanus.", other);
                 WesternHouseSystem::Regiomontanus

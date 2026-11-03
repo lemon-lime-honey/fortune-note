@@ -1,14 +1,15 @@
 use crate::db::{init_db, DbPool};
 use crate::markdown::{
     format_horary_western_markdown, format_prashna_vedic_markdown,
-    format_profile_saju_markdown, format_profile_vedic_markdown, format_profile_western_markdown,
+    format_profile_saju_markdown, format_profile_vedic_markdown,
+    format_profile_western_markdown_with_predictive,
 };
 use crate::models::{
     BackupData, CreateHoraryParams, CreateProfileParams, HoraryQuestion, ImportSummary, Profile,
     UpdateHoraryParams, UpdateProfileParams,
 };
 use crate::repository::{HoraryRepository, ProfileRepository};
-use chrono::Utc;
+use chrono::{Datelike, Utc};
 use fortune_core::{
     calculate_fortune, calculate_fortune_saju, calculate_fortune_vedic, calculate_fortune_western,
     compute_ephemeris, lookup_timezone_id, resolve_with_timezone,
@@ -351,7 +352,23 @@ impl FortuneBackendService {
             .get_profile(id)?
             .ok_or_else(|| FortuneBackendError::NotFoundError(format!("Profile {} not found", id)))?;
         let chart = self.calculate_profile_chart_with_house(id, house_system_name)?;
-        Ok(format_profile_western_markdown(&profile, &chart))
+        let now = Utc::now();
+        let suite = self
+            .calculate_profile_predictive_suite(
+                id,
+                now.year(),
+                now.month(),
+                now.day(),
+                None,
+                None,
+                house_system_name,
+            )
+            .ok();
+        Ok(format_profile_western_markdown_with_predictive(
+            &profile,
+            &chart,
+            suite.as_ref(),
+        ))
     }
 
     pub fn export_profile_vedic_markdown(&self, id: &str) -> Result<String, FortuneBackendError> {
@@ -991,7 +1008,7 @@ mod tests {
             .expect("profile creation failed");
 
         let western_output = service
-            .calculate_profile_western(&p.id, Some("Placidus"))
+            .calculate_profile_western(&p.id, Some("Regiomontanus"))
             .expect("western calculation failed");
 
         let json_str = serde_json::to_string(&western_output).expect("must serialize to json");
@@ -1062,14 +1079,28 @@ mod tests {
             .calculate_profile_western(&p.id, Some("Regiomontanus"))
             .expect("regio calculation failed");
 
-        let placidus_out = service
-            .calculate_profile_western(&p.id, Some("Placidus"))
-            .expect("placidus calculation failed");
+        let wholesign_out = service
+            .calculate_profile_western(&p.id, Some("WholeSign"))
+            .expect("wholesign calculation failed");
 
         // 기본값(None)의 커스프가 Regiomontanus의 커스프와 정확히 일치해야 함
         assert_eq!(default_out.western.house_cusps, regio_out.western.house_cusps);
-        // 중간 하우스 커스프(예: 11번 커스프)는 Placidus와 달라야 함
-        assert_ne!(regio_out.western.house_cusps[10], placidus_out.western.house_cusps[10]);
+        assert!(regio_out.western.traditional.is_some());
+        assert!(regio_out.western.hellenistic.is_none());
+
+        // WholeSign(헬레니즘)에서는 전통 릴리 데이터가 섞이지 않고 헬레니즘 데이터만 존재해야 함
+        assert!(wholesign_out.western.hellenistic.is_some());
+        assert!(wholesign_out.western.traditional.is_none());
+        assert_ne!(regio_out.western.house_cusps[0], wholesign_out.western.house_cusps[0]);
+
+        let hellenistic_md = service
+            .export_profile_western_markdown(&p.id, Some("WholeSign"))
+            .expect("hellenistic markdown export failed");
+        assert!(hellenistic_md.contains("Hellenistic Traditional Analysis (Whole Sign)"));
+        assert!(!hellenistic_md.contains("William Lilly"));
+        assert!(!hellenistic_md.contains("Total Score"));
+        assert!(hellenistic_md.contains("Annual Profection"));
+        assert!(hellenistic_md.contains("Solar & Planetary Returns"));
     }
 
     #[test]

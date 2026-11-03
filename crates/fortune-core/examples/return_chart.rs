@@ -88,11 +88,7 @@ fn main() {
     };
 
     let house_sys_enum = match house_system_name.as_deref().map(|s| s.to_lowercase()).as_deref() {
-        Some("placidus") => WesternHouseSystem::Placidus,
-        Some("koch") => WesternHouseSystem::Koch,
-        Some("equal") => WesternHouseSystem::Equal,
-        Some("wholesign") | Some("whole") => WesternHouseSystem::WholeSign,
-        Some("campanus") => WesternHouseSystem::Campanus,
+        Some("wholesign") | Some("whole_sign") | Some("whole") | Some("hellenistic") => WesternHouseSystem::WholeSign,
         _ => WesternHouseSystem::Regiomontanus,
     };
 
