@@ -48,6 +48,22 @@ android {
     }
 }
 
+val buildRustJniLibs by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Builds Rust fortune-backend JNI libraries (.so) and UniFFI Kotlin bindings"
+    workingDir = rootProject.projectDir.parentFile
+    commandLine("bash", "scripts/build_android.sh")
+
+    inputs.dir(rootProject.projectDir.parentFile.resolve("crates"))
+    inputs.file(rootProject.projectDir.parentFile.resolve("Cargo.toml"))
+    inputs.file(rootProject.projectDir.parentFile.resolve("Cargo.lock"))
+    outputs.dir(projectDir.resolve("src/main/jniLibs"))
+}
+
+tasks.matching { it.name == "mergeDebugJniLibFolders" || it.name == "mergeReleaseJniLibFolders" }.configureEach {
+    dependsOn(buildRustJniLibs)
+}
+
 dependencies {
     // UniFFI JNA runtime
     implementation("net.java.dev.jna:jna:5.14.0@aar")

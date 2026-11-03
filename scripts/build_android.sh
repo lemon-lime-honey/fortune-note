@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+export PATH="${HOME}/.cargo/bin:${PATH}"
+
 # ==============================================================================
 # Fortune Note - Android Native Library & UniFFI Binding Build Script
 # ==============================================================================

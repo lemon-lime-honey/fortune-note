@@ -34,5 +34,4 @@ android/**/build/
 !android/gradlew
 !android/gradlew.bat
 !android/**/proguard-rules.pro
-!android/**/jniLibs/
-!android/**/jniLibs/**
+android/**/jniLibs/
