@@ -4,21 +4,19 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.fortunexample.note.data.ProfileDto
+import com.fortunexample.note.data.*
+import com.fortunexample.note.ui.components.DateInputRow
 import com.fortunexample.note.ui.components.LocationPicker
+import com.fortunexample.note.ui.components.TimeInputRow
 import com.fortunexample.note.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,32 +24,27 @@ import com.fortunexample.note.ui.theme.*
 fun ProfileEditScreen(
     initialProfile: ProfileDto? = null,
     onBack: () -> Unit,
-    onSave: (name: String, isMale: Boolean, year: Int, month: Int, day: Int, hour: Int, minute: Int, second: Double, lat: Double, lon: Double, notes: String) -> Unit
+    onSave: (CreateProfileRequest) -> Unit
 ) {
     var name by remember(initialProfile) { mutableStateOf(initialProfile?.name ?: "") }
     var isMale by remember(initialProfile) { mutableStateOf(initialProfile?.gender != "female") }
-    var yearStr by remember(initialProfile) { mutableStateOf(initialProfile?.birth_year?.toString() ?: "2000") }
-    var monthStr by remember(initialProfile) { mutableStateOf(initialProfile?.birth_month?.toString() ?: "1") }
-    var dayStr by remember(initialProfile) { mutableStateOf(initialProfile?.birth_day?.toString() ?: "1") }
-    var hourStr by remember(initialProfile) { mutableStateOf(initialProfile?.birth_hour?.toString() ?: "12") }
-    var minuteStr by remember(initialProfile) { mutableStateOf(initialProfile?.birth_minute?.toString() ?: "0") }
-    var secondStr by remember(initialProfile) { mutableStateOf(initialProfile?.birth_second?.toInt()?.toString() ?: "0") }
-    var latitude by remember(initialProfile) { mutableDoubleStateOf(initialProfile?.latitude ?: 37.5665) }
-    var longitude by remember(initialProfile) { mutableDoubleStateOf(initialProfile?.longitude ?: 126.9780) }
+    var yearStr by remember(initialProfile) { mutableStateOf(initialProfile?.birth_year?.toString() ?: DEFAULT_BIRTH_YEAR) }
+    var monthStr by remember(initialProfile) { mutableStateOf(initialProfile?.birth_month?.toString() ?: DEFAULT_BIRTH_MONTH) }
+    var dayStr by remember(initialProfile) { mutableStateOf(initialProfile?.birth_day?.toString() ?: DEFAULT_BIRTH_DAY) }
+    var hourStr by remember(initialProfile) { mutableStateOf(initialProfile?.birth_hour?.toString() ?: DEFAULT_BIRTH_HOUR) }
+    var minuteStr by remember(initialProfile) { mutableStateOf(initialProfile?.birth_minute?.toString() ?: DEFAULT_BIRTH_MINUTE) }
+    var secondStr by remember(initialProfile) { mutableStateOf(initialProfile?.birth_second?.toInt()?.toString() ?: DEFAULT_BIRTH_SECOND) }
+    var latitude by remember(initialProfile) { mutableDoubleStateOf(initialProfile?.latitude ?: DEFAULT_LATITUDE) }
+    var longitude by remember(initialProfile) { mutableDoubleStateOf(initialProfile?.longitude ?: DEFAULT_LONGITUDE) }
     var notes by remember(initialProfile) { mutableStateOf(initialProfile?.notes ?: "") }
+    var validationError by remember { mutableStateOf<String?>(null) }
 
     val isEditMode = initialProfile != null
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = if (isEditMode) "인물 수정" else "인물 등록",
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                },
+                title = { Text(if (isEditMode) "인물 수정" else "인물 등록", fontWeight = FontWeight.Bold, color = TextPrimary) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로", tint = TextPrimary)
@@ -74,7 +67,6 @@ fun ProfileEditScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // 이름 입력
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -82,112 +74,26 @@ fun ProfileEditScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(10.dp),
                 singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AccentPrimary,
-                    unfocusedBorderColor = BorderColor
-                )
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentPrimary, unfocusedBorderColor = BorderColor)
             )
 
-            // 성별 선택
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Button(
-                    onClick = { isMale = true },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isMale) AccentPrimary else SurfaceLight,
-                        contentColor = if (isMale) BackgroundWhite else TextPrimary
-                    ),
-                    border = BorderStroke(1.dp, if (isMale) AccentPrimary else BorderColor),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("남성", fontWeight = if (isMale) FontWeight.Bold else FontWeight.Normal)
-                }
-                Button(
-                    onClick = { isMale = false },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (!isMale) AccentPrimary else SurfaceLight,
-                        contentColor = if (!isMale) BackgroundWhite else TextPrimary
-                    ),
-                    border = BorderStroke(1.dp, if (!isMale) AccentPrimary else BorderColor),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("여성", fontWeight = if (!isMale) FontWeight.Bold else FontWeight.Normal)
-                }
-            }
+            GenderSelectorRow(isMale = isMale, onSelect = { isMale = it })
 
-            // 출생 날짜 (숫자 전용 키보드)
             Text("출생 날짜", color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = yearStr,
-                    onValueChange = { yearStr = it },
-                    label = { Text("년도") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                    modifier = Modifier.weight(1.2f),
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = monthStr,
-                    onValueChange = { monthStr = it },
-                    label = { Text("월") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                    modifier = Modifier.weight(1f),
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = dayStr,
-                    onValueChange = { dayStr = it },
-                    label = { Text("일") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                    modifier = Modifier.weight(1f),
-                    singleLine = true
-                )
-            }
+            DateInputRow(yearStr, monthStr, dayStr, { yearStr = it }, { monthStr = it }, { dayStr = it })
 
-            // 출생 시각 (숫자 전용 키보드)
             Text("출생 시각", color = TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = hourStr,
-                    onValueChange = { hourStr = it },
-                    label = { Text("시") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                    modifier = Modifier.weight(1f),
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = minuteStr,
-                    onValueChange = { minuteStr = it },
-                    label = { Text("분") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
-                    modifier = Modifier.weight(1f),
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = secondStr,
-                    onValueChange = { secondStr = it },
-                    label = { Text("초") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
-                    modifier = Modifier.weight(1f),
-                    singleLine = true
-                )
-            }
+            TimeInputRow(hourStr, minuteStr, secondStr, { hourStr = it }, { minuteStr = it }, { secondStr = it })
 
-            // 관측 위치 선택기
             LocationPicker(
                 latitude = latitude,
                 longitude = longitude,
-                onLocationChanged = { newLat, newLon ->
-                    latitude = newLat
-                    longitude = newLon
+                onLocationChanged = { lat, lon ->
+                    latitude = lat
+                    longitude = lon
                 }
             )
 
-            // 메모 입력
             OutlinedTextField(
                 value = notes,
                 onValueChange = { notes = it },
@@ -195,106 +101,72 @@ fun ProfileEditScreen(
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 2,
                 shape = RoundedCornerShape(10.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = AccentPrimary,
-                    unfocusedBorderColor = BorderColor
-                )
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AccentPrimary, unfocusedBorderColor = BorderColor)
             )
 
-            var validationError by remember { mutableStateOf<String?>(null) }
-
-            if (validationError != null) {
-                Text(
-                    text = validationError ?: "",
-                    color = AccentWarning,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(horizontal = 4.dp)
-                )
+            validationError?.let { err ->
+                Text(err, color = AccentWarning, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(horizontal = 4.dp))
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 저장 버튼
             Button(
                 onClick = {
-                    if (name.trim().isEmpty()) {
+                    val trimmedName = name.trim()
+                    if (trimmedName.isEmpty()) {
                         validationError = "이름을 입력해 주세요."
                         return@Button
                     }
-                    val y = yearStr.toIntOrNull()
-                    val m = monthStr.toIntOrNull()
-                    val d = dayStr.toIntOrNull()
-                    val h = hourStr.toIntOrNull()
-                    val min = minuteStr.toIntOrNull()
-                    val sec = if (secondStr.isBlank()) 0.0 else secondStr.toDoubleOrNull()
-
-                    if (y == null || y !in -4000..3000) {
-                        validationError = "올바른 연도를 입력해 주세요 (-4000~3000)."
-                        return@Button
+                    val fields = DateTimeFormFields(yearStr, monthStr, dayStr, hourStr, minuteStr, secondStr, allowBlankSecond = true)
+                    when (val result = validateDateTimeAndCoordinates(fields, latitude, longitude)) {
+                        is FormValidationResult.Invalid -> validationError = result.message
+                        is FormValidationResult.Valid -> {
+                            validationError = null
+                            val dt = result.value
+                            onSave(
+                                CreateProfileRequest(
+                                    name = trimmedName,
+                                    gender = if (isMale) "male" else "female",
+                                    birth_year = dt.year,
+                                    birth_month = dt.month,
+                                    birth_day = dt.day,
+                                    birth_hour = dt.hour,
+                                    birth_minute = dt.minute,
+                                    birth_second = dt.second,
+                                    latitude = latitude,
+                                    longitude = longitude,
+                                    notes = notes.trim()
+                                )
+                            )
+                        }
                     }
-                    if (m == null || m !in 1..12) {
-                        validationError = "올바른 월을 입력해 주세요 (1~12)."
-                        return@Button
-                    }
-                    if (d == null || d !in 1..31) {
-                        validationError = "올바른 일을 입력해 주세요 (1~31)."
-                        return@Button
-                    }
-                    if (h == null || h !in 0..23) {
-                        validationError = "올바른 시를 입력해 주세요 (0~23)."
-                        return@Button
-                    }
-                    if (min == null || min !in 0..59) {
-                        validationError = "올바른 분을 입력해 주세요 (0~59)."
-                        return@Button
-                    }
-                    if (sec == null || sec < 0.0 || sec >= 60.0) {
-                        validationError = "올바른 초를 입력해 주세요 (0~59)."
-                        return@Button
-                    }
-                    try {
-                        java.time.LocalDate.of(y, m, d)
-                    } catch (_: Exception) {
-                        validationError = "존재하지 않는 날짜입니다."
-                        return@Button
-                    }
-                    if (!latitude.isFinite() || latitude !in -90.0..90.0) {
-                        validationError = "올바른 위도를 입력해 주세요 (-90~90)."
-                        return@Button
-                    }
-                    if (!longitude.isFinite() || longitude !in -180.0..180.0) {
-                        validationError = "올바른 경도를 입력해 주세요 (-180~180)."
-                        return@Button
-                    }
-
-                    validationError = null
-                    onSave(
-                        name.trim(),
-                        isMale,
-                        y,
-                        m,
-                        d,
-                        h,
-                        min,
-                        sec,
-                        latitude,
-                        longitude,
-                        notes.trim()
-                    )
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
+                modifier = Modifier.fillMaxWidth().height(50.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = AccentPrimary),
                 shape = RoundedCornerShape(10.dp)
             ) {
-                Text(
-                    text = if (isEditMode) "수정 완료" else "저장하기",
-                    color = BackgroundWhite,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
+                Text(if (isEditMode) "수정 완료" else "저장하기", color = BackgroundWhite, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun GenderSelectorRow(isMale: Boolean, onSelect: (Boolean) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        listOf(true to "남성", false to "여성").forEach { (maleOption, label) ->
+            val selected = isMale == maleOption
+            Button(
+                onClick = { onSelect(maleOption) },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (selected) AccentPrimary else SurfaceLight,
+                    contentColor = if (selected) BackgroundWhite else TextPrimary
+                ),
+                border = BorderStroke(1.dp, if (selected) AccentPrimary else BorderColor),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(label, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
             }
         }
     }

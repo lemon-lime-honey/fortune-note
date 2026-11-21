@@ -675,19 +675,9 @@ internal object IntegrityCheckingUniffiLib {
     }
     external fun uniffi_fortune_backend_checksum_func_fortune_backend_version(
     ): Int
-    external fun uniffi_fortune_backend_checksum_method_fortuneclient_calculate_annual_profection(
-    ): Int
-    external fun uniffi_fortune_backend_checksum_method_fortuneclient_calculate_direct(
-    ): Int
-    external fun uniffi_fortune_backend_checksum_method_fortuneclient_calculate_horary_chart(
-    ): Int
-    external fun uniffi_fortune_backend_checksum_method_fortuneclient_calculate_horary_chart_with_house(
-    ): Int
     external fun uniffi_fortune_backend_checksum_method_fortuneclient_calculate_profile_chart(
     ): Int
     external fun uniffi_fortune_backend_checksum_method_fortuneclient_calculate_profile_chart_with_house(
-    ): Int
-    external fun uniffi_fortune_backend_checksum_method_fortuneclient_calculate_profile_predictive_suite(
     ): Int
     external fun uniffi_fortune_backend_checksum_method_fortuneclient_calculate_profile_saju(
     ): Int
@@ -695,21 +685,43 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_fortune_backend_checksum_method_fortuneclient_calculate_profile_western(
     ): Int
-    external fun uniffi_fortune_backend_checksum_method_fortuneclient_calculate_solar_arc(
-    ): Int
-    external fun uniffi_fortune_backend_checksum_method_fortuneclient_create_horary(
-    ): Int
     external fun uniffi_fortune_backend_checksum_method_fortuneclient_create_profile(
-    ): Int
-    external fun uniffi_fortune_backend_checksum_method_fortuneclient_delete_horary(
     ): Int
     external fun uniffi_fortune_backend_checksum_method_fortuneclient_delete_profile(
     ): Int
-    external fun uniffi_fortune_backend_checksum_method_fortuneclient_export_backup_json(
+    external fun uniffi_fortune_backend_checksum_method_fortuneclient_get_profile(
+    ): Int
+    external fun uniffi_fortune_backend_checksum_method_fortuneclient_list_profiles(
+    ): Int
+    external fun uniffi_fortune_backend_checksum_method_fortuneclient_update_profile(
+    ): Int
+    external fun uniffi_fortune_backend_checksum_method_fortuneclient_calculate_horary_chart(
+    ): Int
+    external fun uniffi_fortune_backend_checksum_method_fortuneclient_calculate_horary_chart_with_house(
+    ): Int
+    external fun uniffi_fortune_backend_checksum_method_fortuneclient_create_horary(
+    ): Int
+    external fun uniffi_fortune_backend_checksum_method_fortuneclient_delete_horary(
     ): Int
     external fun uniffi_fortune_backend_checksum_method_fortuneclient_export_horary_western_markdown(
     ): Int
     external fun uniffi_fortune_backend_checksum_method_fortuneclient_export_prashna_vedic_markdown(
+    ): Int
+    external fun uniffi_fortune_backend_checksum_method_fortuneclient_get_horary(
+    ): Int
+    external fun uniffi_fortune_backend_checksum_method_fortuneclient_list_horary(
+    ): Int
+    external fun uniffi_fortune_backend_checksum_method_fortuneclient_update_horary(
+    ): Int
+    external fun uniffi_fortune_backend_checksum_method_fortuneclient_calculate_annual_profection(
+    ): Int
+    external fun uniffi_fortune_backend_checksum_method_fortuneclient_calculate_direct(
+    ): Int
+    external fun uniffi_fortune_backend_checksum_method_fortuneclient_calculate_profile_predictive_suite(
+    ): Int
+    external fun uniffi_fortune_backend_checksum_method_fortuneclient_calculate_solar_arc(
+    ): Int
+    external fun uniffi_fortune_backend_checksum_method_fortuneclient_export_backup_json(
     ): Int
     external fun uniffi_fortune_backend_checksum_method_fortuneclient_export_profile_saju_markdown(
     ): Int
@@ -717,19 +729,7 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_fortune_backend_checksum_method_fortuneclient_export_profile_western_markdown(
     ): Int
-    external fun uniffi_fortune_backend_checksum_method_fortuneclient_get_horary(
-    ): Int
-    external fun uniffi_fortune_backend_checksum_method_fortuneclient_get_profile(
-    ): Int
     external fun uniffi_fortune_backend_checksum_method_fortuneclient_import_backup_json(
-    ): Int
-    external fun uniffi_fortune_backend_checksum_method_fortuneclient_list_horary(
-    ): Int
-    external fun uniffi_fortune_backend_checksum_method_fortuneclient_list_profiles(
-    ): Int
-    external fun uniffi_fortune_backend_checksum_method_fortuneclient_update_horary(
-    ): Int
-    external fun uniffi_fortune_backend_checksum_method_fortuneclient_update_profile(
     ): Int
     external fun uniffi_fortune_backend_checksum_constructor_fortuneclient_new(
     ): Int
@@ -757,19 +757,9 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_fortune_backend_fn_constructor_fortuneclient_new(`dbPath`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
-    external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_annual_profection(`ptr`: Long,`birthYear`: Int,`birthMonth`: Int,`birthDay`: Int,`targetYear`: Int,`targetMonth`: Int,`targetDay`: Int,`natalAscendant`: Double,`natalPlanetsJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_direct(`ptr`: Long,`year`: Int,`month`: Int,`day`: Int,`hour`: Int,`minute`: Int,`second`: Double,`latitude`: Double,`longitude`: Double,`isMale`: Byte,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_horary_chart(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_horary_chart_with_house(`ptr`: Long,`id`: RustBuffer.ByValue,`houseSystem`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
     external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_profile_chart(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_profile_chart_with_house(`ptr`: Long,`id`: RustBuffer.ByValue,`houseSystem`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_profile_predictive_suite(`ptr`: Long,`id`: RustBuffer.ByValue,`targetYear`: Int,`targetMonth`: Int,`targetDay`: Int,`targetHour`: RustBuffer.ByValue,`targetMinute`: RustBuffer.ByValue,`houseSystem`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_profile_saju(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -777,21 +767,43 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_profile_western(`ptr`: Long,`id`: RustBuffer.ByValue,`houseSystem`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
-    external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_solar_arc(`ptr`: Long,`birthYear`: Int,`birthMonth`: Int,`birthDay`: Int,`targetYear`: Int,`targetMonth`: Int,`targetDay`: Int,`natalPlanetsJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    external fun uniffi_fortune_backend_fn_method_fortuneclient_create_profile(`ptr`: Long,`paramsJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_fortune_backend_fn_method_fortuneclient_delete_profile(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Byte
+    external fun uniffi_fortune_backend_fn_method_fortuneclient_get_profile(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_fortune_backend_fn_method_fortuneclient_list_profiles(`ptr`: Long,`search`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_fortune_backend_fn_method_fortuneclient_update_profile(`ptr`: Long,`id`: RustBuffer.ByValue,`paramsJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_horary_chart(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_horary_chart_with_house(`ptr`: Long,`id`: RustBuffer.ByValue,`houseSystem`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_fortune_backend_fn_method_fortuneclient_create_horary(`ptr`: Long,`paramsJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
-    external fun uniffi_fortune_backend_fn_method_fortuneclient_create_profile(`ptr`: Long,`paramsJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
     external fun uniffi_fortune_backend_fn_method_fortuneclient_delete_horary(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Byte
-    external fun uniffi_fortune_backend_fn_method_fortuneclient_delete_profile(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): Byte
-    external fun uniffi_fortune_backend_fn_method_fortuneclient_export_backup_json(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
     external fun uniffi_fortune_backend_fn_method_fortuneclient_export_horary_western_markdown(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_fortune_backend_fn_method_fortuneclient_export_prashna_vedic_markdown(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_fortune_backend_fn_method_fortuneclient_get_horary(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_fortune_backend_fn_method_fortuneclient_list_horary(`ptr`: Long,`category`: RustBuffer.ByValue,`querentId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_fortune_backend_fn_method_fortuneclient_update_horary(`ptr`: Long,`id`: RustBuffer.ByValue,`paramsJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_annual_profection(`ptr`: Long,`requestJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_direct(`ptr`: Long,`requestJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_profile_predictive_suite(`ptr`: Long,`id`: RustBuffer.ByValue,`requestJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_fortune_backend_fn_method_fortuneclient_calculate_solar_arc(`ptr`: Long,`requestJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_fortune_backend_fn_method_fortuneclient_export_backup_json(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_fortune_backend_fn_method_fortuneclient_export_profile_saju_markdown(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -799,19 +811,7 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_fortune_backend_fn_method_fortuneclient_export_profile_western_markdown(`ptr`: Long,`id`: RustBuffer.ByValue,`houseSystem`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
-    external fun uniffi_fortune_backend_fn_method_fortuneclient_get_horary(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_fortune_backend_fn_method_fortuneclient_get_profile(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
     external fun uniffi_fortune_backend_fn_method_fortuneclient_import_backup_json(`ptr`: Long,`jsonStr`: RustBuffer.ByValue,`replaceExisting`: Byte,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_fortune_backend_fn_method_fortuneclient_list_horary(`ptr`: Long,`category`: RustBuffer.ByValue,`querentId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_fortune_backend_fn_method_fortuneclient_list_profiles(`ptr`: Long,`search`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_fortune_backend_fn_method_fortuneclient_update_horary(`ptr`: Long,`id`: RustBuffer.ByValue,`paramsJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
-    ): RustBuffer.ByValue
-    external fun uniffi_fortune_backend_fn_method_fortuneclient_update_profile(`ptr`: Long,`id`: RustBuffer.ByValue,`paramsJson`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_fortune_backend_fn_func_fortune_backend_version(uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -937,25 +937,10 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_fortune_backend_checksum_func_fortune_backend_version() and 0xFFFF) != 53091) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_calculate_annual_profection() and 0xFFFF) != 15956) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_calculate_direct() and 0xFFFF) != 28359) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_calculate_horary_chart() and 0xFFFF) != 57737) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_calculate_horary_chart_with_house() and 0xFFFF) != 21493) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
     if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_calculate_profile_chart() and 0xFFFF) != 50415) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_calculate_profile_chart_with_house() and 0xFFFF) != 40761) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_calculate_profile_predictive_suite() and 0xFFFF) != 56161) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_calculate_profile_saju() and 0xFFFF) != 46256) {
@@ -967,58 +952,73 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_calculate_profile_western() and 0xFFFF) != 6880) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_calculate_solar_arc() and 0xFFFF) != 1870) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_create_horary() and 0xFFFF) != 9877) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
     if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_create_profile() and 0xFFFF) != 22403) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_delete_horary() and 0xFFFF) != 38558) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_delete_profile() and 0xFFFF) != 7718) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_export_backup_json() and 0xFFFF) != 40571) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_export_horary_western_markdown() and 0xFFFF) != 44166) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_export_prashna_vedic_markdown() and 0xFFFF) != 38472) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_export_profile_saju_markdown() and 0xFFFF) != 36970) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_export_profile_vedic_markdown() and 0xFFFF) != 10629) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_export_profile_western_markdown() and 0xFFFF) != 6553) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_get_horary() and 0xFFFF) != 8914) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
     if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_get_profile() and 0xFFFF) != 44537) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_import_backup_json() and 0xFFFF) != 52854) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_list_horary() and 0xFFFF) != 45462) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_list_profiles() and 0xFFFF) != 27095) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_update_horary() and 0xFFFF) != 28707) {
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_update_profile() and 0xFFFF) != 49745) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_update_profile() and 0xFFFF) != 49745) {
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_calculate_horary_chart() and 0xFFFF) != 42177) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_calculate_horary_chart_with_house() and 0xFFFF) != 35491) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_create_horary() and 0xFFFF) != 17970) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_delete_horary() and 0xFFFF) != 33512) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_export_horary_western_markdown() and 0xFFFF) != 42859) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_export_prashna_vedic_markdown() and 0xFFFF) != 6064) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_get_horary() and 0xFFFF) != 35252) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_list_horary() and 0xFFFF) != 486) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_update_horary() and 0xFFFF) != 8706) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_calculate_annual_profection() and 0xFFFF) != 31894) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_calculate_direct() and 0xFFFF) != 5903) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_calculate_profile_predictive_suite() and 0xFFFF) != 4394) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_calculate_solar_arc() and 0xFFFF) != 12861) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_export_backup_json() and 0xFFFF) != 5735) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_export_profile_saju_markdown() and 0xFFFF) != 57231) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_export_profile_vedic_markdown() and 0xFFFF) != 42458) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_export_profile_western_markdown() and 0xFFFF) != 37094) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_fortune_backend_checksum_method_fortuneclient_import_backup_json() and 0xFFFF) != 37531) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_fortune_backend_checksum_constructor_fortuneclient_new() and 0xFFFF) != 59773) {
@@ -1179,75 +1179,6 @@ private class JavaLangRefCleanable(
     val cleanable: java.lang.ref.Cleaner.Cleanable
 ) : UniffiCleaner.Cleanable {
     override fun clean() = cleanable.clean()
-}
-
-/**
- * @suppress
- */
-public object FfiConverterUInt: FfiConverter<UInt, Int> {
-    override fun lift(value: Int): UInt {
-        return value.toUInt()
-    }
-
-    override fun read(buf: ByteBuffer): UInt {
-        return lift(buf.getInt())
-    }
-
-    override fun lower(value: UInt): Int {
-        return value.toInt()
-    }
-
-    override fun allocationSize(value: UInt) = 4UL
-
-    override fun write(value: UInt, buf: ByteBuffer) {
-        buf.putInt(value.toInt())
-    }
-}
-
-/**
- * @suppress
- */
-public object FfiConverterInt: FfiConverter<Int, Int> {
-    override fun lift(value: Int): Int {
-        return value
-    }
-
-    override fun read(buf: ByteBuffer): Int {
-        return buf.getInt()
-    }
-
-    override fun lower(value: Int): Int {
-        return value
-    }
-
-    override fun allocationSize(value: Int) = 4UL
-
-    override fun write(value: Int, buf: ByteBuffer) {
-        buf.putInt(value)
-    }
-}
-
-/**
- * @suppress
- */
-public object FfiConverterDouble: FfiConverter<Double, Double> {
-    override fun lift(value: Double): Double {
-        return value
-    }
-
-    override fun read(buf: ByteBuffer): Double {
-        return buf.getDouble()
-    }
-
-    override fun lower(value: Double): Double {
-        return value
-    }
-
-    override fun allocationSize(value: Double) = 8UL
-
-    override fun write(value: Double, buf: ByteBuffer) {
-        buf.putDouble(value)
-    }
 }
 
 /**
@@ -1428,19 +1359,9 @@ public object FfiConverterString: FfiConverter<String, RustBuffer.ByValue> {
 
 public interface FortuneClientInterface {
     
-    fun `calculateAnnualProfection`(`birthYear`: kotlin.Int, `birthMonth`: kotlin.UInt, `birthDay`: kotlin.UInt, `targetYear`: kotlin.Int, `targetMonth`: kotlin.UInt, `targetDay`: kotlin.UInt, `natalAscendant`: kotlin.Double, `natalPlanetsJson`: kotlin.String): kotlin.String
-    
-    fun `calculateDirect`(`year`: kotlin.Int, `month`: kotlin.UInt, `day`: kotlin.UInt, `hour`: kotlin.UInt, `minute`: kotlin.UInt, `second`: kotlin.Double, `latitude`: kotlin.Double, `longitude`: kotlin.Double, `isMale`: kotlin.Boolean): kotlin.String
-    
-    fun `calculateHoraryChart`(`id`: kotlin.String): kotlin.String
-    
-    fun `calculateHoraryChartWithHouse`(`id`: kotlin.String, `houseSystem`: kotlin.String?): kotlin.String
-    
     fun `calculateProfileChart`(`id`: kotlin.String): kotlin.String
     
     fun `calculateProfileChartWithHouse`(`id`: kotlin.String, `houseSystem`: kotlin.String?): kotlin.String
-    
-    fun `calculateProfilePredictiveSuite`(`id`: kotlin.String, `targetYear`: kotlin.Int, `targetMonth`: kotlin.UInt, `targetDay`: kotlin.UInt, `targetHour`: kotlin.UInt?, `targetMinute`: kotlin.UInt?, `houseSystem`: kotlin.String?): kotlin.String
     
     fun `calculateProfileSaju`(`id`: kotlin.String): kotlin.String
     
@@ -1448,21 +1369,43 @@ public interface FortuneClientInterface {
     
     fun `calculateProfileWestern`(`id`: kotlin.String, `houseSystem`: kotlin.String?): kotlin.String
     
-    fun `calculateSolarArc`(`birthYear`: kotlin.Int, `birthMonth`: kotlin.UInt, `birthDay`: kotlin.UInt, `targetYear`: kotlin.Int, `targetMonth`: kotlin.UInt, `targetDay`: kotlin.UInt, `natalPlanetsJson`: kotlin.String): kotlin.String
-    
-    fun `createHorary`(`paramsJson`: kotlin.String): kotlin.String
-    
     fun `createProfile`(`paramsJson`: kotlin.String): kotlin.String
-    
-    fun `deleteHorary`(`id`: kotlin.String): kotlin.Boolean
     
     fun `deleteProfile`(`id`: kotlin.String): kotlin.Boolean
     
-    fun `exportBackupJson`(): kotlin.String
+    fun `getProfile`(`id`: kotlin.String): kotlin.String?
+    
+    fun `listProfiles`(`search`: kotlin.String?): kotlin.String
+    
+    fun `updateProfile`(`id`: kotlin.String, `paramsJson`: kotlin.String): kotlin.String
+    
+    fun `calculateHoraryChart`(`id`: kotlin.String): kotlin.String
+    
+    fun `calculateHoraryChartWithHouse`(`id`: kotlin.String, `houseSystem`: kotlin.String?): kotlin.String
+    
+    fun `createHorary`(`paramsJson`: kotlin.String): kotlin.String
+    
+    fun `deleteHorary`(`id`: kotlin.String): kotlin.Boolean
     
     fun `exportHoraryWesternMarkdown`(`id`: kotlin.String): kotlin.String
     
     fun `exportPrashnaVedicMarkdown`(`id`: kotlin.String): kotlin.String
+    
+    fun `getHorary`(`id`: kotlin.String): kotlin.String?
+    
+    fun `listHorary`(`category`: kotlin.String?, `querentId`: kotlin.String?): kotlin.String
+    
+    fun `updateHorary`(`id`: kotlin.String, `paramsJson`: kotlin.String): kotlin.String
+    
+    fun `calculateAnnualProfection`(`requestJson`: kotlin.String): kotlin.String
+    
+    fun `calculateDirect`(`requestJson`: kotlin.String): kotlin.String
+    
+    fun `calculateProfilePredictiveSuite`(`id`: kotlin.String, `requestJson`: kotlin.String): kotlin.String
+    
+    fun `calculateSolarArc`(`requestJson`: kotlin.String): kotlin.String
+    
+    fun `exportBackupJson`(): kotlin.String
     
     fun `exportProfileSajuMarkdown`(`id`: kotlin.String): kotlin.String
     
@@ -1470,19 +1413,7 @@ public interface FortuneClientInterface {
     
     fun `exportProfileWesternMarkdown`(`id`: kotlin.String, `houseSystem`: kotlin.String?): kotlin.String
     
-    fun `getHorary`(`id`: kotlin.String): kotlin.String?
-    
-    fun `getProfile`(`id`: kotlin.String): kotlin.String?
-    
     fun `importBackupJson`(`jsonStr`: kotlin.String, `replaceExisting`: kotlin.Boolean): kotlin.String
-    
-    fun `listHorary`(`category`: kotlin.String?, `querentId`: kotlin.String?): kotlin.String
-    
-    fun `listProfiles`(`search`: kotlin.String?): kotlin.String
-    
-    fun `updateHorary`(`id`: kotlin.String, `paramsJson`: kotlin.String): kotlin.String
-    
-    fun `updateProfile`(`id`: kotlin.String, `paramsJson`: kotlin.String): kotlin.String
     
     companion object
 }
@@ -1598,82 +1529,6 @@ open class FortuneClient: Disposable, AutoCloseable, FortuneClientInterface
     }
 
     
-    @Throws(FortuneBackendFfiException::class)override fun `calculateAnnualProfection`(`birthYear`: kotlin.Int, `birthMonth`: kotlin.UInt, `birthDay`: kotlin.UInt, `targetYear`: kotlin.Int, `targetMonth`: kotlin.UInt, `targetDay`: kotlin.UInt, `natalAscendant`: kotlin.Double, `natalPlanetsJson`: kotlin.String): kotlin.String {
-            return FfiConverterString.lift(
-    callWithHandle {
-    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
-    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_calculate_annual_profection(
-        it,
-        
-        FfiConverterInt.lower(`birthYear`),
-        FfiConverterUInt.lower(`birthMonth`),
-        FfiConverterUInt.lower(`birthDay`),
-        FfiConverterInt.lower(`targetYear`),
-        FfiConverterUInt.lower(`targetMonth`),
-        FfiConverterUInt.lower(`targetDay`),
-        FfiConverterDouble.lower(`natalAscendant`),
-        FfiConverterString.lower(`natalPlanetsJson`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    @Throws(FortuneBackendFfiException::class)override fun `calculateDirect`(`year`: kotlin.Int, `month`: kotlin.UInt, `day`: kotlin.UInt, `hour`: kotlin.UInt, `minute`: kotlin.UInt, `second`: kotlin.Double, `latitude`: kotlin.Double, `longitude`: kotlin.Double, `isMale`: kotlin.Boolean): kotlin.String {
-            return FfiConverterString.lift(
-    callWithHandle {
-    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
-    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_calculate_direct(
-        it,
-        
-        FfiConverterInt.lower(`year`),
-        FfiConverterUInt.lower(`month`),
-        FfiConverterUInt.lower(`day`),
-        FfiConverterUInt.lower(`hour`),
-        FfiConverterUInt.lower(`minute`),
-        FfiConverterDouble.lower(`second`),
-        FfiConverterDouble.lower(`latitude`),
-        FfiConverterDouble.lower(`longitude`),
-        FfiConverterBoolean.lower(`isMale`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    @Throws(FortuneBackendFfiException::class)override fun `calculateHoraryChart`(`id`: kotlin.String): kotlin.String {
-            return FfiConverterString.lift(
-    callWithHandle {
-    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
-    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_calculate_horary_chart(
-        it,
-        
-        FfiConverterString.lower(`id`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    @Throws(FortuneBackendFfiException::class)override fun `calculateHoraryChartWithHouse`(`id`: kotlin.String, `houseSystem`: kotlin.String?): kotlin.String {
-            return FfiConverterString.lift(
-    callWithHandle {
-    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
-    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_calculate_horary_chart_with_house(
-        it,
-        
-        FfiConverterString.lower(`id`),
-        FfiConverterOptionalString.lower(`houseSystem`),_status)
-}
-    }
-    )
-    }
-    
-
-    
     @Throws(FortuneBackendFfiException::class)override fun `calculateProfileChart`(`id`: kotlin.String): kotlin.String {
             return FfiConverterString.lift(
     callWithHandle {
@@ -1697,27 +1552,6 @@ open class FortuneClient: Disposable, AutoCloseable, FortuneClientInterface
         it,
         
         FfiConverterString.lower(`id`),
-        FfiConverterOptionalString.lower(`houseSystem`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    @Throws(FortuneBackendFfiException::class)override fun `calculateProfilePredictiveSuite`(`id`: kotlin.String, `targetYear`: kotlin.Int, `targetMonth`: kotlin.UInt, `targetDay`: kotlin.UInt, `targetHour`: kotlin.UInt?, `targetMinute`: kotlin.UInt?, `houseSystem`: kotlin.String?): kotlin.String {
-            return FfiConverterString.lift(
-    callWithHandle {
-    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
-    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_calculate_profile_predictive_suite(
-        it,
-        
-        FfiConverterString.lower(`id`),
-        FfiConverterInt.lower(`targetYear`),
-        FfiConverterUInt.lower(`targetMonth`),
-        FfiConverterUInt.lower(`targetDay`),
-        FfiConverterOptionalUInt.lower(`targetHour`),
-        FfiConverterOptionalUInt.lower(`targetMinute`),
         FfiConverterOptionalString.lower(`houseSystem`),_status)
 }
     }
@@ -1772,42 +1606,6 @@ open class FortuneClient: Disposable, AutoCloseable, FortuneClientInterface
     
 
     
-    @Throws(FortuneBackendFfiException::class)override fun `calculateSolarArc`(`birthYear`: kotlin.Int, `birthMonth`: kotlin.UInt, `birthDay`: kotlin.UInt, `targetYear`: kotlin.Int, `targetMonth`: kotlin.UInt, `targetDay`: kotlin.UInt, `natalPlanetsJson`: kotlin.String): kotlin.String {
-            return FfiConverterString.lift(
-    callWithHandle {
-    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
-    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_calculate_solar_arc(
-        it,
-        
-        FfiConverterInt.lower(`birthYear`),
-        FfiConverterUInt.lower(`birthMonth`),
-        FfiConverterUInt.lower(`birthDay`),
-        FfiConverterInt.lower(`targetYear`),
-        FfiConverterUInt.lower(`targetMonth`),
-        FfiConverterUInt.lower(`targetDay`),
-        FfiConverterString.lower(`natalPlanetsJson`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    @Throws(FortuneBackendFfiException::class)override fun `createHorary`(`paramsJson`: kotlin.String): kotlin.String {
-            return FfiConverterString.lift(
-    callWithHandle {
-    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
-    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_create_horary(
-        it,
-        
-        FfiConverterString.lower(`paramsJson`),_status)
-}
-    }
-    )
-    }
-    
-
-    
     @Throws(FortuneBackendFfiException::class)override fun `createProfile`(`paramsJson`: kotlin.String): kotlin.String {
             return FfiConverterString.lift(
     callWithHandle {
@@ -1816,21 +1614,6 @@ open class FortuneClient: Disposable, AutoCloseable, FortuneClientInterface
         it,
         
         FfiConverterString.lower(`paramsJson`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    @Throws(FortuneBackendFfiException::class)override fun `deleteHorary`(`id`: kotlin.String): kotlin.Boolean {
-            return FfiConverterBoolean.lift(
-    callWithHandle {
-    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
-    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_delete_horary(
-        it,
-        
-        FfiConverterString.lower(`id`),_status)
 }
     }
     )
@@ -1853,13 +1636,106 @@ open class FortuneClient: Disposable, AutoCloseable, FortuneClientInterface
     
 
     
-    @Throws(FortuneBackendFfiException::class)override fun `exportBackupJson`(): kotlin.String {
+    @Throws(FortuneBackendFfiException::class)override fun `getProfile`(`id`: kotlin.String): kotlin.String? {
+            return FfiConverterOptionalString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
+    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_get_profile(
+        it,
+        
+        FfiConverterString.lower(`id`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(FortuneBackendFfiException::class)override fun `listProfiles`(`search`: kotlin.String?): kotlin.String {
             return FfiConverterString.lift(
     callWithHandle {
     uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
-    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_export_backup_json(
+    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_list_profiles(
         it,
-        _status)
+        
+        FfiConverterOptionalString.lower(`search`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(FortuneBackendFfiException::class)override fun `updateProfile`(`id`: kotlin.String, `paramsJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
+    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_update_profile(
+        it,
+        
+        FfiConverterString.lower(`id`),
+        FfiConverterString.lower(`paramsJson`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(FortuneBackendFfiException::class)override fun `calculateHoraryChart`(`id`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
+    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_calculate_horary_chart(
+        it,
+        
+        FfiConverterString.lower(`id`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(FortuneBackendFfiException::class)override fun `calculateHoraryChartWithHouse`(`id`: kotlin.String, `houseSystem`: kotlin.String?): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
+    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_calculate_horary_chart_with_house(
+        it,
+        
+        FfiConverterString.lower(`id`),
+        FfiConverterOptionalString.lower(`houseSystem`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(FortuneBackendFfiException::class)override fun `createHorary`(`paramsJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
+    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_create_horary(
+        it,
+        
+        FfiConverterString.lower(`paramsJson`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(FortuneBackendFfiException::class)override fun `deleteHorary`(`id`: kotlin.String): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    callWithHandle {
+    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
+    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_delete_horary(
+        it,
+        
+        FfiConverterString.lower(`id`),_status)
 }
     }
     )
@@ -1890,6 +1766,128 @@ open class FortuneClient: Disposable, AutoCloseable, FortuneClientInterface
         it,
         
         FfiConverterString.lower(`id`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(FortuneBackendFfiException::class)override fun `getHorary`(`id`: kotlin.String): kotlin.String? {
+            return FfiConverterOptionalString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
+    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_get_horary(
+        it,
+        
+        FfiConverterString.lower(`id`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(FortuneBackendFfiException::class)override fun `listHorary`(`category`: kotlin.String?, `querentId`: kotlin.String?): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
+    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_list_horary(
+        it,
+        
+        FfiConverterOptionalString.lower(`category`),
+        FfiConverterOptionalString.lower(`querentId`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(FortuneBackendFfiException::class)override fun `updateHorary`(`id`: kotlin.String, `paramsJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
+    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_update_horary(
+        it,
+        
+        FfiConverterString.lower(`id`),
+        FfiConverterString.lower(`paramsJson`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(FortuneBackendFfiException::class)override fun `calculateAnnualProfection`(`requestJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
+    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_calculate_annual_profection(
+        it,
+        
+        FfiConverterString.lower(`requestJson`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(FortuneBackendFfiException::class)override fun `calculateDirect`(`requestJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
+    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_calculate_direct(
+        it,
+        
+        FfiConverterString.lower(`requestJson`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(FortuneBackendFfiException::class)override fun `calculateProfilePredictiveSuite`(`id`: kotlin.String, `requestJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
+    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_calculate_profile_predictive_suite(
+        it,
+        
+        FfiConverterString.lower(`id`),
+        FfiConverterString.lower(`requestJson`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(FortuneBackendFfiException::class)override fun `calculateSolarArc`(`requestJson`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
+    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_calculate_solar_arc(
+        it,
+        
+        FfiConverterString.lower(`requestJson`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    @Throws(FortuneBackendFfiException::class)override fun `exportBackupJson`(): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
+    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_export_backup_json(
+        it,
+        _status)
 }
     }
     )
@@ -1943,36 +1941,6 @@ open class FortuneClient: Disposable, AutoCloseable, FortuneClientInterface
     
 
     
-    @Throws(FortuneBackendFfiException::class)override fun `getHorary`(`id`: kotlin.String): kotlin.String? {
-            return FfiConverterOptionalString.lift(
-    callWithHandle {
-    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
-    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_get_horary(
-        it,
-        
-        FfiConverterString.lower(`id`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    @Throws(FortuneBackendFfiException::class)override fun `getProfile`(`id`: kotlin.String): kotlin.String? {
-            return FfiConverterOptionalString.lift(
-    callWithHandle {
-    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
-    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_get_profile(
-        it,
-        
-        FfiConverterString.lower(`id`),_status)
-}
-    }
-    )
-    }
-    
-
-    
     @Throws(FortuneBackendFfiException::class)override fun `importBackupJson`(`jsonStr`: kotlin.String, `replaceExisting`: kotlin.Boolean): kotlin.String {
             return FfiConverterString.lift(
     callWithHandle {
@@ -1982,69 +1950,6 @@ open class FortuneClient: Disposable, AutoCloseable, FortuneClientInterface
         
         FfiConverterString.lower(`jsonStr`),
         FfiConverterBoolean.lower(`replaceExisting`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    @Throws(FortuneBackendFfiException::class)override fun `listHorary`(`category`: kotlin.String?, `querentId`: kotlin.String?): kotlin.String {
-            return FfiConverterString.lift(
-    callWithHandle {
-    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
-    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_list_horary(
-        it,
-        
-        FfiConverterOptionalString.lower(`category`),
-        FfiConverterOptionalString.lower(`querentId`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    @Throws(FortuneBackendFfiException::class)override fun `listProfiles`(`search`: kotlin.String?): kotlin.String {
-            return FfiConverterString.lift(
-    callWithHandle {
-    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
-    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_list_profiles(
-        it,
-        
-        FfiConverterOptionalString.lower(`search`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    @Throws(FortuneBackendFfiException::class)override fun `updateHorary`(`id`: kotlin.String, `paramsJson`: kotlin.String): kotlin.String {
-            return FfiConverterString.lift(
-    callWithHandle {
-    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
-    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_update_horary(
-        it,
-        
-        FfiConverterString.lower(`id`),
-        FfiConverterString.lower(`paramsJson`),_status)
-}
-    }
-    )
-    }
-    
-
-    
-    @Throws(FortuneBackendFfiException::class)override fun `updateProfile`(`id`: kotlin.String, `paramsJson`: kotlin.String): kotlin.String {
-            return FfiConverterString.lift(
-    callWithHandle {
-    uniffiRustCallWithError(FortuneBackendFfiException) { _status ->
-    UniffiLib.uniffi_fortune_backend_fn_method_fortuneclient_update_profile(
-        it,
-        
-        FfiConverterString.lower(`id`),
-        FfiConverterString.lower(`paramsJson`),_status)
 }
     }
     )
@@ -2233,38 +2138,6 @@ public object FfiConverterTypeFortuneBackendFfiError : FfiConverterRustBuffer<Fo
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
     }
 
-}
-
-
-
-
-/**
- * @suppress
- */
-public object FfiConverterOptionalUInt: FfiConverterRustBuffer<kotlin.UInt?> {
-    override fun read(buf: ByteBuffer): kotlin.UInt? {
-        if (buf.get().toInt() == 0) {
-            return null
-        }
-        return FfiConverterUInt.read(buf)
-    }
-
-    override fun allocationSize(value: kotlin.UInt?): ULong {
-        if (value == null) {
-            return 1UL
-        } else {
-            return 1UL + FfiConverterUInt.allocationSize(value)
-        }
-    }
-
-    override fun write(value: kotlin.UInt?, buf: ByteBuffer) {
-        if (value == null) {
-            buf.put(0)
-        } else {
-            buf.put(1)
-            FfiConverterUInt.write(value, buf)
-        }
-    }
 }
 
 

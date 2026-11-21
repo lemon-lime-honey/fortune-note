@@ -26,3 +26,9 @@ val VedicGreen = AstrologicalGreen       // 클래식 포레스트 그린
 val SajuSlate = Color(0xFF334155)        // 정갈한 다크 슬레이트
 val SajuAmber = SajuSlate                // 주황색 제거
 val AccentWarning = AstrologicalRed      // 경고/오류 텍스트 컬러
+
+// 차트 캔버스 전용 토큰 (하드코딩 Hex 제거)
+val ChartFrameInk = Color(0xFF0F172A)
+val ChartSubtleInk = Color(0xFF64748B)
+val ChartMutedLine = Color(0xFFCBD5E1)
+val ChartKendraFill = Color(0xFFF8FAFC)

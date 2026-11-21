@@ -5,8 +5,163 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import uniffi.fortune_backend.FortuneClient
 
+interface ProfileDataSource {
+    suspend fun createProfile(request: CreateProfileRequest): Result<ProfileDto>
+    suspend fun updateProfile(id: String, request: UpdateProfileRequest): Result<ProfileDto>
+    suspend fun listProfiles(search: String? = null): Result<List<ProfileDto>>
+    suspend fun deleteProfile(id: String): Result<Boolean>
+    suspend fun calculateSaju(id: String): Result<SajuCalculationOutputDto>
+    suspend fun calculateWestern(id: String, houseSystem: String?): Result<WesternCalculationOutputDto>
+    suspend fun calculateVedic(id: String): Result<VedicCalculationOutputDto>
+    suspend fun calculatePredictiveSuite(
+        id: String,
+        request: PredictiveSuiteRequestDto
+    ): Result<PredictiveSuiteData>
+}
+
+interface HoraryDataSource {
+    suspend fun createHorary(request: CreateHoraryRequest): Result<HoraryDto>
+    suspend fun updateHorary(id: String, request: UpdateHoraryRequest): Result<HoraryDto>
+    suspend fun listHorary(category: String? = null, querentId: String? = null): Result<List<HoraryDto>>
+    suspend fun deleteHorary(id: String): Result<Boolean>
+    suspend fun calculateChart(id: String): Result<FortuneChartOutput>
+    suspend fun exportWesternMarkdown(id: String): Result<String>
+    suspend fun exportPrashnaMarkdown(id: String): Result<String>
+}
+
+interface BackupDataSource {
+    suspend fun exportBackupJson(): Result<String>
+    suspend fun importBackupJson(jsonStr: String, replaceExisting: Boolean): Result<ImportSummaryDto>
+}
+
+private class RustProfileDataSource(
+    private val client: FortuneClient,
+    private val json: Json
+) : ProfileDataSource {
+    override suspend fun createProfile(request: CreateProfileRequest): Result<ProfileDto> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val reqJson = json.encodeToString(CreateProfileRequest.serializer(), request)
+                json.decodeFromString(ProfileDto.serializer(), client.createProfile(reqJson))
+            }
+        }
+
+    override suspend fun updateProfile(id: String, request: UpdateProfileRequest): Result<ProfileDto> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val reqJson = json.encodeToString(CreateProfileRequest.serializer(), request)
+                json.decodeFromString(ProfileDto.serializer(), client.updateProfile(id, reqJson))
+            }
+        }
+
+    override suspend fun listProfiles(search: String?): Result<List<ProfileDto>> =
+        withContext(Dispatchers.IO) {
+            runCatching { json.decodeFromString<List<ProfileDto>>(client.listProfiles(search)) }
+        }
+
+    override suspend fun deleteProfile(id: String): Result<Boolean> =
+        withContext(Dispatchers.IO) { runCatching { client.deleteProfile(id) } }
+
+    override suspend fun calculateSaju(id: String): Result<SajuCalculationOutputDto> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                json.decodeFromString(SajuCalculationOutputDto.serializer(), client.calculateProfileSaju(id))
+            }
+        }
+
+    override suspend fun calculateWestern(
+        id: String,
+        houseSystem: String?
+    ): Result<WesternCalculationOutputDto> = withContext(Dispatchers.IO) {
+        runCatching {
+            json.decodeFromString(
+                WesternCalculationOutputDto.serializer(),
+                client.calculateProfileWestern(id, houseSystem)
+            )
+        }
+    }
+
+    override suspend fun calculateVedic(id: String): Result<VedicCalculationOutputDto> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                json.decodeFromString(VedicCalculationOutputDto.serializer(), client.calculateProfileVedic(id))
+            }
+        }
+
+    override suspend fun calculatePredictiveSuite(
+        id: String,
+        request: PredictiveSuiteRequestDto
+    ): Result<PredictiveSuiteData> = withContext(Dispatchers.IO) {
+        runCatching {
+            val reqJson = json.encodeToString(PredictiveSuiteRequestDto.serializer(), request)
+            val resJson = client.calculateProfilePredictiveSuite(id, reqJson)
+            json.decodeFromString(PredictiveSuiteData.serializer(), resJson)
+        }
+    }
+}
+
+private class RustHoraryDataSource(
+    private val client: FortuneClient,
+    private val json: Json
+) : HoraryDataSource {
+    override suspend fun createHorary(request: CreateHoraryRequest): Result<HoraryDto> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val reqJson = json.encodeToString(CreateHoraryRequest.serializer(), request)
+                json.decodeFromString(HoraryDto.serializer(), client.createHorary(reqJson))
+            }
+        }
+
+    override suspend fun updateHorary(id: String, request: UpdateHoraryRequest): Result<HoraryDto> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val reqJson = json.encodeToString(CreateHoraryRequest.serializer(), request)
+                json.decodeFromString(HoraryDto.serializer(), client.updateHorary(id, reqJson))
+            }
+        }
+
+    override suspend fun listHorary(category: String?, querentId: String?): Result<List<HoraryDto>> =
+        withContext(Dispatchers.IO) {
+            runCatching { json.decodeFromString<List<HoraryDto>>(client.listHorary(category, querentId)) }
+        }
+
+    override suspend fun deleteHorary(id: String): Result<Boolean> =
+        withContext(Dispatchers.IO) { runCatching { client.deleteHorary(id) } }
+
+    override suspend fun calculateChart(id: String): Result<FortuneChartOutput> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                json.decodeFromString(FortuneChartOutput.serializer(), client.calculateHoraryChart(id))
+            }
+        }
+
+    override suspend fun exportWesternMarkdown(id: String): Result<String> =
+        withContext(Dispatchers.IO) { runCatching { client.exportHoraryWesternMarkdown(id) } }
+
+    override suspend fun exportPrashnaMarkdown(id: String): Result<String> =
+        withContext(Dispatchers.IO) { runCatching { client.exportPrashnaVedicMarkdown(id) } }
+}
+
+private class RustBackupDataSource(
+    private val client: FortuneClient,
+    private val json: Json
+) : BackupDataSource {
+    override suspend fun exportBackupJson(): Result<String> =
+        withContext(Dispatchers.IO) { runCatching { client.exportBackupJson() } }
+
+    override suspend fun importBackupJson(
+        jsonStr: String,
+        replaceExisting: Boolean
+    ): Result<ImportSummaryDto> = withContext(Dispatchers.IO) {
+        runCatching {
+            val resJson = client.importBackupJson(jsonStr, replaceExisting)
+            json.decodeFromString(ImportSummaryDto.serializer(), resJson)
+        }
+    }
+}
+
 class FortuneRepository(
-    private val client: FortuneClient
+    client: FortuneClient
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -14,191 +169,7 @@ class FortuneRepository(
         encodeDefaults = true
     }
 
-    suspend fun createProfile(request: CreateProfileRequest): Result<ProfileDto> = withContext(Dispatchers.IO) {
-        runCatching {
-            val reqJson = json.encodeToString(CreateProfileRequest.serializer(), request)
-            val resJson = client.createProfile(reqJson)
-            json.decodeFromString(ProfileDto.serializer(), resJson)
-        }
-    }
-
-    suspend fun updateProfile(id: String, request: UpdateProfileRequest): Result<ProfileDto> = withContext(Dispatchers.IO) {
-        runCatching {
-            val reqJson = json.encodeToString(UpdateProfileRequest.serializer(), request)
-            val resJson = client.updateProfile(id, reqJson)
-            json.decodeFromString(ProfileDto.serializer(), resJson)
-        }
-    }
-
-    suspend fun getProfile(id: String): Result<ProfileDto?> = withContext(Dispatchers.IO) {
-        runCatching {
-            val resJson = client.getProfile(id) ?: return@runCatching null
-            json.decodeFromString(ProfileDto.serializer(), resJson)
-        }
-    }
-
-    suspend fun listProfiles(search: String? = null): Result<List<ProfileDto>> = withContext(Dispatchers.IO) {
-        runCatching {
-            val resJson = client.listProfiles(search)
-            json.decodeFromString<List<ProfileDto>>(resJson)
-        }
-    }
-
-    suspend fun deleteProfile(id: String): Result<Boolean> = withContext(Dispatchers.IO) {
-        runCatching {
-            client.deleteProfile(id)
-        }
-    }
-
-    suspend fun calculateProfileChart(id: String): Result<FortuneChartOutput> = withContext(Dispatchers.IO) {
-        runCatching {
-            val resJson = client.calculateProfileChart(id)
-            json.decodeFromString(FortuneChartOutput.serializer(), resJson)
-        }
-    }
-
-    suspend fun calculateProfileChartWithHouse(id: String, houseSystem: String?): Result<FortuneChartOutput> = withContext(Dispatchers.IO) {
-        runCatching {
-            val resJson = client.calculateProfileChartWithHouse(id, houseSystem)
-            json.decodeFromString(FortuneChartOutput.serializer(), resJson)
-        }
-    }
-
-    suspend fun calculateProfileSaju(id: String): Result<SajuCalculationOutputDto> = withContext(Dispatchers.IO) {
-        runCatching {
-            val resJson = client.calculateProfileSaju(id)
-            json.decodeFromString(SajuCalculationOutputDto.serializer(), resJson)
-        }
-    }
-
-    suspend fun calculateProfileWestern(id: String, houseSystem: String?): Result<WesternCalculationOutputDto> = withContext(Dispatchers.IO) {
-        runCatching {
-            val resJson = client.calculateProfileWestern(id, houseSystem)
-            json.decodeFromString(WesternCalculationOutputDto.serializer(), resJson)
-        }
-    }
-
-    suspend fun calculateProfileVedic(id: String): Result<VedicCalculationOutputDto> = withContext(Dispatchers.IO) {
-        runCatching {
-            val resJson = client.calculateProfileVedic(id)
-            json.decodeFromString(VedicCalculationOutputDto.serializer(), resJson)
-        }
-    }
-
-    suspend fun calculateHoraryChartWithHouse(id: String, houseSystem: String?): Result<FortuneChartOutput> = withContext(Dispatchers.IO) {
-        runCatching {
-            val resJson = client.calculateHoraryChartWithHouse(id, houseSystem)
-            json.decodeFromString(FortuneChartOutput.serializer(), resJson)
-        }
-    }
-
-    suspend fun calculateProfilePredictiveSuite(
-        id: String,
-        targetYear: Int,
-        targetMonth: Int,
-        targetDay: Int,
-        targetHour: Int? = null,
-        targetMinute: Int? = null,
-        houseSystem: String? = null
-    ): Result<PredictiveSuiteData> = withContext(Dispatchers.IO) {
-        runCatching {
-            val resJson = client.calculateProfilePredictiveSuite(
-                id,
-                targetYear,
-                targetMonth.toUInt(),
-                targetDay.toUInt(),
-                targetHour?.toUInt(),
-                targetMinute?.toUInt(),
-                houseSystem
-            )
-            json.decodeFromString(PredictiveSuiteData.serializer(), resJson)
-        }
-    }
-
-    suspend fun exportProfileSajuMarkdown(id: String): Result<String> = withContext(Dispatchers.IO) {
-        runCatching {
-            client.exportProfileSajuMarkdown(id)
-        }
-    }
-
-    suspend fun exportProfileWesternMarkdown(id: String, houseSystem: String? = null): Result<String> = withContext(Dispatchers.IO) {
-        runCatching {
-            client.exportProfileWesternMarkdown(id, houseSystem)
-        }
-    }
-
-    suspend fun exportProfileVedicMarkdown(id: String): Result<String> = withContext(Dispatchers.IO) {
-        runCatching {
-            client.exportProfileVedicMarkdown(id)
-        }
-    }
-
-    suspend fun createHorary(request: CreateHoraryRequest): Result<HoraryDto> = withContext(Dispatchers.IO) {
-        runCatching {
-            val reqJson = json.encodeToString(CreateHoraryRequest.serializer(), request)
-            val resJson = client.createHorary(reqJson)
-            json.decodeFromString(HoraryDto.serializer(), resJson)
-        }
-    }
-
-    suspend fun updateHorary(id: String, request: UpdateHoraryRequest): Result<HoraryDto> = withContext(Dispatchers.IO) {
-        runCatching {
-            val reqJson = json.encodeToString(UpdateHoraryRequest.serializer(), request)
-            val resJson = client.updateHorary(id, reqJson)
-            json.decodeFromString(HoraryDto.serializer(), resJson)
-        }
-    }
-
-    suspend fun getHorary(id: String): Result<HoraryDto?> = withContext(Dispatchers.IO) {
-        runCatching {
-            val resJson = client.getHorary(id) ?: return@runCatching null
-            json.decodeFromString(HoraryDto.serializer(), resJson)
-        }
-    }
-
-    suspend fun listHorary(category: String? = null, querentId: String? = null): Result<List<HoraryDto>> = withContext(Dispatchers.IO) {
-        runCatching {
-            val resJson = client.listHorary(category, querentId)
-            json.decodeFromString<List<HoraryDto>>(resJson)
-        }
-    }
-
-    suspend fun deleteHorary(id: String): Result<Boolean> = withContext(Dispatchers.IO) {
-        runCatching {
-            client.deleteHorary(id)
-        }
-    }
-
-    suspend fun calculateHoraryChart(id: String): Result<FortuneChartOutput> = withContext(Dispatchers.IO) {
-        runCatching {
-            val resJson = client.calculateHoraryChart(id)
-            json.decodeFromString(FortuneChartOutput.serializer(), resJson)
-        }
-    }
-
-
-    suspend fun exportHoraryWesternMarkdown(id: String): Result<String> = withContext(Dispatchers.IO) {
-        runCatching {
-            client.exportHoraryWesternMarkdown(id)
-        }
-    }
-
-    suspend fun exportPrashnaVedicMarkdown(id: String): Result<String> = withContext(Dispatchers.IO) {
-        runCatching {
-            client.exportPrashnaVedicMarkdown(id)
-        }
-    }
-
-    suspend fun exportBackupJson(): Result<String> = withContext(Dispatchers.IO) {
-        runCatching {
-            client.exportBackupJson()
-        }
-    }
-
-    suspend fun importBackupJson(jsonStr: String, replaceExisting: Boolean): Result<ImportSummaryDto> = withContext(Dispatchers.IO) {
-        runCatching {
-            val resJson = client.importBackupJson(jsonStr, replaceExisting)
-            json.decodeFromString(ImportSummaryDto.serializer(), resJson)
-        }
-    }
+    val profiles: ProfileDataSource = RustProfileDataSource(client, json)
+    val horary: HoraryDataSource = RustHoraryDataSource(client, json)
+    val backup: BackupDataSource = RustBackupDataSource(client, json)
 }

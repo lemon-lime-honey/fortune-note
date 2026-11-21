@@ -5,14 +5,17 @@ import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -36,6 +39,46 @@ private data class WheelBodyItem(
     var displayLon: Double
 )
 
+private class WheelGeometry(size: Size, val d: Float, val asc: Double) {
+    val center = Offset(size.width / 2f, size.height / 2f)
+    val outerRadius = size.minDimension / 2f - 4f * d
+    val signInnerRadius = outerRadius * 0.855f
+    val tickInnerRadius = outerRadius * 0.82f
+    val planetCodeRadius = outerRadius * 0.725f
+    val planetDegRadius = outerRadius * 0.625f
+    val houseRingRadius = outerRadius * 0.51f
+    val innerAspectRadius = outerRadius * 0.42f
+
+    fun lonToScreenDeg(lon: Double): Float {
+        val rel = (lon - asc + 360.0) % 360.0
+        return ((180.0 - rel + 360.0) % 360.0).toFloat()
+    }
+
+    fun lonToOffset(lon: Double, r: Float): Offset {
+        val rad = lonToScreenDeg(lon) * (PI / 180.0)
+        return Offset(center.x + (r * cos(rad)).toFloat(), center.y + (r * sin(rad)).toFloat())
+    }
+}
+
+private class WheelPaints(d: Float) {
+    val sign = makePaint(ChartFrameInk.toArgb(), 10.5f * d, Typeface.BOLD)
+    val houseNum = makePaint(TextSecondary.toArgb(), 9.5f * d, Typeface.BOLD)
+    val ascLabel = makePaint(CrimsonAlert.toArgb(), 9.5f * d, Typeface.BOLD)
+    val mcLabel = makePaint(CelestialBlue.toArgb(), 9.5f * d, Typeface.BOLD)
+    val bodyCode = makePaint(ChartFrameInk.toArgb(), 9.5f * d, Typeface.BOLD)
+    val nodeCode = makePaint(TextSecondary.toArgb(), 9.0f * d, Typeface.BOLD)
+    val retroBodyCode = makePaint(CrimsonAlert.toArgb(), 9.5f * d, Typeface.BOLD)
+    val bodyDeg = makePaint(TextSecondary.toArgb(), 8.2f * d, Typeface.NORMAL)
+
+    private fun makePaint(argb: Int, sizePx: Float, style: Int): Paint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = argb
+            textSize = sizePx
+            textAlign = Paint.Align.CENTER
+            typeface = Typeface.create(Typeface.MONOSPACE, style)
+        }
+}
+
 @Composable
 fun WesternChartWheel(
     data: WesternChartData,
@@ -51,399 +94,174 @@ fun WesternChartWheel(
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val canvasSize = size.minDimension
-            val center = Offset(size.width / 2f, size.height / 2f)
-            val d = density
-
-            // Radii proportional to canvas size
-            val outerRadius = canvasSize / 2f - 4f * d
-            val signInnerRadius = outerRadius * 0.855f
-            val tickInnerRadius = outerRadius * 0.82f
-            val planetCodeRadius = outerRadius * 0.725f
-            val planetDegRadius = outerRadius * 0.625f
-            val houseRingRadius = outerRadius * 0.51f
-            val innerAspectRadius = outerRadius * 0.42f
-
-            // Colors
-            val frameInk = Color(0xFF0F172A)
-            val subtleInk = Color(0xFF475569)
-            val mutedLine = Color(0xFFCBD5E1)
-            val faintFill = Color(0xFFF8FAFC)
-            val ascColor = CrimsonAlert // #B91C1C
-            val mcColor = CelestialBlue // #1D4ED8
-
-            val asc = data.ascendant
-
-            // Coordinate mapping: ASC is fixed at 9 o'clock (180° in Android Canvas where 0° is 3 o'clock).
-            // Zodiac longitude increases counter-clockwise on the wheel.
-            fun lonToScreenDeg(lon: Double): Float {
-                val rel = (lon - asc + 360.0) % 360.0
-                return ((180.0 - rel + 360.0) % 360.0).toFloat()
-            }
-
-            fun lonToOffset(lon: Double, r: Float): Offset {
-                val deg = lonToScreenDeg(lon)
-                val rad = deg * (PI / 180.0)
-                return Offset(
-                    x = center.x + (r * cos(rad)).toFloat(),
-                    y = center.y + (r * sin(rad)).toFloat()
-                )
-            }
-
-            // Native Paints (isolated instances, zero in-place color mutation)
-            val signPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = frameInk.toArgb()
-                textSize = 10.5f * d
-                textAlign = Paint.Align.CENTER
-                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-            }
-
-            val houseNumPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = subtleInk.toArgb()
-                textSize = 9.5f * d
-                textAlign = Paint.Align.CENTER
-                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-            }
-
-            val ascLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = ascColor.toArgb()
-                textSize = 9.5f * d
-                textAlign = Paint.Align.CENTER
-                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-            }
-
-            val mcLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = mcColor.toArgb()
-                textSize = 9.5f * d
-                textAlign = Paint.Align.CENTER
-                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-            }
-
-            val bodyCodePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = frameInk.toArgb()
-                textSize = 9.5f * d
-                textAlign = Paint.Align.CENTER
-                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-            }
-
-            val nodeCodePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = subtleInk.toArgb()
-                textSize = 9.0f * d
-                textAlign = Paint.Align.CENTER
-                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-            }
-
-            val retroBodyCodePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = ascColor.toArgb()
-                textSize = 9.5f * d
-                textAlign = Paint.Align.CENTER
-                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-            }
-
-            val bodyDegPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = subtleInk.toArgb()
-                textSize = 8.2f * d
-                textAlign = Paint.Align.CENTER
-                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
-            }
-
-            // 1. Draw alternating monochrome sectors for the 12 signs
-            for (i in 0 until 12) {
-                val signStartLon = i * 30.0
-                val signEndLon = (i + 1) * 30.0
-                val endScreenDeg = lonToScreenDeg(signEndLon)
-
-                if (i % 2 == 1) {
-                    drawArc(
-                        color = faintFill,
-                        startAngle = endScreenDeg,
-                        sweepAngle = 30f,
-                        useCenter = true,
-                        topLeft = Offset(center.x - outerRadius, center.y - outerRadius),
-                        size = Size(outerRadius * 2f, outerRadius * 2f)
-                    )
-                }
-            }
-
-            // Clear inner area inside signInnerRadius with pure white
-            drawCircle(
-                color = BackgroundWhite,
-                radius = signInnerRadius,
-                center = center
-            )
-
-            // 2. Draw Zodiac Ring Borders & 3-Letter Sign Codes
-            drawCircle(
-                color = frameInk,
-                radius = outerRadius,
-                center = center,
-                style = Stroke(width = 1.5f * d)
-            )
-            drawCircle(
-                color = frameInk,
-                radius = signInnerRadius,
-                center = center,
-                style = Stroke(width = 1.2f * d)
-            )
-
-            for (i in 0 until 12) {
-                val signStartLon = i * 30.0
-                val pOuter = lonToOffset(signStartLon, outerRadius)
-                val pInner = lonToOffset(signStartLon, signInnerRadius)
-                drawLine(
-                    color = frameInk,
-                    start = pInner,
-                    end = pOuter,
-                    strokeWidth = 1.0f * d
-                )
-
-                // Sign 3-letter code at midpoint of sector
-                val midLon = signStartLon + 15.0
-                val textRadius = (outerRadius + signInnerRadius) / 2f
-                val textPos = lonToOffset(midLon, textRadius)
-                drawCenteredText(ZODIAC_CODES[i], textPos, signPaint)
-            }
-
-            // 3. Draw Precision Ephemeris Degree Ticks (every 1°, 5°, 10°) along signInnerRadius
-            for (deg in 0 until 360) {
-                val lon = deg.toDouble()
-                val isTen = deg % 10 == 0
-                val isFive = deg % 5 == 0
-                val tickLen = when {
-                    isTen -> 5.5f * d
-                    isFive -> 3.8f * d
-                    else -> 2.0f * d
-                }
-                val tickWidth = when {
-                    isTen -> 1.1f * d
-                    isFive -> 0.8f * d
-                    else -> 0.5f * d
-                }
-                val tickColor = if (isTen || isFive) frameInk else mutedLine
-                val pStart = lonToOffset(lon, signInnerRadius)
-                val pEnd = lonToOffset(lon, signInnerRadius - tickLen)
-                drawLine(
-                    color = tickColor,
-                    start = pStart,
-                    end = pEnd,
-                    strokeWidth = tickWidth
-                )
-            }
-
-            // 4. Draw Inner Rings (House Number Band & Aspect Core)
-            drawCircle(
-                color = faintFill,
-                radius = houseRingRadius,
-                center = center
-            )
-            drawCircle(
-                color = BackgroundWhite,
-                radius = innerAspectRadius,
-                center = center
-            )
-            drawCircle(
-                color = mutedLine,
-                radius = houseRingRadius,
-                center = center,
-                style = Stroke(width = 1.0f * d)
-            )
-            drawCircle(
-                color = frameInk,
-                radius = innerAspectRadius,
-                center = center,
-                style = Stroke(width = 1.1f * d)
-            )
-
-            // 5. Draw House Cusps & House Numbers
-            val cusps = data.house_cusps
-            if (cusps.size == 12) {
-                for (i in 0 until 12) {
-                    val cuspLon = cusps[i]
-                    val nextCuspLon = cusps[(i + 1) % 12]
-                    val isAngle = (i == 0 || i == 3 || i == 6 || i == 9)
-
-                    val pInner = lonToOffset(cuspLon, innerAspectRadius)
-                    val pOuter = lonToOffset(cuspLon, signInnerRadius)
-
-                    if (!isAngle) {
-                        drawLine(
-                            color = mutedLine,
-                            start = pInner,
-                            end = pOuter,
-                            strokeWidth = 0.9f * d
-                        )
-                    }
-
-                    // Midpoint of house for number label (1..12)
-                    val span = (nextCuspLon - cuspLon + 360.0) % 360.0
-                    val midLon = (cuspLon + span / 2.0) % 360.0
-                    val numRadius = (houseRingRadius + innerAspectRadius) / 2f
-                    val numPos = lonToOffset(midLon, numRadius)
-                    drawCenteredText("${i + 1}", numPos, houseNumPaint)
-                }
-            }
-
-            // 6. Draw Primary Angles (ASC/DSC and MC/IC) with sharp contrast
-            val dsc = (asc + 180.0) % 360.0
-            val mc = data.midheaven
-            val ic = (mc + 180.0) % 360.0
-
-            // ASC-DSC Axis
-            drawLine(
-                color = ascColor,
-                start = lonToOffset(asc, innerAspectRadius),
-                end = lonToOffset(asc, signInnerRadius),
-                strokeWidth = 2.0f * d
-            )
-            drawLine(
-                color = ascColor.copy(alpha = 0.65f),
-                start = lonToOffset(dsc, innerAspectRadius),
-                end = lonToOffset(dsc, signInnerRadius),
-                strokeWidth = 1.4f * d
-            )
-
-            // MC-IC Axis
-            drawLine(
-                color = mcColor,
-                start = lonToOffset(mc, innerAspectRadius),
-                end = lonToOffset(mc, signInnerRadius),
-                strokeWidth = 2.0f * d
-            )
-            drawLine(
-                color = mcColor.copy(alpha = 0.65f),
-                start = lonToOffset(ic, innerAspectRadius),
-                end = lonToOffset(ic, signInnerRadius),
-                strokeWidth = 1.4f * d
-            )
-
-            // Angle markers inside the aspect core rim
-            val angleBadgeRadius = innerAspectRadius - 10f * d
-            drawCenteredText("ASC", lonToOffset(asc, angleBadgeRadius), ascLabelPaint)
-            drawCenteredText("MC", lonToOffset(mc, angleBadgeRadius), mcLabelPaint)
-
-            // 7. Draw Aspect Lines inside innerAspectRadius
-            val bodyLonMap = mutableMapOf<String, Double>()
-            data.planets.forEach { bodyLonMap[it.name] = it.longitude }
-            data.nodes.forEach { bodyLonMap[it.name] = it.longitude }
-
-            data.aspects.forEach { asp ->
-                val lon1 = bodyLonMap[asp.planet1]
-                val lon2 = bodyLonMap[asp.planet2]
-                if (lon1 != null && lon2 != null) {
-                    val p1 = lonToOffset(lon1, innerAspectRadius - 2f * d)
-                    val p2 = lonToOffset(lon2, innerAspectRadius - 2f * d)
-
-                    val isHard = isHardAspect(asp.aspect_type)
-                    val isSoft = isSoftAspect(asp.aspect_type)
-
-                    val lineColor = when {
-                        isHard -> ascColor.copy(alpha = 0.55f)
-                        isSoft -> mcColor.copy(alpha = 0.55f)
-                        else -> subtleInk.copy(alpha = 0.45f)
-                    }
-                    val pathEffect = if (asp.aspect_type.equals("Sextile", ignoreCase = true)) {
-                        PathEffect.dashPathEffect(floatArrayOf(5f * d, 4f * d), 0f)
-                    } else null
-
-                    drawLine(
-                        color = lineColor,
-                        start = p1,
-                        end = p2,
-                        strokeWidth = if (asp.orb <= 2.0) 1.4f * d else 0.9f * d,
-                        pathEffect = pathEffect
-                    )
-                }
-            }
-
-            // 8. Angular Collision-Avoidance Solver for Planets & Nodes
-            val rawBodies = mutableListOf<WheelBodyItem>()
-            data.planets.forEach { p ->
-                val deg = ((p.sign_degree % 30.0 + 30.0) % 30.0).toInt().coerceIn(0, 29)
-                rawBodies.add(
-                    WheelBodyItem(
-                        code = bodyCode(p.name),
-                        trueLon = (p.longitude % 360.0 + 360.0) % 360.0,
-                        degInSign = deg,
-                        isRetrograde = p.is_retrograde,
-                        isNode = false,
-                        displayLon = (p.longitude % 360.0 + 360.0) % 360.0
-                    )
-                )
-            }
-            data.nodes.forEach { n ->
-                val deg = ((n.sign_degree % 30.0 + 30.0) % 30.0).toInt().coerceIn(0, 29)
-                rawBodies.add(
-                    WheelBodyItem(
-                        code = bodyCode(n.name),
-                        trueLon = (n.longitude % 360.0 + 360.0) % 360.0,
-                        degInSign = deg,
-                        isRetrograde = n.is_retrograde,
-                        isNode = true,
-                        displayLon = (n.longitude % 360.0 + 360.0) % 360.0
-                    )
-                )
-            }
-
-            val solvedBodies = resolveAngularCollisions(rawBodies, minSepDeg = 7.2)
-
-            // 9. Draw True Longitude Dots, Leader Lines, Planet Codes, and Degree Labels
-            solvedBodies.forEach { b ->
-                val exactRimPoint = lonToOffset(b.trueLon, signInnerRadius - 2.5f * d)
-                val leaderInnerPoint = lonToOffset(b.displayLon, tickInnerRadius - 2f * d)
-                val codePos = lonToOffset(b.displayLon, planetCodeRadius)
-                val degPos = lonToOffset(b.displayLon, planetDegRadius)
-
-                // Exact point dot on inner zodiac rim
-                drawCircle(
-                    color = if (b.isRetrograde && !b.isNode) ascColor else frameInk,
-                    radius = 2.0f * d,
-                    center = exactRimPoint
-                )
-
-                // Thin leader line connecting exact degree on rim to displaced label azimuth
-                drawLine(
-                    color = subtleInk.copy(alpha = 0.65f),
-                    start = exactRimPoint,
-                    end = leaderInnerPoint,
-                    strokeWidth = 0.8f * d
-                )
-
-                // Planet 2/3-letter code
-                val codePaint = when {
-                    b.isNode -> nodeCodePaint
-                    b.isRetrograde -> retroBodyCodePaint
-                    else -> bodyCodePaint
-                }
-                drawCenteredText(b.code, codePos, codePaint)
-
-                // Degree + Retrograde indicator on inner layer
-                val degLabel = String.format(
-                    Locale.US,
-                    "%02d°%s",
-                    b.degInSign,
-                    if (b.isRetrograde && !b.isNode) "R" else ""
-                )
-                drawCenteredText(degLabel, degPos, bodyDegPaint)
-            }
+            val geom = WheelGeometry(size, density, data.ascendant)
+            val paints = WheelPaints(density)
+            drawZodiacRingAndTicks(geom, paints)
+            drawInnerRingsAndHouses(geom, data, paints)
+            drawPrimaryAngleAxes(geom, data, paints)
+            drawAspectWeb(geom, data)
+            drawWheelBodies(geom, data, paints)
         }
+    }
+}
+
+private fun DrawScope.drawZodiacRingAndTicks(geom: WheelGeometry, paints: WheelPaints) {
+    for (i in 0 until 12) {
+        if (i % 2 == 1) {
+            drawArc(
+                color = ChartKendraFill,
+                startAngle = geom.lonToScreenDeg((i + 1) * 30.0),
+                sweepAngle = 30f,
+                useCenter = true,
+                topLeft = Offset(geom.center.x - geom.outerRadius, geom.center.y - geom.outerRadius),
+                size = Size(geom.outerRadius * 2f, geom.outerRadius * 2f)
+            )
+        }
+    }
+    drawCircle(color = BackgroundWhite, radius = geom.signInnerRadius, center = geom.center)
+    drawCircle(color = ChartFrameInk, radius = geom.outerRadius, center = geom.center, style = Stroke(1.5f * geom.d))
+    drawCircle(color = ChartFrameInk, radius = geom.signInnerRadius, center = geom.center, style = Stroke(1.2f * geom.d))
+
+    val textRadius = (geom.outerRadius + geom.signInnerRadius) / 2f
+    for (i in 0 until 12) {
+        val startLon = i * 30.0
+        drawLine(
+            color = ChartFrameInk,
+            start = geom.lonToOffset(startLon, geom.signInnerRadius),
+            end = geom.lonToOffset(startLon, geom.outerRadius),
+            strokeWidth = 1.0f * geom.d
+        )
+        drawCenteredText(ZODIAC_CODES[i], geom.lonToOffset(startLon + 15.0, textRadius), paints.sign)
+    }
+
+    for (deg in 0 until 360) {
+        val isTen = deg % 10 == 0
+        val isFive = deg % 5 == 0
+        val len = when { isTen -> 5.5f; isFive -> 3.8f; else -> 2.0f } * geom.d
+        val width = when { isTen -> 1.1f; isFive -> 0.8f; else -> 0.5f } * geom.d
+        drawLine(
+            color = if (isTen || isFive) ChartFrameInk else ChartMutedLine,
+            start = geom.lonToOffset(deg.toDouble(), geom.signInnerRadius),
+            end = geom.lonToOffset(deg.toDouble(), geom.signInnerRadius - len),
+            strokeWidth = width
+        )
+    }
+}
+
+private fun DrawScope.drawInnerRingsAndHouses(
+    geom: WheelGeometry,
+    data: WesternChartData,
+    paints: WheelPaints
+) {
+    drawCircle(color = ChartKendraFill, radius = geom.houseRingRadius, center = geom.center)
+    drawCircle(color = BackgroundWhite, radius = geom.innerAspectRadius, center = geom.center)
+    drawCircle(color = ChartMutedLine, radius = geom.houseRingRadius, center = geom.center, style = Stroke(1.0f * geom.d))
+    drawCircle(color = ChartFrameInk, radius = geom.innerAspectRadius, center = geom.center, style = Stroke(1.1f * geom.d))
+
+    val cusps = data.house_cusps
+    if (cusps.size != 12) return
+    val numRadius = (geom.houseRingRadius + geom.innerAspectRadius) / 2f
+    for (i in 0 until 12) {
+        val cuspLon = cusps[i]
+        val nextCuspLon = cusps[(i + 1) % 12]
+        if (i !in listOf(0, 3, 6, 9)) {
+            drawLine(
+                color = ChartMutedLine,
+                start = geom.lonToOffset(cuspLon, geom.innerAspectRadius),
+                end = geom.lonToOffset(cuspLon, geom.signInnerRadius),
+                strokeWidth = 0.9f * geom.d
+            )
+        }
+        val midLon = (cuspLon + ((nextCuspLon - cuspLon + 360.0) % 360.0) / 2.0) % 360.0
+        drawCenteredText("${i + 1}", geom.lonToOffset(midLon, numRadius), paints.houseNum)
+    }
+}
+
+private fun DrawScope.drawPrimaryAngleAxes(
+    geom: WheelGeometry,
+    data: WesternChartData,
+    paints: WheelPaints
+) {
+    val asc = data.ascendant
+    val dsc = (asc + 180.0) % 360.0
+    val mc = data.midheaven
+    val ic = (mc + 180.0) % 360.0
+    drawLine(CrimsonAlert, geom.lonToOffset(asc, geom.innerAspectRadius), geom.lonToOffset(asc, geom.signInnerRadius), 2.0f * geom.d)
+    drawLine(CrimsonAlert.copy(alpha = 0.65f), geom.lonToOffset(dsc, geom.innerAspectRadius), geom.lonToOffset(dsc, geom.signInnerRadius), 1.4f * geom.d)
+    drawLine(CelestialBlue, geom.lonToOffset(mc, geom.innerAspectRadius), geom.lonToOffset(mc, geom.signInnerRadius), 2.0f * geom.d)
+    drawLine(CelestialBlue.copy(alpha = 0.65f), geom.lonToOffset(ic, geom.innerAspectRadius), geom.lonToOffset(ic, geom.signInnerRadius), 1.4f * geom.d)
+
+    val badgeRadius = geom.innerAspectRadius - 10f * geom.d
+    drawCenteredText("ASC", geom.lonToOffset(asc, badgeRadius), paints.ascLabel)
+    drawCenteredText("MC", geom.lonToOffset(mc, badgeRadius), paints.mcLabel)
+}
+
+private fun DrawScope.drawAspectWeb(geom: WheelGeometry, data: WesternChartData) {
+    val bodyLonMap = buildMap {
+        data.planets.forEach { put(it.name, it.longitude) }
+        data.nodes.forEach { put(it.name, it.longitude) }
+    }
+    val rim = geom.innerAspectRadius - 2f * geom.d
+    data.aspects.forEach { asp ->
+        val lon1 = bodyLonMap[asp.planet1] ?: return@forEach
+        val lon2 = bodyLonMap[asp.planet2] ?: return@forEach
+        val lineColor = when {
+            isHardAspect(asp.aspect_type) -> CrimsonAlert.copy(alpha = 0.55f)
+            isSoftAspect(asp.aspect_type) -> CelestialBlue.copy(alpha = 0.55f)
+            else -> TextSecondary.copy(alpha = 0.45f)
+        }
+        val dash = if (asp.aspect_type.equals("Sextile", ignoreCase = true)) {
+            PathEffect.dashPathEffect(floatArrayOf(5f * geom.d, 4f * geom.d), 0f)
+        } else null
+        drawLine(
+            color = lineColor,
+            start = geom.lonToOffset(lon1, rim),
+            end = geom.lonToOffset(lon2, rim),
+            strokeWidth = if (asp.orb <= 2.0) 1.4f * geom.d else 0.9f * geom.d,
+            pathEffect = dash
+        )
+    }
+}
+
+private fun DrawScope.drawWheelBodies(
+    geom: WheelGeometry,
+    data: WesternChartData,
+    paints: WheelPaints
+) {
+    val rawBodies = buildList {
+        data.planets.forEach { p ->
+            val lon = (p.longitude % 360.0 + 360.0) % 360.0
+            val deg = ((p.sign_degree % 30.0 + 30.0) % 30.0).toInt().coerceIn(0, 29)
+            add(WheelBodyItem(bodyCode(p.name), lon, deg, p.is_retrograde, false, lon))
+        }
+        data.nodes.forEach { n ->
+            val lon = (n.longitude % 360.0 + 360.0) % 360.0
+            val deg = ((n.sign_degree % 30.0 + 30.0) % 30.0).toInt().coerceIn(0, 29)
+            add(WheelBodyItem(bodyCode(n.name), lon, deg, n.is_retrograde, true, lon))
+        }
+    }
+    resolveAngularCollisions(rawBodies, minSepDeg = 7.2).forEach { b ->
+        val rimPt = geom.lonToOffset(b.trueLon, geom.signInnerRadius - 2.5f * geom.d)
+        val leaderPt = geom.lonToOffset(b.displayLon, geom.tickInnerRadius - 2f * geom.d)
+        drawCircle(if (b.isRetrograde && !b.isNode) CrimsonAlert else ChartFrameInk, 2.0f * geom.d, rimPt)
+        drawLine(TextSecondary.copy(alpha = 0.65f), rimPt, leaderPt, 0.8f * geom.d)
+        val codePaint = when {
+            b.isNode -> paints.nodeCode
+            b.isRetrograde -> paints.retroBodyCode
+            else -> paints.bodyCode
+        }
+        drawCenteredText(b.code, geom.lonToOffset(b.displayLon, geom.planetCodeRadius), codePaint)
+        val degLabel = String.format(Locale.US, "%02d°%s", b.degInSign, if (b.isRetrograde && !b.isNode) "R" else "")
+        drawCenteredText(degLabel, geom.lonToOffset(b.displayLon, geom.planetDegRadius), paints.bodyDeg)
     }
 }
 
 private fun DrawScope.drawCenteredText(text: String, pos: Offset, paint: Paint) {
     val fm = paint.fontMetrics
     val baselineOffset = -(fm.ascent + fm.descent) / 2f
-    drawContext.canvas.nativeCanvas.drawText(
-        text,
-        pos.x,
-        pos.y + baselineOffset,
-        paint
-    )
+    drawContext.canvas.nativeCanvas.drawText(text, pos.x, pos.y + baselineOffset, paint)
 }
 
-/**
- * Iterative circular relaxation solver that spreads clustered planets along the azimuth
- * so labels never overlap while staying anchored as close as possible to their true longitudes.
- */
 private fun resolveAngularCollisions(
     items: List<WheelBodyItem>,
     minSepDeg: Double
@@ -451,33 +269,27 @@ private fun resolveAngularCollisions(
     if (items.size <= 1) return items
     val sorted = items.sortedBy { it.trueLon }.toMutableList()
     val n = sorted.size
-
     repeat(60) {
         var moved = false
         for (i in 0 until n) {
-            val j = (i + 1) % n
             val a = sorted[i]
-            val b = sorted[j]
-            // Signed angular distance from a to b in [0, 360)
+            val b = sorted[(i + 1) % n]
             var diff = (b.displayLon - a.displayLon + 360.0) % 360.0
             if (diff > 180.0) diff -= 360.0
-
             if (diff >= 0.0 && diff < minSepDeg) {
                 val push = (minSepDeg - diff) * 0.52
                 a.displayLon = (a.displayLon - push + 360.0) % 360.0
                 b.displayLon = (b.displayLon + push + 360.0) % 360.0
                 moved = true
             } else if (diff < 0.0 && abs(diff) < minSepDeg) {
-                // Crossed over during push: restore order
                 val mid = (a.displayLon + diff / 2.0 + 360.0) % 360.0
                 a.displayLon = (mid - minSepDeg * 0.5 + 360.0) % 360.0
                 b.displayLon = (mid + minSepDeg * 0.5 + 360.0) % 360.0
                 moved = true
             }
         }
-        // Gentle spring pull back toward true longitude so clusters remain centered on their real degree
         for (item in sorted) {
-            var delta = (item.trueLon - item.displayLon + 540.0) % 360.0 - 180.0
+            val delta = (item.trueLon - item.displayLon + 540.0) % 360.0 - 180.0
             if (abs(delta) > 0.2) {
                 item.displayLon = (item.displayLon + delta * 0.08 + 360.0) % 360.0
             }
