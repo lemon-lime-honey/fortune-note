@@ -18,6 +18,7 @@
 # Build and deployment scripts
 !scripts/
 !scripts/**
+scripts/__pycache__/
 
 # Android app sources
 !android/
@@ -26,6 +27,7 @@
 !android/**/*.kt
 !android/**/*.xml
 !android/**/*.properties
+!android/app/src/main/assets/*.csv
 android/local.properties
 android/.gradle/
 android/**/build/

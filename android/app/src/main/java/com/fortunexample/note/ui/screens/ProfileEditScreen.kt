@@ -259,6 +259,14 @@ fun ProfileEditScreen(
                         validationError = "존재하지 않는 날짜입니다."
                         return@Button
                     }
+                    if (!latitude.isFinite() || latitude !in -90.0..90.0) {
+                        validationError = "올바른 위도를 입력해 주세요 (-90~90)."
+                        return@Button
+                    }
+                    if (!longitude.isFinite() || longitude !in -180.0..180.0) {
+                        validationError = "올바른 경도를 입력해 주세요 (-180~180)."
+                        return@Button
+                    }
 
                     validationError = null
                     onSave(

@@ -1,8 +1,10 @@
 package com.fortunexample.note.ui.screens
 
-import android.content.Context
-import android.location.LocationManager
+import android.Manifest
+import android.content.pm.PackageManager
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -21,9 +23,11 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.fortunexample.note.data.HoraryDto
 import com.fortunexample.note.data.ProfileDto
 import com.fortunexample.note.ui.components.LocationPicker
+import com.fortunexample.note.ui.components.fetchCurrentGpsLocation
 import com.fortunexample.note.ui.theme.*
 import java.util.Calendar
 
@@ -54,6 +58,23 @@ fun HoraryEditScreen(
     var secondStr by remember(initialHorary) { mutableStateOf(initialHorary?.query_second?.toInt()?.toString() ?: cal.get(Calendar.SECOND).toString()) }
     var latitude by remember(initialHorary) { mutableDoubleStateOf(initialHorary?.latitude ?: 37.5665) }
     var longitude by remember(initialHorary) { mutableDoubleStateOf(initialHorary?.longitude ?: 126.9780) }
+
+    val capturePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (granted) {
+            fetchCurrentGpsLocation(
+                context = context,
+                onSuccess = { lat, lon ->
+                    latitude = lat
+                    longitude = lon
+                },
+                onError = {}
+            )
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -98,16 +119,21 @@ fun HoraryEditScreen(
                     minuteStr = now.get(Calendar.MINUTE).toString()
                     secondStr = now.get(Calendar.SECOND).toString()
 
-                    val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-                    if (lm != null) {
-                        try {
-                            val loc = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-                                ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-                            if (loc != null) {
-                                latitude = loc.latitude
-                                longitude = loc.longitude
-                            }
-                        } catch (_: SecurityException) {}
+                    val fineGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                    val coarseGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                    if (fineGranted || coarseGranted) {
+                        fetchCurrentGpsLocation(
+                            context = context,
+                            onSuccess = { lat, lon ->
+                                latitude = lat
+                                longitude = lon
+                            },
+                            onError = {}
+                        )
+                    } else {
+                        capturePermissionLauncher.launch(
+                            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                        )
                     }
                     Toast.makeText(context, "현재 시각이 캡처되었습니다.", Toast.LENGTH_SHORT).show()
                 },
@@ -337,6 +363,14 @@ fun HoraryEditScreen(
                         java.time.LocalDate.of(y, m, d)
                     } catch (_: Exception) {
                         validationError = "존재하지 않는 날짜입니다."
+                        return@Button
+                    }
+                    if (!latitude.isFinite() || latitude !in -90.0..90.0) {
+                        validationError = "올바른 위도를 입력해 주세요 (-90~90)."
+                        return@Button
+                    }
+                    if (!longitude.isFinite() || longitude !in -180.0..180.0) {
+                        validationError = "올바른 경도를 입력해 주세요 (-180~180)."
                         return@Button
                     }
 
