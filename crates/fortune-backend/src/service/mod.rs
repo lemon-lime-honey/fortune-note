@@ -8,8 +8,8 @@ mod horary_calc;
 mod tests;
 
 use std::sync::MutexGuard;
-use chrono::Utc;
-use fortune_core::lookup_timezone_id;
+use chrono::{NaiveDate, Utc};
+use fortune_core::{lookup_timezone_id, CalendarDateTime, GeoCoordinate};
 use rusqlite::Connection;
 use uuid::Uuid;
 
@@ -60,6 +60,33 @@ pub(crate) fn db_err(err: impl ToString) -> FortuneBackendError {
     FortuneBackendError::DatabaseError(err.to_string())
 }
 
+pub(crate) fn validate_datetime_and_coords(
+    dt: CalendarDateTime,
+    loc: GeoCoordinate,
+) -> Result<(), FortuneBackendError> {
+    if !(-4000..=3000).contains(&dt.year) {
+        return Err(FortuneBackendError::ValidationError("Year must be between -4000 and 3000".into()));
+    }
+    if NaiveDate::from_ymd_opt(dt.year, dt.month, dt.day).is_none() {
+        return Err(FortuneBackendError::ValidationError(format!(
+            "Invalid calendar date: {:04}-{:02}-{:02}", dt.year, dt.month, dt.day
+        )));
+    }
+    if dt.hour > 23 || dt.minute > 59 {
+        return Err(FortuneBackendError::ValidationError("Hour must be 0..=23 and minute 0..=59".into()));
+    }
+    if !dt.second.is_finite() || !(0.0..60.0).contains(&dt.second) {
+        return Err(FortuneBackendError::ValidationError("Second must be between 0.0 and 59.999".into()));
+    }
+    if !loc.latitude.is_finite() || !(-90.0..=90.0).contains(&loc.latitude) {
+        return Err(FortuneBackendError::ValidationError("Latitude must be between -90 and 90".into()));
+    }
+    if !loc.longitude.is_finite() || !(-180.0..=180.0).contains(&loc.longitude) {
+        return Err(FortuneBackendError::ValidationError("Longitude must be between -180 and 180".into()));
+    }
+    Ok(())
+}
+
 fn validate_profile_params(params: &CreateProfileParams) -> Result<(String, String), FortuneBackendError> {
     let name = params.name.trim().to_string();
     if name.is_empty() {
@@ -69,9 +96,13 @@ fn validate_profile_params(params: &CreateProfileParams) -> Result<(String, Stri
     if gender != "male" && gender != "female" {
         return Err(FortuneBackendError::ValidationError("Gender must be 'male' or 'female'".to_string()));
     }
-    if !(0.0..60.0).contains(&params.birth_second) || !params.birth_second.is_finite() {
-        return Err(FortuneBackendError::ValidationError("Birth second must be between 0.0 and 59.999".to_string()));
-    }
+    validate_datetime_and_coords(
+        CalendarDateTime::new(
+            params.birth_year, params.birth_month, params.birth_day,
+            params.birth_hour, params.birth_minute, params.birth_second,
+        ),
+        GeoCoordinate::new(params.latitude, params.longitude),
+    )?;
     Ok((name, gender))
 }
 
@@ -125,6 +156,13 @@ fn build_horary(
     if title.is_empty() {
         return Err(FortuneBackendError::ValidationError("Title cannot be empty".to_string()));
     }
+    validate_datetime_and_coords(
+        CalendarDateTime::new(
+            params.query_year, params.query_month, params.query_day,
+            params.query_hour, params.query_minute, params.query_second,
+        ),
+        GeoCoordinate::new(params.latitude, params.longitude),
+    )?;
     let timezone_id = resolve_timezone_or_fallback(params.timezone_id, params.latitude, params.longitude, fallback_tz);
     let querent_profile_id = params
         .querent_profile_id

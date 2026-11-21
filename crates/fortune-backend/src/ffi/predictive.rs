@@ -1,4 +1,4 @@
-use fortune_core::{CalendarDateTime, GeoCoordinate};
+use fortune_core::{CalendarDate, CalendarDateTime, GeoCoordinate};
 use serde::Deserialize;
 
 use crate::service::PredictiveSuiteRequest;
@@ -94,9 +94,10 @@ impl FortuneClient {
         let req: ProfectionRequest = from_json(&request_json, "annual profection request")?;
         let tuples: Vec<(&str, f64)> = req.natal_planets.iter().map(|(n, l)| (n.as_str(), *l)).collect();
         let res = fortune_core::western::predictive::calculate_annual_profection(
-            req.birth_year, req.birth_month, req.birth_day,
-            req.target_year, req.target_month, req.target_day,
-            req.natal_ascendant, &tuples,
+            CalendarDate::new(req.birth_year, req.birth_month, req.birth_day),
+            CalendarDate::new(req.target_year, req.target_month, req.target_day),
+            req.natal_ascendant,
+            &tuples,
         );
         to_json(&res, "annual profection")
     }

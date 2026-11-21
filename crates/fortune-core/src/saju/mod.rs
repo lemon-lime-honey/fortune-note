@@ -18,6 +18,8 @@ use crate::ephemeris::{find_solar_longitude_moment, EphemerisError, EphemerisSna
 pub enum SajuError {
     #[error("Ephemeris calculation failed: {0}")]
     Ephemeris(#[from] EphemerisError),
+    #[error("Sun position missing from ephemeris snapshot")]
+    MissingSunPosition,
 }
 
 pub const HEAVENLY_STEMS: [&str; 10] = ["갑", "을", "병", "정", "무", "기", "경", "신", "임", "계"];
@@ -146,7 +148,10 @@ pub fn calculate_saju_with_options(
     gender: Gender,
     options: SajuOptions,
 ) -> Result<SajuChart, SajuError> {
-    let sun_lon = ephem.get_body("Sun").expect("Sun required").tropical_longitude;
+    let sun_lon = ephem
+        .get_body("Sun")
+        .ok_or(SajuError::MissingSunPosition)?
+        .tropical_longitude;
     let jd = ephem.jd_ut1;
     let (month_branch, prev_jd, next_jd) = find_surrounding_major_terms(sun_lon, jd)?;
 
@@ -160,14 +165,18 @@ pub fn calculate_saju_with_options(
     let month_pillar = Pillar::new(month_stem, month_branch);
 
     let local_jd = jd + (longitude / 15.0 / 24.0);
-    let effective_solar_hours = if options.apply_equation_of_time {
+    let mean_solar_hours = ((local_jd + 0.5).rem_euclid(1.0)) * 24.0;
+    let (effective_local_jd, effective_solar_hours) = if options.apply_equation_of_time {
         let (sun_ra, _) = ecliptic_to_equatorial(sun_lon, ephem.true_obliquity_deg);
-        ((ephem.ramc - sun_ra + 180.0).rem_euclid(360.0)) / 15.0
+        let apparent_hours = ((ephem.ramc - sun_ra + 180.0).rem_euclid(360.0)) / 15.0;
+        let eot_hours = (apparent_hours - mean_solar_hours + 36.0).rem_euclid(24.0) - 12.0;
+        (local_jd + eot_hours / 24.0, apparent_hours)
     } else {
-        ((local_jd + 0.5).rem_euclid(1.0)) * 24.0
+        (local_jd, mean_solar_hours)
     };
 
-    let (day_pillar, hour_pillar) = calculate_day_and_hour_pillars(local_jd, effective_solar_hours, options.zi_hour_mode);
+    let (day_pillar, hour_pillar) =
+        calculate_day_and_hour_pillars(effective_local_jd, effective_solar_hours, options.zi_hour_mode);
 
     let is_year_yang = year_stem.is_multiple_of(2);
     let is_forward_daeun = match gender {

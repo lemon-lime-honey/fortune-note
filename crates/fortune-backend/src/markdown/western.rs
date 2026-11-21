@@ -64,7 +64,7 @@ fn append_hellenistic_conditions_table(out: &mut String, h: &HellenisticData) {
 
 fn append_hellenistic_lots_and_aspects(out: &mut String, h: &HellenisticData) {
     if !h.lots.is_empty() {
-        out.push_str("\n### Hermetic Lots (Paulus Alexandrinus)\n");
+        out.push_str("\n### Hellenistic Lots (Vettius Valens)\n");
         for lot in &h.lots {
             out.push_str(&format!(
                 "- {}: {:.2}° ({}) - House {:02} (Ruler: {})\n",
@@ -75,7 +75,7 @@ fn append_hellenistic_lots_and_aspects(out: &mut String, h: &HellenisticData) {
     if !h.aspects.is_empty() {
         out.push_str("\n### Sign-Based Aspects & Degree Contacts\n");
         for ta in &h.aspects {
-            let partile = if ta.is_partile { " [Partile <= 1°]" } else { "" };
+            let partile = if ta.is_partile { " [Partile]" } else { "" };
             let dyn_str = if ta.is_applying { "Applying" } else { "Separating" };
             out.push_str(&format!("- {} - {}: {} (Orb: {:.2}°){}, {}\n", ta.planet1, ta.planet2, ta.aspect_type, ta.orb, partile, dyn_str));
         }

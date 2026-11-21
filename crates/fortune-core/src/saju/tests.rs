@@ -70,3 +70,36 @@ fn test_saju_zi_hour_mode_and_equation_of_time() {
     let apparent = seoul_saju(nov, Gender::Male, SajuOptions { zi_hour_mode: ZiHourMode::NextDayAt23, apply_equation_of_time: true });
     assert_eq!((mean.year_pillar, mean.month_pillar), (apparent.year_pillar, apparent.month_pillar));
 }
+
+#[test]
+fn test_saju_eot_midnight_day_boundary_consistency() {
+    // 2024-02-11 15:38 UTC at Seoul (126.978E -> LMT offset +8h27m55s -> ~00:06 LMT on Feb 12).
+    // Equation of Time on Feb 11 is approx -14m, pushing apparent solar time back to ~23:52 on Feb 11.
+    let feb_midnight = CalendarDateTime::new(2024, 2, 11, 15, 38, 0.0);
+    let noon_feb12 = seoul_saju(
+        CalendarDateTime::new(2024, 2, 12, 3, 0, 0.0),
+        Gender::Male,
+        SajuOptions::default(),
+    );
+    let noon_feb11 = seoul_saju(
+        CalendarDateTime::new(2024, 2, 11, 3, 0, 0.0),
+        Gender::Male,
+        SajuOptions::default(),
+    );
+
+    // With NextDayAt23, 23:52 on Feb 11 must yield Feb 12's day pillar (NOT Feb 13).
+    let next_at_23 = seoul_saju(
+        feb_midnight,
+        Gender::Male,
+        SajuOptions { zi_hour_mode: ZiHourMode::NextDayAt23, apply_equation_of_time: true },
+    );
+    assert_eq!(next_at_23.day_pillar, noon_feb12.day_pillar);
+
+    // With MidnightAt00, 23:52 on Feb 11 must yield Feb 11's day pillar (NOT Feb 12).
+    let mid_at_00 = seoul_saju(
+        feb_midnight,
+        Gender::Male,
+        SajuOptions { zi_hour_mode: ZiHourMode::MidnightAt00, apply_equation_of_time: true },
+    );
+    assert_eq!(mid_at_00.day_pillar, noon_feb11.day_pillar);
+}

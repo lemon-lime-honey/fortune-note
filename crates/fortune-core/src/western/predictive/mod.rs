@@ -219,9 +219,10 @@ pub fn calculate_predictive_suite(
 
     let birth_date = natal.birth_dt.date();
     let profection = calculate_annual_profection(
-        birth_date.year, birth_date.month, birth_date.day,
-        target.date.year, target.date.month, target.date.day,
-        natal.ascendant, natal.planets,
+        birth_date,
+        target.date,
+        natal.ascendant,
+        natal.planets,
     );
     let solar_arc = progressions::calculate_solar_arc_detailed_from_birth_jd(
         birth_date, birth_utc_jd, target.date, natal.planets, &all_natal_points,
@@ -318,9 +319,10 @@ mod tests {
     #[test]
     fn test_annual_profection_birthday_boundary() {
         let natal_planets = [("Sun", 50.0), ("Moon", 120.0)];
-        let prof_before = calculate_annual_profection(1990, 5, 15, 2026, 5, 14, 15.0, &natal_planets);
+        let birth = CalendarDate::new(1990, 5, 15);
+        let prof_before = calculate_annual_profection(birth, CalendarDate::new(2026, 5, 14), 15.0, &natal_planets);
         assert_eq!((prof_before.target_age, prof_before.profected_house), (35, 12));
-        let prof_on = calculate_annual_profection(1990, 5, 15, 2026, 5, 15, 15.0, &natal_planets);
+        let prof_on = calculate_annual_profection(birth, CalendarDate::new(2026, 5, 15), 15.0, &natal_planets);
         assert_eq!((prof_on.target_age, prof_on.profected_house), (36, 1));
     }
 

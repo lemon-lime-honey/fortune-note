@@ -142,4 +142,38 @@ fn test_backup_restore_and_rollback_on_fk_failure() {
 
     assert!(s2.import_backup_json(&invalid_backup, true).is_err());
     assert_eq!(s2.list_profiles(None).unwrap().len(), 1, "Rollback must preserve existing profiles");
+
+    // Regression: duplicate IDs in a single backup with replace_existing=true must upsert without UNIQUE error.
+    let dup_backup = serde_json::json!({
+        "app": "fortune-note", "version": 1, "exported_at": "2026-10-14T00:00:00Z",
+        "profiles": [
+            {
+                "id": "dup-1", "name": "초기", "gender": "male",
+                "birth_year": 1990, "birth_month": 5, "birth_day": 15,
+                "birth_hour": 12, "birth_minute": 0, "birth_second": 0.0,
+                "latitude": 37.5, "longitude": 127.0, "timezone_id": "Asia/Seoul",
+                "notes": "", "created_at": "2026-10-14T00:00:00Z", "updated_at": "2026-10-14T00:00:00Z"
+            },
+            {
+                "id": "dup-1", "name": "갱신", "gender": "male",
+                "birth_year": 1990, "birth_month": 5, "birth_day": 15,
+                "birth_hour": 12, "birth_minute": 0, "birth_second": 0.0,
+                "latitude": 37.5, "longitude": 127.0, "timezone_id": "Asia/Seoul",
+                "notes": "", "created_at": "2026-10-14T00:00:00Z", "updated_at": "2026-10-14T00:00:00Z"
+            }
+        ],
+        "horary_questions": []
+    }).to_string();
+    s2.import_backup_json(&dup_backup, true).expect("Duplicate ID in backup should upsert cleanly");
+    assert_eq!(s2.get_profile("dup-1").unwrap().unwrap().name, "갱신");
+
+    // Regression: out-of-range coordinates / invalid calendar dates must be rejected by CRUD and backup restore.
+    let mut bad_p = sample_profile("오류좌표", "male", None);
+    bad_p.latitude = 120.0;
+    assert!(s2.create_profile(bad_p).is_err());
+
+    let mut bad_date = sample_profile("오류날짜", "male", None);
+    bad_date.birth_month = 2;
+    bad_date.birth_day = 30;
+    assert!(s2.create_profile(bad_date).is_err());
 }

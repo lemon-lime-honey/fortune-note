@@ -130,7 +130,7 @@ fn prepare_transit_search(
             let active = query
                 .aspect_types
                 .as_ref()
-                .map_or(true, |sel| sel.iter().any(|s| s.eq_ignore_ascii_case(asp_name)));
+                .is_none_or(|sel| sel.iter().any(|s| s.eq_ignore_ascii_case(asp_name)));
             if active {
                 for &target_sep in targets {
                     target_specs.push(TargetAspectSpec {
@@ -233,7 +233,7 @@ fn filter_natal_points<'a>(
         .iter()
         .copied()
         .filter(|(name, _)| {
-            targets_opt.map_or(true, |targets| targets.iter().any(|t| matches_natal_target(t, name)))
+            targets_opt.is_none_or(|targets| targets.iter().any(|t| matches_natal_target(t, name)))
         })
         .collect()
 }

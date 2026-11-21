@@ -85,16 +85,18 @@ fn build_planet_dignities(
         if let Some(cp) = dignity::ClassicalPlanet::from_name(&p.name) {
             let trad_house = determine_house_traditional(p.longitude, ctx.cusps, ctx.system);
             reports.push(dignity::calculate_planet_dignity_with_context(
-                cp,
-                p.longitude,
-                p.speed,
-                trad_house,
-                sun_lon,
-                ctx.is_day_chart,
-                north_node_lon,
-                south_node_lon,
-                ctx.planet_pos_tuples,
-                conjunctions,
+                &dignity::PlanetDignityInput {
+                    planet: cp,
+                    longitude: p.longitude,
+                    speed: p.speed,
+                    house_number: trad_house,
+                    sun_longitude: sun_lon,
+                    is_day_chart: ctx.is_day_chart,
+                    north_node_lon,
+                    south_node_lon,
+                    other_planets: ctx.planet_pos_tuples,
+                    fixed_star_conjunctions: conjunctions,
+                },
             ));
         }
     }

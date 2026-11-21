@@ -12,8 +12,9 @@ use serde::{Deserialize, Serialize};
 use vedaksha::ephem::analytical::AnalyticalProvider;
 use vedaksha::ephem::bodies::Body;
 use vedaksha::ephem::coordinates::apparent_position;
-use vedaksha::ephem::julian::jd_to_calendar;
 use vedaksha::math::angle::normalize_degrees;
+
+use crate::celestial::format_jd_utc_seconds;
 
 /// Prenatal Syzygy report.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -70,21 +71,8 @@ pub fn calculate_prenatal_syzygy_with_coords(
         }
 
         if diff.abs() < 1e-6 {
-            // Converged: add 0.5s before calendar conversion so 59.5s+ rolls over date/hour/minute accurately
-            let (y, m, d_frac) = jd_to_calendar(cur_jd + 0.5 / 86400.0);
-            let day = d_frac.floor() as u32;
-            let total_sec = ((d_frac - day as f64) * 86400.0).floor() as u32;
-            let hour = (total_sec / 3600).min(23);
-            let minute = (total_sec % 3600) / 60;
-            let second = total_sec % 60;
-
-            let exact_datetime_utc = format!(
-                "{:04}-{:02}-{:02} {:02}:{:02}:{:02} UTC",
-                y, m, day, hour, minute, second
-            );
-
-            // In traditional astrology, the SAN degree is taken from the Moon's longitude
-            let target_lon = m_lon;
+            let exact_datetime_utc = format_jd_utc_seconds(cur_jd);
+            let target_lon = normalize_degrees(m_lon);
             let sign_index = (target_lon / 30.0).floor() as u8 % 12;
             let sign_degree = target_lon - (sign_index as f64 * 30.0);
 
