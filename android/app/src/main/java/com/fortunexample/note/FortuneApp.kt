@@ -23,7 +23,7 @@ class FortuneApp : Application() {
 
     fun getDbFile(): File = File(filesDir, "fortune_note.db")
 
-    fun reloadRepository() {
+    private fun reloadRepository() {
         val dbFile = getDbFile()
         currentClient?.close()
         val client = FortuneClient(dbFile.absolutePath)

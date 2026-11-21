@@ -24,7 +24,7 @@ object BackupManager {
     }
 
     fun generateBackupFileName(): String {
-        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
         return "fortune_note_backup_$timestamp.json"
     }
 
@@ -33,6 +33,8 @@ object BackupManager {
         if (!backupDir.exists()) {
             backupDir.mkdirs()
         }
+        backupDir.listFiles { file -> file.isFile && file.extension.equals("json", ignoreCase = true) }
+            ?.forEach { it.delete() }
         val file = File(backupDir, generateBackupFileName())
         file.writeText(jsonContent, Charsets.UTF_8)
         FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)

@@ -127,7 +127,7 @@ internal fun HoursAndMoonSubSection(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         PlanetaryHoursCard(data, isHorary)
-        LunarConditionCard(data)
+        LunarConditionCard(data, isHorary)
         data.prenatal_syzygy?.let { PrenatalSyzygyCard(it) }
     }
 }
@@ -136,28 +136,32 @@ internal fun HoursAndMoonSubSection(
 private fun PlanetaryHoursCard(data: WesternTraditionalData, isHorary: Boolean) {
     val ph = data.planetary_hours
     AstroPanelCard(
-        title = "Planetary Hours & Radicality",
-        headerAction = {
-            AstroStatusBadge(
-                text = if (ph.is_radical) "RADICAL" else "NON-RADICAL",
-                color = if (ph.is_radical) CelestialBlue else CrimsonAlert
-            )
-        }
+        title = if (isHorary) "Planetary Hours & Radicality" else "Planetary Hours",
+        headerAction = if (isHorary) {
+            {
+                AstroStatusBadge(
+                    text = if (ph.is_radical) "RADICAL" else "NON-RADICAL",
+                    color = if (ph.is_radical) CelestialBlue else CrimsonAlert
+                )
+            }
+        } else null
     ) {
-        CompactMetricGrid(
-            items = listOf(
-                MetricTileItem("DAY RULER", bodyCode(ph.day_ruler), ph.day_ruler),
-                MetricTileItem("HOUR RULER", bodyCode(ph.hour_ruler), ph.hour_ruler),
-                MetricTileItem("HOUR NO.", "#${ph.hour_number}", if (ph.is_day_hour) "DIURNAL" else "NOCTURNAL"),
-                MetricTileItem("STATUS", if (ph.is_radical) "MATCH" else "WARN", if (isHorary) "HORARY" else "NATAL")
-            ),
-            columns = 4
+        val baseItems = listOf(
+            MetricTileItem("DAY RULER", bodyCode(ph.day_ruler), ph.day_ruler),
+            MetricTileItem("HOUR RULER", bodyCode(ph.hour_ruler), ph.hour_ruler),
+            MetricTileItem("HOUR NO.", "#${ph.hour_number}", if (ph.is_day_hour) "DIURNAL" else "NOCTURNAL")
         )
-        if (ph.radicality_reason.isNotBlank()) {
+        val items = if (isHorary) {
+            baseItems + MetricTileItem("STATUS", if (ph.is_radical) "MATCH" else "WARN", "HORARY")
+        } else {
+            baseItems
+        }
+        CompactMetricGrid(items = items, columns = items.size)
+        if (isHorary && ph.radicality_reason.isNotBlank()) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(ph.radicality_reason, fontSize = 11.sp, color = TextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
-        if (ph.considerations.isNotEmpty()) {
+        if (isHorary && ph.considerations.isNotEmpty()) {
             Spacer(modifier = Modifier.height(6.dp))
             ph.considerations.forEach { c ->
                 Text("• $c", fontSize = 11.sp, color = CrimsonAlert, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -167,43 +171,50 @@ private fun PlanetaryHoursCard(data: WesternTraditionalData, isHorary: Boolean) 
 }
 
 @Composable
-private fun LunarConditionCard(data: WesternTraditionalData) {
+private fun LunarConditionCard(data: WesternTraditionalData, isHorary: Boolean) {
     val mc = data.moon_condition
-    AstroPanelCard(title = "Lunar Phase & Condition") {
-        CompactMetricGrid(
-            items = listOf(
-                MetricTileItem("PHASE", mc.lunar_phase_name.uppercase(Locale.US), if (mc.is_waxing) "WAX" else "WAN"),
-                MetricTileItem("ELONGATION", String.format(Locale.US, "%.1f°", mc.elongation_deg), "SUN-MON"),
-                MetricTileItem(
-                    tag = "VOID OF COURSE",
-                    primary = if (mc.is_void_of_course) "YES (VOC)" else "NO (ACTIVE)",
-                    secondary = if (mc.is_in_tincture_exception) "EXEMPT" else "",
-                    highlightColor = if (mc.is_void_of_course) CrimsonAlert else CelestialBlue
-                ),
-                MetricTileItem(
-                    tag = "VIA COMBUSTA",
-                    primary = if (mc.is_via_combusta) "YES" else "CLEAR",
-                    secondary = "15°LIB-15°SCO",
-                    highlightColor = if (mc.is_via_combusta) CrimsonAlert else null
-                )
+    val baseItems = listOf(
+        MetricTileItem("PHASE", mc.lunar_phase_name.uppercase(Locale.US), if (mc.is_waxing) "WAX" else "WAN"),
+        MetricTileItem("ELONGATION", String.format(Locale.US, "%.1f°", mc.elongation_deg), "SUN-MON")
+    )
+    val items = if (isHorary) {
+        baseItems + listOf(
+            MetricTileItem(
+                tag = "VOID OF COURSE",
+                primary = if (mc.is_void_of_course) "YES (VOC)" else "NO (ACTIVE)",
+                secondary = if (mc.is_in_tincture_exception) "EXEMPT" else "",
+                highlightColor = if (mc.is_void_of_course) CrimsonAlert else CelestialBlue
             ),
-            columns = 2
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("NEXT APPLYING ASPECT", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextSecondary, style = TabularMonoStyle)
-            Text(
-                text = mc.next_applying_aspect ?: "None before sign exit",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = TextPrimary,
-                style = TabularMonoStyle,
-                maxLines = 1
+            MetricTileItem(
+                tag = "VIA COMBUSTA",
+                primary = if (mc.is_via_combusta) "YES" else "CLEAR",
+                secondary = "15°LIB-15°SCO",
+                highlightColor = if (mc.is_via_combusta) CrimsonAlert else null
             )
+        )
+    } else {
+        baseItems
+    }
+
+    AstroPanelCard(title = if (isHorary) "Lunar Phase & Condition" else "Lunar Phase") {
+        CompactMetricGrid(items = items, columns = 2)
+        if (isHorary) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("NEXT APPLYING ASPECT", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = TextSecondary, style = TabularMonoStyle)
+                Text(
+                    text = mc.next_applying_aspect ?: "None before sign exit",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextPrimary,
+                    style = TabularMonoStyle,
+                    maxLines = 1
+                )
+            }
         }
     }
 }

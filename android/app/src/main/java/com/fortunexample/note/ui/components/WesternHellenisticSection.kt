@@ -19,10 +19,10 @@ internal fun HellenisticSubSection(h: HellenisticData) {
         HellenisticAnglesCard(h)
         HellenisticConditionsCard(h)
         ArabicLotsTableCard(
-            title = "Hermetic Lots (Paulus Alexandrinus)",
+            title = "Hellenistic Lots (Vettius Valens)",
             rulerColumnHeader = "LORD",
             lots = h.lots,
-            copyLabel = "Hermetic Lots"
+            copyLabel = "Hellenistic Lots"
         )
         h.prenatal_syzygy?.let { PrenatalSyzygyCard(it) }
         FixedStarConjunctionsCard(h.fixed_star_conjunctions)

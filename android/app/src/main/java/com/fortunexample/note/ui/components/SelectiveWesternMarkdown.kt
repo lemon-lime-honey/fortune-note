@@ -125,7 +125,7 @@ private fun StringBuilder.appendHellenisticMd(h: HellenisticData, options: Selec
     }
     if (options.incWesternParts) {
         if (h.lots.isNotEmpty()) {
-            append("- Hermetic Lots (Paulus Alexandrinus):\n")
+            append("- Hellenistic Lots (Vettius Valens):\n")
             h.lots.forEach { lot ->
                 append("  * ${lot.name}: ${fmtUs("%.2f°", lot.sign_degree)} (${getZodiacSignName(lot.sign_index)}) - House ${lot.house_number} (Ruler: ${lot.ruler})\n")
             }

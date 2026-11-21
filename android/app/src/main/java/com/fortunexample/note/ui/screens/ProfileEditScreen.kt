@@ -19,7 +19,42 @@ import com.fortunexample.note.ui.components.LocationPicker
 import com.fortunexample.note.ui.components.TimeInputRow
 import com.fortunexample.note.ui.theme.*
 
-@OptIn(ExperimentalMaterial3Api::class)
+private fun buildProfileRequest(
+    name: String,
+    isMale: Boolean,
+    fields: DateTimeFormFields,
+    coords: Pair<Double, Double>,
+    isCoordinateInputValid: Boolean,
+    notes: String
+): Result<CreateProfileRequest> {
+    val trimmedName = name.trim()
+    if (trimmedName.isEmpty()) return Result.failure(IllegalArgumentException("이름을 입력해 주세요."))
+    if (!isCoordinateInputValid) {
+        return Result.failure(IllegalArgumentException("올바른 위도(-90~90)와 경도(-180~180)를 입력해 주세요."))
+    }
+    return when (val result = validateDateTimeAndCoordinates(fields, coords.first, coords.second)) {
+        is FormValidationResult.Invalid -> Result.failure(IllegalArgumentException(result.message))
+        is FormValidationResult.Valid -> {
+            val dt = result.value
+            Result.success(
+                CreateProfileRequest(
+                    name = trimmedName,
+                    gender = if (isMale) "male" else "female",
+                    birth_year = dt.year,
+                    birth_month = dt.month,
+                    birth_day = dt.day,
+                    birth_hour = dt.hour,
+                    birth_minute = dt.minute,
+                    birth_second = dt.second,
+                    latitude = coords.first,
+                    longitude = coords.second,
+                    notes = notes.trim()
+                )
+            )
+        }
+    }
+}
+
 @Composable
 fun ProfileEditScreen(
     initialProfile: ProfileDto? = null,
@@ -36,27 +71,14 @@ fun ProfileEditScreen(
     var secondStr by remember(initialProfile) { mutableStateOf(initialProfile?.birth_second?.toInt()?.toString() ?: DEFAULT_BIRTH_SECOND) }
     var latitude by remember(initialProfile) { mutableDoubleStateOf(initialProfile?.latitude ?: DEFAULT_LATITUDE) }
     var longitude by remember(initialProfile) { mutableDoubleStateOf(initialProfile?.longitude ?: DEFAULT_LONGITUDE) }
+    var isCoordinateInputValid by remember { mutableStateOf(true) }
     var notes by remember(initialProfile) { mutableStateOf(initialProfile?.notes ?: "") }
     var validationError by remember { mutableStateOf<String?>(null) }
 
     val isEditMode = initialProfile != null
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(if (isEditMode) "인물 수정" else "인물 등록", fontWeight = FontWeight.Bold, color = TextPrimary) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로", tint = TextPrimary)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = BackgroundWhite,
-                    titleContentColor = TextPrimary,
-                    navigationIconContentColor = TextPrimary
-                )
-            )
-        },
+        topBar = { ProfileEditTopBar(isEditMode = isEditMode, onBack = onBack) },
         containerColor = BackgroundWhite
     ) { padding ->
         Column(
@@ -88,10 +110,8 @@ fun ProfileEditScreen(
             LocationPicker(
                 latitude = latitude,
                 longitude = longitude,
-                onLocationChanged = { lat, lon ->
-                    latitude = lat
-                    longitude = lon
-                }
+                onLocationChanged = { lat, lon -> latitude = lat; longitude = lon },
+                onValidationChanged = { isCoordinateInputValid = it }
             )
 
             OutlinedTextField(
@@ -112,34 +132,10 @@ fun ProfileEditScreen(
 
             Button(
                 onClick = {
-                    val trimmedName = name.trim()
-                    if (trimmedName.isEmpty()) {
-                        validationError = "이름을 입력해 주세요."
-                        return@Button
-                    }
                     val fields = DateTimeFormFields(yearStr, monthStr, dayStr, hourStr, minuteStr, secondStr, allowBlankSecond = true)
-                    when (val result = validateDateTimeAndCoordinates(fields, latitude, longitude)) {
-                        is FormValidationResult.Invalid -> validationError = result.message
-                        is FormValidationResult.Valid -> {
-                            validationError = null
-                            val dt = result.value
-                            onSave(
-                                CreateProfileRequest(
-                                    name = trimmedName,
-                                    gender = if (isMale) "male" else "female",
-                                    birth_year = dt.year,
-                                    birth_month = dt.month,
-                                    birth_day = dt.day,
-                                    birth_hour = dt.hour,
-                                    birth_minute = dt.minute,
-                                    birth_second = dt.second,
-                                    latitude = latitude,
-                                    longitude = longitude,
-                                    notes = notes.trim()
-                                )
-                            )
-                        }
-                    }
+                    buildProfileRequest(name, isMale, fields, latitude to longitude, isCoordinateInputValid, notes)
+                        .onSuccess { validationError = null; onSave(it) }
+                        .onFailure { validationError = it.message }
                 },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = AccentPrimary),
@@ -149,6 +145,24 @@ fun ProfileEditScreen(
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProfileEditTopBar(isEditMode: Boolean, onBack: () -> Unit) {
+    TopAppBar(
+        title = { Text(if (isEditMode) "인물 수정" else "인물 등록", fontWeight = FontWeight.Bold, color = TextPrimary) },
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로", tint = TextPrimary)
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = BackgroundWhite,
+            titleContentColor = TextPrimary,
+            navigationIconContentColor = TextPrimary
+        )
+    )
 }
 
 @Composable

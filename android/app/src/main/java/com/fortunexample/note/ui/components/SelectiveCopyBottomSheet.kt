@@ -85,7 +85,8 @@ fun SelectiveCopyBottomSheet(
     isOpen: Boolean,
     onDismiss: () -> Unit,
     payload: SelectiveCopyPayload,
-    selectedDomainTab: Int
+    selectedDomainTab: Int,
+    isPredictiveLoading: Boolean = false
 ) {
     val isReady = when (selectedDomainTab) {
         0 -> payload.saju != null
@@ -136,6 +137,7 @@ fun SelectiveCopyBottomSheet(
                     selectedDomainTab = selectedDomainTab,
                     payload = payload,
                     options = options,
+                    isPredictiveLoading = isPredictiveLoading,
                     onChange = { options = it }
                 )
             }
@@ -167,6 +169,7 @@ private fun DomainCopyCheckboxes(
     selectedDomainTab: Int,
     payload: SelectiveCopyPayload,
     options: SelectiveCopyOptions,
+    isPredictiveLoading: Boolean,
     onChange: (SelectiveCopyOptions) -> Unit
 ) {
     when (selectedDomainTab) {
@@ -174,7 +177,7 @@ private fun DomainCopyCheckboxes(
             CopyCheckboxItem("사주팔자 원국 명식 (연/월/일/시주)", options.incSajuPillars) { onChange(options.copy(incSajuPillars = it)) }
             CopyCheckboxItem("10년 주기 대운 흐름 및 대운수", options.incSajuDaeun) { onChange(options.copy(incSajuDaeun = it)) }
         }
-        1 -> WesternCopyCheckboxes(payload, options, onChange)
+        1 -> WesternCopyCheckboxes(payload, options, isPredictiveLoading, onChange)
         else -> {
             CopyCheckboxItem("라그나 및 D1 라시 차트 배치 (품위/연소 포함)", options.incVedicRasi) { onChange(options.copy(incVedicRasi = it)) }
             CopyCheckboxItem("베다 핵심 지표 (판창가, 카라카, 파다, 드리슈티, SAV)", options.incVedicIndicators) { onChange(options.copy(incVedicIndicators = it)) }
@@ -188,6 +191,7 @@ private fun DomainCopyCheckboxes(
 private fun WesternCopyCheckboxes(
     payload: SelectiveCopyPayload,
     options: SelectiveCopyOptions,
+    isPredictiveLoading: Boolean,
     onChange: (SelectiveCopyOptions) -> Unit
 ) {
     val isWholeSign = isWholeSignHouseSystem(payload.western)
@@ -196,7 +200,7 @@ private fun WesternCopyCheckboxes(
         CopyCheckboxItem("메이저 애스펙트 (Major Aspects)", options.incWesternAspects) { onChange(options.copy(incWesternAspects = it)) }
         CopyCheckboxItem("헬레니즘 행성 상태·이집트 바운드·트리플리시티", options.incWesternDignities) { onChange(options.copy(incWesternDignities = it)) }
         CopyCheckboxItem("사인 기반 애스펙트 및 접촉 (Sign-Based Aspects)", options.incWesternDynamicAspects) { onChange(options.copy(incWesternDynamicAspects = it)) }
-        CopyCheckboxItem("헤르메스 랏 및 출생 전 합충 (Hermetic Lots & SAN)", options.incWesternParts) { onChange(options.copy(incWesternParts = it)) }
+        CopyCheckboxItem("헬레니즘 랏 및 출생 전 합충 (Valens Lots & SAN)", options.incWesternParts) { onChange(options.copy(incWesternParts = it)) }
         CopyCheckboxItem("항성 회합 (Fixed Star Conjunctions ≤ 1.5°)", options.incWesternStars) { onChange(options.copy(incWesternStars = it)) }
     } else {
         CopyCheckboxItem("천체 및 레기오몬타누스 커스프 (Regiomontanus Placements)", options.incWesternPlanets) { onChange(options.copy(incWesternPlanets = it)) }
@@ -209,7 +213,8 @@ private fun WesternCopyCheckboxes(
         CopyCheckboxItem("항성 회합 (Fixed Star Conjunctions ≤ 1.5°)", options.incWesternStars) { onChange(options.copy(incWesternStars = it)) }
         CopyCheckboxItem("아라빅 파츠 및 하우스 알무텐 (Arabic Parts & Almutens)", options.incWesternParts) { onChange(options.copy(incWesternParts = it)) }
     }
-    payload.predictive?.let { pred ->
+    val pred = payload.predictive
+    if (pred != null) {
         Spacer(modifier = Modifier.height(6.dp))
         HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
         Spacer(modifier = Modifier.height(6.dp))
@@ -217,6 +222,19 @@ private fun WesternCopyCheckboxes(
         CopyCheckboxItem("태양 및 행성 회귀 (Solar & Planetary Returns · ${pred.target_year})", options.incWesternReturns) { onChange(options.copy(incWesternReturns = it)) }
         CopyCheckboxItem("솔라 아크 및 세컨더리 프로그레션 (Solar Arc & Progressions)", options.incWesternProgressions) { onChange(options.copy(incWesternProgressions = it)) }
         CopyCheckboxItem("트랜짓 및 프라이머리 디렉션 (Transits & Primary Directions)", options.incWesternTransitsDirections) { onChange(options.copy(incWesternTransitsDirections = it)) }
+    } else if (isPredictiveLoading) {
+        Spacer(modifier = Modifier.height(6.dp))
+        HorizontalDivider(color = BorderColor, thickness = 0.5.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = CelestialBlue)
+            Text("예측 천체 데이터 계산 중...", color = TextSecondary, fontSize = 13.sp)
+        }
     }
 }
 

@@ -19,11 +19,122 @@ import androidx.compose.ui.unit.sp
 import com.fortunexample.note.data.*
 import com.fortunexample.note.ui.components.*
 import com.fortunexample.note.ui.theme.*
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import java.util.Calendar
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+private data class ProfileChartQuery(
+    val domainTab: Int,
+    val houseSystem: String,
+    val loadPredictive: Boolean,
+    val predRequest: PredictiveSuiteRequestDto
+)
+
+private class ProfileChartHolder {
+    var sajuOutput by mutableStateOf<SajuCalculationOutputDto?>(null)
+    var isSajuLoading by mutableStateOf(false)
+    var sajuError by mutableStateOf<String?>(null)
+    var sajuRetryKey by mutableIntStateOf(0)
+
+    var westernOutput by mutableStateOf<WesternCalculationOutputDto?>(null)
+    var isWesternLoading by mutableStateOf(false)
+    var westernError by mutableStateOf<String?>(null)
+    var westernRetryKey by mutableIntStateOf(0)
+    var lastWesternKey by mutableStateOf<Pair<String, Int>?>(null)
+
+    var vedicOutput by mutableStateOf<VedicCalculationOutputDto?>(null)
+    var isVedicLoading by mutableStateOf(false)
+    var vedicError by mutableStateOf<String?>(null)
+    var vedicRetryKey by mutableIntStateOf(0)
+    var lastVedicKey by mutableStateOf<Int?>(null)
+
+    var predictiveData by mutableStateOf<PredictiveSuiteData?>(null)
+    var isPredictiveLoading by mutableStateOf(false)
+    var lastPredKey by mutableStateOf<Pair<String, PredictiveSuiteRequestDto>?>(null)
+}
+
+private suspend fun <T> executeChartFetch(
+    setLoading: (Boolean) -> Unit,
+    setError: (String?) -> Unit,
+    fallbackError: String,
+    fetch: suspend () -> Result<T>,
+    onLoaded: (T) -> Unit
+) {
+    setLoading(true)
+    setError(null)
+    val result = fetch()
+    currentCoroutineContext().ensureActive()
+    result.onSuccess(onLoaded).onFailure { setError(it.message ?: fallbackError) }
+    setLoading(false)
+}
+
+@Composable
+private fun rememberProfileChartHolder(
+    profile: ProfileDto,
+    profileRepository: ProfileDataSource,
+    query: ProfileChartQuery
+): ProfileChartHolder {
+    val holder = remember(profile) { ProfileChartHolder() }
+
+    LaunchedEffect(profile, holder.sajuRetryKey) {
+        executeChartFetch(
+            setLoading = { holder.isSajuLoading = it },
+            setError = { holder.sajuError = it },
+            fallbackError = "Failed to compute Four Pillars data.",
+            fetch = { profileRepository.calculateSaju(profile.id) },
+            onLoaded = { holder.sajuOutput = it }
+        )
+    }
+
+    LaunchedEffect(profile, query.domainTab, query.houseSystem, holder.westernRetryKey) {
+        val targetKey = query.houseSystem to holder.westernRetryKey
+        if (query.domainTab != 1) {
+            holder.isWesternLoading = false
+            return@LaunchedEffect
+        }
+        if (holder.lastWesternKey == targetKey) return@LaunchedEffect
+        executeChartFetch(
+            setLoading = { holder.isWesternLoading = it },
+            setError = { holder.westernError = it },
+            fallbackError = "Failed to compute Western chart.",
+            fetch = { profileRepository.calculateWestern(profile.id, query.houseSystem) },
+            onLoaded = { holder.westernOutput = it; holder.lastWesternKey = targetKey }
+        )
+    }
+
+    LaunchedEffect(profile, query.domainTab, holder.vedicRetryKey) {
+        if (query.domainTab != 2) {
+            holder.isVedicLoading = false
+            return@LaunchedEffect
+        }
+        if (holder.lastVedicKey == holder.vedicRetryKey) return@LaunchedEffect
+        executeChartFetch(
+            setLoading = { holder.isVedicLoading = it },
+            setError = { holder.vedicError = it },
+            fallbackError = "Failed to compute Vedic chart.",
+            fetch = { profileRepository.calculateVedic(profile.id) },
+            onLoaded = { holder.vedicOutput = it; holder.lastVedicKey = holder.vedicRetryKey }
+        )
+    }
+
+    LaunchedEffect(profile, query.predRequest, query.loadPredictive) {
+        val cacheKey = profile.id to query.predRequest
+        if (!query.loadPredictive) {
+            holder.isPredictiveLoading = false
+            return@LaunchedEffect
+        }
+        if (holder.lastPredKey == cacheKey) return@LaunchedEffect
+        holder.isPredictiveLoading = true
+        val result = profileRepository.calculatePredictiveSuite(profile.id, query.predRequest)
+        currentCoroutineContext().ensureActive()
+        result.onSuccess { holder.predictiveData = it; holder.lastPredKey = cacheKey }
+        holder.isPredictiveLoading = false
+    }
+
+    return holder
+}
+
 @Composable
 fun ProfileDetailScreen(
     profile: ProfileDto,
@@ -32,7 +143,6 @@ fun ProfileDetailScreen(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val scope = rememberCoroutineScope()
     var selectedDomainTab by rememberSaveable { mutableIntStateOf(0) }
     var selectedWesternSubTab by rememberSaveable { mutableIntStateOf(0) }
     var selectedVedicSubTab by rememberSaveable { mutableIntStateOf(0) }
@@ -41,18 +151,6 @@ fun ProfileDetailScreen(
     var showVargaPickerSheet by remember { mutableStateOf(false) }
     var expandedDashaLord by remember { mutableStateOf<String?>(null) }
     var showSelectiveCopySheet by remember { mutableStateOf(false) }
-
-    var sajuOutput by remember { mutableStateOf<SajuCalculationOutputDto?>(null) }
-    var isSajuLoading by remember { mutableStateOf(false) }
-    var sajuError by remember { mutableStateOf<String?>(null) }
-
-    var westernOutput by remember { mutableStateOf<WesternCalculationOutputDto?>(null) }
-    var isWesternLoading by remember { mutableStateOf(false) }
-    var westernError by remember { mutableStateOf<String?>(null) }
-
-    var vedicOutput by remember { mutableStateOf<VedicCalculationOutputDto?>(null) }
-    var isVedicLoading by remember { mutableStateOf(false) }
-    var vedicError by remember { mutableStateOf<String?>(null) }
 
     val todayCal = remember { Calendar.getInstance() }
     var predRequest by remember {
@@ -65,78 +163,19 @@ fun ProfileDetailScreen(
             )
         )
     }
-    var predictiveData by remember { mutableStateOf<PredictiveSuiteData?>(null) }
-    var lastLoadedPredKey by remember { mutableStateOf<Pair<String, PredictiveSuiteRequestDto>?>(null) }
-    var isPredictiveLoading by remember { mutableStateOf(false) }
-
-    fun loadSaju() {
-        scope.launch {
-            isSajuLoading = true
-            sajuError = null
-            profileRepository.calculateSaju(profile.id)
-                .onSuccess { sajuOutput = it; isSajuLoading = false }
-                .onFailure { sajuError = it.message ?: "Failed to compute Four Pillars data."; isSajuLoading = false }
-        }
-    }
-
-    fun loadWestern() {
-        scope.launch {
-            isWesternLoading = true
-            westernError = null
-            profileRepository.calculateWestern(profile.id, selectedHouse)
-                .onSuccess { westernOutput = it; isWesternLoading = false }
-                .onFailure { westernError = it.message ?: "Failed to compute Western chart."; isWesternLoading = false }
-        }
-    }
-
-    fun loadVedic() {
-        scope.launch {
-            isVedicLoading = true
-            vedicError = null
-            profileRepository.calculateVedic(profile.id)
-                .onSuccess { vedicOutput = it; isVedicLoading = false }
-                .onFailure { vedicError = it.message ?: "Failed to compute Vedic chart."; isVedicLoading = false }
-        }
-    }
-
-    LaunchedEffect(profile) {
-        sajuOutput = null; westernOutput = null; vedicOutput = null
-        predictiveData = null; lastLoadedPredKey = null
-        loadSaju()
-    }
-
-    LaunchedEffect(profile, selectedDomainTab, selectedHouse) {
-        if (selectedDomainTab == 1 && (westernOutput == null || westernOutput?.western?.house_system != selectedHouse)) {
-            loadWestern()
-        }
-    }
-
-    LaunchedEffect(profile, selectedDomainTab) {
-        if (selectedDomainTab == 2 && vedicOutput == null) {
-            loadVedic()
-        }
-    }
 
     val effectivePredReq = predRequest.copy(house_system = selectedHouse)
     val shouldLoadPredictive = selectedDomainTab == 1 && (selectedWesternSubTab == 3 || showSelectiveCopySheet)
-    LaunchedEffect(profile.id, effectivePredReq, shouldLoadPredictive) {
-        val cacheKey = profile.id to effectivePredReq
-        if (shouldLoadPredictive && lastLoadedPredKey != cacheKey) {
-            isPredictiveLoading = true
-            profileRepository.calculatePredictiveSuite(profile.id, effectivePredReq)
-                .onSuccess {
-                    predictiveData = it
-                    lastLoadedPredKey = cacheKey
-                    isPredictiveLoading = false
-                }
-                .onFailure { isPredictiveLoading = false }
-        }
-    }
+    val charts = rememberProfileChartHolder(
+        profile = profile,
+        profileRepository = profileRepository,
+        query = ProfileChartQuery(selectedDomainTab, selectedHouse, shouldLoadPredictive, effectivePredReq)
+    )
 
     val isCopyEnabled = when (selectedDomainTab) {
-        0 -> sajuOutput != null
-        1 -> westernOutput != null
-        else -> vedicOutput != null
+        0 -> charts.sajuOutput != null
+        1 -> charts.westernOutput != null
+        else -> charts.vedicOutput != null
     }
 
     Scaffold(
@@ -161,21 +200,21 @@ fun ProfileDetailScreen(
                     .padding(14.dp)
             ) {
                 when (selectedDomainTab) {
-                    0 -> SajuDomainBody(sajuOutput, isSajuLoading, sajuError, ::loadSaju)
+                    0 -> SajuDomainBody(charts.sajuOutput, charts.isSajuLoading, charts.sajuError) { charts.sajuRetryKey++ }
                     1 -> WesternDomainContent(
                         profile = profile,
                         state = WesternDomainUiState(
-                            westernOutput = westernOutput,
-                            isLoading = isWesternLoading,
-                            error = westernError,
+                            westernOutput = charts.westernOutput,
+                            isLoading = charts.isWesternLoading,
+                            error = charts.westernError,
                             selectedHouse = selectedHouse,
                             selectedSubTab = selectedWesternSubTab,
-                            predictiveData = predictiveData,
+                            predictiveData = charts.predictiveData,
                             predictiveControl = PredictiveControlState(
                                 targetYear = effectivePredReq.target_year,
                                 targetMonth = effectivePredReq.target_month,
                                 targetDay = effectivePredReq.target_day,
-                                isLoading = isPredictiveLoading,
+                                isLoading = charts.isPredictiveLoading,
                                 onYearChange = { yr -> predRequest = predRequest.copy(target_year = yr) },
                                 onDateTimeChange = { y, m, d, hr, min ->
                                     predRequest = predRequest.copy(
@@ -187,13 +226,13 @@ fun ProfileDetailScreen(
                         ),
                         onSelectHouse = { selectedHouse = it },
                         onSelectSubTab = { selectedWesternSubTab = it },
-                        onRetry = ::loadWestern
+                        onRetry = { charts.westernRetryKey++ }
                     )
                     2 -> VedicDomainContent(
                         state = VedicDomainUiState(
-                            vedicOutput = vedicOutput,
-                            isLoading = isVedicLoading,
-                            error = vedicError,
+                            vedicOutput = charts.vedicOutput,
+                            isLoading = charts.isVedicLoading,
+                            error = charts.vedicError,
                             selectedVarga = selectedVarga,
                             selectedSubTab = selectedVedicSubTab,
                             expandedDashaLord = expandedDashaLord
@@ -203,7 +242,7 @@ fun ProfileDetailScreen(
                         onToggleDashaLord = { lord ->
                             expandedDashaLord = if (expandedDashaLord == lord) null else lord
                         },
-                        onRetry = ::loadVedic
+                        onRetry = { charts.vedicRetryKey++ }
                     )
                 }
             }
@@ -222,14 +261,20 @@ fun ProfileDetailScreen(
             onDismiss = { showSelectiveCopySheet = false },
             payload = SelectiveCopyPayload(
                 profile = profile,
-                saju = sajuOutput?.saju,
-                western = westernOutput?.western,
-                predictive = predictiveData,
-                vedic = vedicOutput?.vedic,
-                timezoneId = sajuOutput?.timezone_id ?: westernOutput?.timezone_id ?: vedicOutput?.timezone_id ?: profile.timezone_id,
-                utcOffsetHours = sajuOutput?.utc_offset_hours ?: westernOutput?.utc_offset_hours ?: vedicOutput?.utc_offset_hours
+                saju = charts.sajuOutput?.saju,
+                western = charts.westernOutput?.western,
+                predictive = charts.predictiveData,
+                vedic = charts.vedicOutput?.vedic,
+                timezoneId = charts.sajuOutput?.timezone_id
+                    ?: charts.westernOutput?.timezone_id
+                    ?: charts.vedicOutput?.timezone_id
+                    ?: profile.timezone_id,
+                utcOffsetHours = charts.sajuOutput?.utc_offset_hours
+                    ?: charts.westernOutput?.utc_offset_hours
+                    ?: charts.vedicOutput?.utc_offset_hours
             ),
-            selectedDomainTab = selectedDomainTab
+            selectedDomainTab = selectedDomainTab,
+            isPredictiveLoading = charts.isPredictiveLoading
         )
     }
 }
