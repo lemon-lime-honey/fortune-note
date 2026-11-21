@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,11 +64,11 @@ fun ProfileDetailScreen(
     onDelete: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    var selectedDomainTab by remember { mutableIntStateOf(0) }
-    var selectedWesternSubTab by remember { mutableIntStateOf(0) }
-    var selectedVedicSubTab by remember { mutableIntStateOf(0) }
+    var selectedDomainTab by rememberSaveable { mutableIntStateOf(0) }
+    var selectedWesternSubTab by rememberSaveable { mutableIntStateOf(0) }
+    var selectedVedicSubTab by rememberSaveable { mutableIntStateOf(0) }
 
-    var selectedVarga by remember { mutableStateOf("D1") }
+    var selectedVarga by rememberSaveable { mutableStateOf("D1") }
     var showVargaPickerSheet by remember { mutableStateOf(false) }
     var expandedDashaLord by remember { mutableStateOf<String?>(null) }
     var showSelectiveCopySheet by remember { mutableStateOf(false) }
@@ -80,7 +81,7 @@ fun ProfileDetailScreen(
     var westernOutput by remember { mutableStateOf<WesternCalculationOutputDto?>(null) }
     var isWesternLoading by remember { mutableStateOf(false) }
     var westernError by remember { mutableStateOf<String?>(null) }
-    var selectedHouse by remember { mutableStateOf("Regiomontanus") }
+    var selectedHouse by rememberSaveable { mutableStateOf("Regiomontanus") }
 
     var vedicOutput by remember { mutableStateOf<VedicCalculationOutputDto?>(null) }
     var isVedicLoading by remember { mutableStateOf(false) }

@@ -9,11 +9,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -32,6 +34,7 @@ import java.util.Locale
 fun HomeScreen(
     profiles: List<ProfileDto>,
     horaryQuestions: List<HoraryDto>,
+    searchQuery: String,
     onProfileClick: (String) -> Unit,
     onHoraryClick: (String) -> Unit,
     onAddProfile: () -> Unit,
@@ -39,8 +42,7 @@ fun HomeScreen(
     onSearch: (String) -> Unit,
     onNavigateToDataManagement: () -> Unit
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) }
-    var searchQuery by remember { mutableStateOf("") }
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var showMenu by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -102,12 +104,16 @@ fun HomeScreen(
         ) {
             OutlinedTextField(
                 value = searchQuery,
-                onValueChange = {
-                    searchQuery = it
-                    onSearch(it)
-                },
+                onValueChange = onSearch,
                 placeholder = { Text("Search name, question, or notes...", color = TextSecondary, fontSize = 13.sp) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = TextSecondary) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { onSearch("") }) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear Search", tint = TextSecondary)
+                        }
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 14.dp, vertical = 6.dp),
@@ -157,7 +163,11 @@ fun HomeScreen(
             if (selectedTab == 0) {
                 if (profiles.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No natal profiles registered.", color = TextSecondary, fontSize = 13.sp)
+                        Text(
+                            text = if (searchQuery.isNotBlank()) "No matching natal profiles." else "No natal profiles registered.",
+                            color = TextSecondary,
+                            fontSize = 13.sp
+                        )
                     }
                 } else {
                     LazyColumn(
@@ -173,7 +183,11 @@ fun HomeScreen(
             } else {
                 if (horaryQuestions.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No horary questions registered.", color = TextSecondary, fontSize = 13.sp)
+                        Text(
+                            text = if (searchQuery.isNotBlank()) "No matching horary questions." else "No horary questions registered.",
+                            color = TextSecondary,
+                            fontSize = 13.sp
+                        )
                     }
                 } else {
                     LazyColumn(
@@ -320,6 +334,16 @@ private fun HoraryCard(
                 style = TabularMonoStyle,
                 maxLines = 1
             )
+            if (horary.question_text.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = horary.question_text,
+                    color = TextPrimary,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
             if (horary.result_notes.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(

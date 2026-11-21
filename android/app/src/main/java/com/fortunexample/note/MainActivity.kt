@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -29,16 +30,36 @@ class MainActivity : ComponentActivity() {
                 val scope = rememberCoroutineScope()
 
                 var allProfiles by remember { mutableStateOf<List<ProfileDto>>(emptyList()) }
-                var profileSearchQuery by remember { mutableStateOf("") }
+                var searchQuery by rememberSaveable { mutableStateOf("") }
                 var horaryList by remember { mutableStateOf<List<HoraryDto>>(emptyList()) }
 
-                val displayedProfiles = remember(allProfiles, profileSearchQuery) {
-                    if (profileSearchQuery.isBlank()) {
+                val profileNameById = remember(allProfiles) {
+                    allProfiles.associate { it.id to it.name }
+                }
+
+                val displayedProfiles = remember(allProfiles, searchQuery) {
+                    val q = searchQuery.trim()
+                    if (q.isEmpty()) {
                         allProfiles
                     } else {
                         allProfiles.filter {
-                            it.name.contains(profileSearchQuery, ignoreCase = true) ||
-                            it.notes.contains(profileSearchQuery, ignoreCase = true)
+                            it.name.contains(q, ignoreCase = true) ||
+                                it.notes.contains(q, ignoreCase = true)
+                        }
+                    }
+                }
+
+                val displayedHorary = remember(horaryList, profileNameById, searchQuery) {
+                    val q = searchQuery.trim()
+                    if (q.isEmpty()) {
+                        horaryList
+                    } else {
+                        horaryList.filter { item ->
+                            item.title.contains(q, ignoreCase = true) ||
+                                item.category.contains(q, ignoreCase = true) ||
+                                item.question_text.contains(q, ignoreCase = true) ||
+                                item.result_notes.contains(q, ignoreCase = true) ||
+                                (item.querent_profile_id?.let { profileNameById[it]?.contains(q, ignoreCase = true) } == true)
                         }
                     }
                 }
@@ -58,12 +79,13 @@ class MainActivity : ComponentActivity() {
                     composable("home") {
                         HomeScreen(
                             profiles = displayedProfiles,
-                            horaryQuestions = horaryList,
+                            horaryQuestions = displayedHorary,
+                            searchQuery = searchQuery,
                             onProfileClick = { id -> navController.navigate("profile_detail/$id") },
                             onHoraryClick = { id -> navController.navigate("horary_detail/$id") },
                             onAddProfile = { navController.navigate("profile_edit") },
                             onAddHorary = { navController.navigate("horary_edit") },
-                            onSearch = { query -> profileSearchQuery = query },
+                            onSearch = { query -> searchQuery = query },
                             onNavigateToDataManagement = {
                                 navController.navigate("data_management")
                             }

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -41,9 +42,9 @@ fun HoraryDetailScreen(
     onDelete: () -> Unit
 ) {
     val context = LocalContext.current
-    var selectedTab by remember { mutableIntStateOf(0) }
-    var selectedWesternSubTab by remember { mutableIntStateOf(0) }
-    var selectedPrashnaSubTab by remember { mutableIntStateOf(0) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var selectedWesternSubTab by rememberSaveable { mutableIntStateOf(0) }
+    var selectedPrashnaSubTab by rememberSaveable { mutableIntStateOf(0) }
     var showMenu by remember { mutableStateOf(false) }
 
     fun copyToClipboard(label: String, text: String?, message: String) {
