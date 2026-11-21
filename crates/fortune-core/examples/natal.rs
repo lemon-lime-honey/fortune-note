@@ -385,25 +385,24 @@ fn main() {
         .iter()
         .map(|p| (p.name.as_str(), p.longitude))
         .collect();
+    let natal_ctx = fortune_core::western::predictive::NatalPredictiveContext {
+        birth_dt: fortune_core::CalendarDateTime::new(year, month, day, hour, minute, second),
+        location: fortune_core::GeoCoordinate::new(latitude, longitude),
+        timezone_id: None,
+        ascendant: output.western.ascendant,
+        midheaven: output.western.midheaven,
+        planets: &natal_planet_tuples,
+        true_obliquity_deg: Some(output.ephemeris.true_obliquity_deg),
+    };
+    let pred_target = fortune_core::western::predictive::PredictiveTarget {
+        date: fortune_core::CalendarDate::new(today.year(), today.month(), today.day()),
+        hour: Some(hour),
+        minute: Some(minute),
+        house_system: Some(vedaksha::astro::houses::HouseSystem::Regiomontanus),
+    };
     let pred_suite = fortune_core::western::predictive::calculate_predictive_suite(
-        year,
-        month,
-        day,
-        hour,
-        minute,
-        second,
-        latitude,
-        longitude,
-        today.year(),
-        today.month(),
-        today.day(),
-        Some(hour),
-        Some(minute),
-        output.western.ascendant,
-        output.western.midheaven,
-        &natal_planet_tuples,
-        Some(vedaksha::astro::houses::HouseSystem::Regiomontanus),
-        Some(output.ephemeris.true_obliquity_deg),
+        &natal_ctx,
+        pred_target,
     );
 
     println!("[3-C. Western Predictive Suite (Target: {})]", today);

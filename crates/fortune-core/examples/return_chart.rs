@@ -17,8 +17,11 @@
 //!   # 3. 2026 Jupiter Return using Placidus houses:
 //!   cargo run --example return_chart -- 1990 5 15 14 30 37.5665 126.9780 2026 Jupiter --house Placidus
 
-use fortune_core::western::predictive::calculate_planetary_return;
-use fortune_core::{calculate_fortune_western, FortuneCalculationInput, Gender, WesternHouseSystem};
+use fortune_core::western::predictive::{calculate_planetary_return, PlanetaryReturnRequest};
+use fortune_core::{
+    calculate_fortune_western, CalendarDateTime, FortuneCalculationInput, Gender, GeoCoordinate,
+    WesternHouseSystem,
+};
 use std::env;
 
 const ZODIAC_SIGNS: [&str; 12] = [
@@ -132,12 +135,16 @@ fn main() {
     );
 
     let start_time = std::time::Instant::now();
-    let returns = calculate_planetary_return(
-        birth_year, birth_month, birth_day, birth_hour, birth_minute, 0.0,
-        lat, lon, target_year, &return_body,
-        Some(house_sys_enum.to_vedaksha_system()),
-        Some(orb),
-    ).expect("Planetary return calculation failed");
+    let returns = calculate_planetary_return(&PlanetaryReturnRequest {
+        birth_dt: CalendarDateTime::new(birth_year, birth_month, birth_day, birth_hour, birth_minute, 0.0),
+        location: GeoCoordinate::new(lat, lon),
+        timezone_id: None,
+        target_year,
+        return_body_name: &return_body,
+        house_system: Some(house_sys_enum.to_vedaksha_system()),
+        aspect_max_orb: Some(orb),
+    })
+    .expect("Planetary return calculation failed");
     let elapsed = start_time.elapsed();
 
     println!("Found {} return event(s) in {:.2?}:", returns.len(), elapsed);

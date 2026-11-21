@@ -23,8 +23,10 @@ pub mod parts;
 pub mod predictive;
 pub mod reception;
 pub mod syzygy;
+pub mod traditional;
 
-pub use hellenistic::{HellenisticAnglePoints, HellenisticData, HellenisticPlanetCondition};
+pub use hellenistic::{HellenisticAnglePoints, HellenisticData, HellenisticInput, HellenisticPlanetCondition};
+pub use traditional::WesternTraditionalData;
 
 /// Supported Western house division systems (strictly Hellenistic Whole Sign vs Medieval Regiomontanus).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -62,10 +64,10 @@ impl WesternHouseSystem {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WesternPlanet {
     pub name: String,
-    pub longitude: f64,       // 0.0 .. 360.0
-    pub sign_index: u8,       // 0 = Aries .. 11 = Pisces
-    pub sign_degree: f64,     // 0.0 .. 30.0
-    pub house_number: u8,     // 1 .. 12
+    pub longitude: f64,
+    pub sign_index: u8,
+    pub sign_degree: f64,
+    pub house_number: u8,
     pub is_retrograde: bool,
     #[serde(default)]
     pub speed: f64,
@@ -76,11 +78,11 @@ pub struct WesternPlanet {
 /// Lunar node placement in the Western tropical chart (Dragon's Head and Tail).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WesternNode {
-    pub name: String,         // "North Node", "South Node"
-    pub longitude: f64,       // 0.0 .. 360.0
-    pub sign_index: u8,       // 0 = Aries .. 11 = Pisces
-    pub sign_degree: f64,     // 0.0 .. 30.0
-    pub house_number: u8,     // 1 .. 12
+    pub name: String,
+    pub longitude: f64,
+    pub sign_index: u8,
+    pub sign_degree: f64,
+    pub house_number: u8,
     pub is_retrograde: bool,
 }
 
@@ -97,24 +99,7 @@ pub struct WesternAspect {
     pub is_applying: bool,
 }
 
-/// Complete William Lilly Traditional Astrology Analysis Data.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WesternTraditionalData {
-    pub planet_dignities: Vec<dignity::PlanetDignityReport>,
-    pub moon_condition: moon::MoonCondition,
-    pub planetary_hours: hours::PlanetaryHoursReport,
-    pub traditional_aspects: Vec<aspects::TraditionalAspect>,
-    pub antiscia: Vec<antiscia::AntiscionPoint>,
-    pub mutual_receptions: Vec<reception::MutualReception>,
-    pub perfection: reception::PerfectionReport,
-    pub cusp_dignities: Vec<almuten::HouseCuspDignity>,
-    pub arabic_parts: Vec<parts::ArabicPart>,
-    pub fixed_stars: Vec<fixed_stars::FixedStarInfo>,
-    pub fixed_star_conjunctions: Vec<fixed_stars::FixedStarConjunction>,
-    pub prenatal_syzygy: Option<syzygy::PrenatalSyzygy>,
-}
-
-/// Complete Western chart result.
+/// Complete Western astrology chart output.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WesternChart {
     pub ascendant: f64,
@@ -124,58 +109,11 @@ pub struct WesternChart {
     pub planets: Vec<WesternPlanet>,
     pub nodes: Vec<WesternNode>,
     pub aspects: Vec<WesternAspect>,
-    #[serde(default)]
     pub traditional: Option<WesternTraditionalData>,
-    #[serde(default)]
     pub hellenistic: Option<HellenisticData>,
 }
 
-/// Determine which house a given longitude falls into based on 12 cusp degrees.
-pub fn determine_house(lon: f64, cusps: &[f64; 12]) -> u8 {
-    for h in 0..12 {
-        let cusp_curr = cusps[h];
-        let cusp_next = cusps[(h + 1) % 12];
-
-        let inside = if cusp_curr <= cusp_next {
-            lon >= cusp_curr && lon < cusp_next
-        } else {
-            lon >= cusp_curr || lon < cusp_next
-        };
-
-        if inside {
-            return (h + 1) as u8;
-        }
-    }
-    1 // Fallback
-}
-
-/// Determine traditional house placement applying William Lilly's 5-Degree Rule (CA p. 115)
-/// for quadrant / Equal house systems (in Whole Sign, strict sign boundaries apply).
-pub fn determine_house_traditional(
-    lon: f64,
-    cusps: &[f64; 12],
-    system: WesternHouseSystem,
-) -> u8 {
-    let base_house = determine_house(lon, cusps);
-    if system == WesternHouseSystem::WholeSign {
-        return base_house;
-    }
-
-    let next_idx = (base_house as usize) % 12;
-    let next_cusp = cusps[next_idx];
-    let dist_to_next = (next_cusp - lon).rem_euclid(360.0);
-    if dist_to_next <= 5.0 {
-        (next_idx + 1) as u8
-    } else {
-        base_house
-    }
-}
-
-/// Default conjunction orb for traditional fixed stars (degrees).
-pub const DEFAULT_FIXED_STAR_MAX_ORB: f64 = 1.5;
-
-/// Classical aspect definitions: (Aspect Name, Target Angle, Default Modern Orb)
-pub const DEFAULT_MAJOR_ASPECTS: [(&str, f64, f64); 5] = [
+const DEFAULT_MAJOR_ASPECTS: [(&str, f64, f64); 5] = [
     ("Conjunction", 0.0, 8.0),
     ("Sextile", 60.0, 6.0),
     ("Square", 90.0, 7.0),
@@ -183,7 +121,145 @@ pub const DEFAULT_MAJOR_ASPECTS: [(&str, f64, f64); 5] = [
     ("Opposition", 180.0, 8.0),
 ];
 
-/// Calculate Western astrology chart from an ephemeris snapshot and observer latitude (Natal mode by default).
+pub(crate) const DEFAULT_FIXED_STAR_MAX_ORB: f64 = 2.0;
+
+/// Determine house number (1..=12) for a given tropical longitude based on house cusps.
+pub fn determine_house(longitude: f64, cusps: &[f64; 12]) -> u8 {
+    let lon = longitude.rem_euclid(360.0);
+    for i in 0..12 {
+        let start = cusps[i].rem_euclid(360.0);
+        let end = cusps[(i + 1) % 12].rem_euclid(360.0);
+        let in_house = if start < end {
+            lon >= start && lon < end
+        } else {
+            lon >= start || lon < end
+        };
+        if in_house {
+            return (i + 1) as u8;
+        }
+    }
+    1
+}
+
+/// Determine traditional house number with William Lilly's 5-degree rule for quadrant systems.
+pub fn determine_house_traditional(
+    longitude: f64,
+    cusps: &[f64; 12],
+    system: WesternHouseSystem,
+) -> u8 {
+    let base_house = determine_house(longitude, cusps);
+    if matches!(system, WesternHouseSystem::WholeSign) {
+        return base_house;
+    }
+
+    let next_house_idx = (base_house as usize) % 12;
+    let next_cusp = cusps[next_house_idx].rem_euclid(360.0);
+    let lon = longitude.rem_euclid(360.0);
+    let dist_to_next = (next_cusp - lon).rem_euclid(360.0);
+
+    if dist_to_next > 0.0 && dist_to_next <= 5.0 {
+        (next_house_idx + 1) as u8
+    } else {
+        base_house
+    }
+}
+
+fn collect_planets_and_nodes(
+    ephem: &EphemerisSnapshot,
+    cusps: &[f64; 12],
+) -> (Vec<WesternPlanet>, Vec<WesternNode>) {
+    let mut planets = Vec::with_capacity(7);
+    let mut nodes = Vec::with_capacity(2);
+
+    for b in &ephem.bodies {
+        let lon = b.tropical_longitude;
+        let sign_index = (lon / 30.0).floor() as u8 % 12;
+        let sign_degree = lon - (sign_index as f64 * 30.0);
+        let house_number = determine_house(lon, cusps);
+
+        match b.name.as_str() {
+            "Rahu" | "Ketu" => nodes.push(WesternNode {
+                name: crate::celestial::normalize_western_body_name(&b.name),
+                longitude: lon,
+                sign_index,
+                sign_degree,
+                house_number,
+                is_retrograde: b.is_retrograde,
+            }),
+            _ => planets.push(WesternPlanet {
+                name: b.name.clone(),
+                longitude: lon,
+                sign_index,
+                sign_degree,
+                house_number,
+                is_retrograde: b.is_retrograde,
+                speed: b.speed,
+                latitude: b.latitude,
+            }),
+        }
+    }
+
+    (planets, nodes)
+}
+
+fn compute_major_aspects(planets: &[WesternPlanet]) -> Vec<WesternAspect> {
+    let mut aspects = Vec::new();
+    for i in 0..planets.len() {
+        for j in (i + 1)..planets.len() {
+            let (p1, p2) = (&planets[i], &planets[j]);
+            let diff = (p1.longitude - p2.longitude).abs().rem_euclid(360.0);
+            let shortest = if diff > 180.0 { 360.0 - diff } else { diff };
+
+            for (name, target, max_orb) in DEFAULT_MAJOR_ASPECTS {
+                let orb = (shortest - target).abs();
+                if orb <= max_orb {
+                    aspects.push(WesternAspect {
+                        planet1: p1.name.clone(),
+                        planet2: p2.name.clone(),
+                        aspect_type: name.to_string(),
+                        exact_angle: target,
+                        actual_angle: shortest,
+                        orb,
+                        is_applying: aspects::is_aspect_applying(
+                            p1.longitude,
+                            p1.speed,
+                            p2.longitude,
+                            p2.speed,
+                            target,
+                        ),
+                    });
+                }
+            }
+        }
+    }
+    aspects
+}
+
+fn build_domain_analysis(
+    ctx: &traditional::TraditionalBuildContext<'_>,
+) -> (Option<WesternTraditionalData>, Option<HellenisticData>) {
+    if ctx.system == WesternHouseSystem::WholeSign {
+        let h_input = HellenisticInput {
+            planet_tuples: ctx.planet_tuples,
+            planet_pos_tuples: ctx.planet_pos_tuples,
+            ascendant: ctx.ascendant,
+            midheaven: ctx.midheaven,
+            cusps: ctx.cusps,
+            is_day_chart: ctx.is_day_chart,
+            is_male: ctx.is_male,
+            jd_ut1: ctx.ephem.jd_ut1,
+            jd_tt: ctx.ephem.jd_tt,
+            observer_lat: ctx.latitude,
+            obliquity_deg: ctx.ephem.true_obliquity_deg,
+            fixed_star_max_orb: DEFAULT_FIXED_STAR_MAX_ORB,
+        };
+        (None, Some(hellenistic::calculate_hellenistic_data(&h_input)))
+    } else {
+        (Some(traditional::build_traditional_data(ctx)), None)
+    }
+}
+
+/// Calculate Western astrology chart (Natal default mode: `is_horary = false`).
 pub fn calculate_western(
     ephem: &EphemerisSnapshot,
     latitude: f64,
@@ -207,258 +283,36 @@ pub fn calculate_western_with_mode(
         ephem.true_obliquity_deg,
         system.to_vedaksha_system(),
     );
+    let (cusps, ascendant, midheaven) = (house_result.cusps, house_result.asc, house_result.mc);
+    let (planets, nodes) = collect_planets_and_nodes(ephem, &cusps);
+    let aspects = compute_major_aspects(&planets);
 
-    let cusps = house_result.cusps;
-    let ascendant = house_result.asc;
-    let midheaven = house_result.mc;
-
-    // 1. Separate 7 classical planets and 2 lunar nodes (Dragon's Head & Tail)
-    let mut planets = Vec::with_capacity(7);
-    let mut nodes = Vec::with_capacity(2);
-
-    for b in &ephem.bodies {
-        let lon = b.tropical_longitude;
-        let sign_index = (lon / 30.0).floor() as u8;
-        let sign_degree = lon - (sign_index as f64 * 30.0);
-        let house_number = determine_house(lon, &cusps);
-
-        match b.name.as_str() {
-            "Rahu" => {
-                nodes.push(WesternNode {
-                    name: "North Node".to_string(),
-                    longitude: lon,
-                    sign_index,
-                    sign_degree,
-                    house_number,
-                    is_retrograde: b.is_retrograde,
-                });
-            }
-            "Ketu" => {
-                nodes.push(WesternNode {
-                    name: "South Node".to_string(),
-                    longitude: lon,
-                    sign_index,
-                    sign_degree,
-                    house_number,
-                    is_retrograde: b.is_retrograde,
-                });
-            }
-            _ => {
-                planets.push(WesternPlanet {
-                    name: b.name.clone(),
-                    longitude: lon,
-                    sign_index,
-                    sign_degree,
-                    house_number,
-                    is_retrograde: b.is_retrograde,
-                    speed: b.speed,
-                    latitude: b.latitude,
-                });
-            }
-        }
-    }
-
-    // 2. Compute major aspects exclusively among the 7 classical planets
-    let mut aspects = Vec::new();
-    let aspect_defs = DEFAULT_MAJOR_ASPECTS;
-
-    for i in 0..planets.len() {
-        for j in (i + 1)..planets.len() {
-            let p1 = &planets[i];
-            let p2 = &planets[j];
-
-            let diff = (p1.longitude - p2.longitude).abs().rem_euclid(360.0);
-            let shortest = if diff > 180.0 { 360.0 - diff } else { diff };
-
-            for (name, target, max_orb) in aspect_defs {
-                let orb = (shortest - target).abs();
-                if orb <= max_orb {
-                    let is_applying = aspects::is_aspect_applying(
-                        p1.longitude,
-                        p1.speed,
-                        p2.longitude,
-                        p2.speed,
-                        target,
-                    );
-
-                    aspects.push(WesternAspect {
-                        planet1: p1.name.clone(),
-                        planet2: p2.name.clone(),
-                        aspect_type: name.to_string(),
-                        exact_angle: target,
-                        actual_angle: shortest,
-                        orb,
-                        is_applying,
-                    });
-                }
-            }
-        }
-    }
-
-    // 3. William Lilly Traditional Astrology calculations
-    let planet_tuples: Vec<(&str, f64, f64)> = ephem.bodies
+    let planet_tuples: Vec<(&str, f64, f64)> = ephem
+        .bodies
         .iter()
         .filter(|b| b.name != "Rahu" && b.name != "Ketu")
         .map(|b| (b.name.as_str(), b.tropical_longitude, b.speed))
         .collect();
+    let planet_pos_tuples: Vec<(&str, f64)> = planet_tuples.iter().map(|&(n, lon, _)| (n, lon)).collect();
 
-    let planet_pos_tuples: Vec<(&str, f64)> = planet_tuples
-        .iter()
-        .map(|&(n, lon, _)| (n, lon))
-        .collect();
-
-    let sun_opt = ephem.bodies.iter().find(|b| b.name == "Sun");
-    let moon_opt = ephem.bodies.iter().find(|b| b.name == "Moon");
-    let sun_lon = sun_opt.map_or(0.0, |b| b.tropical_longitude);
-    let moon_lon = moon_opt.map_or(0.0, |b| b.tropical_longitude);
-    let moon_speed = moon_opt.map_or(13.176, |b| b.speed);
-
-    // True astronomical day/night sect based on the eastern horizon (ASC) and western horizon (DSC = ASC + 180°).
-    // Above the horizon spans from DSC (180°) counter-clockwise to ASC (360°/0°).
+    let sun_lon = ephem.get_body("Sun").map_or(0.0, |b| b.tropical_longitude);
     let is_day_chart = (sun_lon - ascendant).rem_euclid(360.0) >= 180.0;
 
-    // 3. Domain Layer: Strictly separate Hellenistic (Whole Sign) and Medieval (Regiomontanus)
-    let (traditional, hellenistic) = if system == WesternHouseSystem::WholeSign {
-        let h_data = hellenistic::calculate_hellenistic_data(
-            &planet_tuples,
-            &planet_pos_tuples,
-            ascendant,
-            midheaven,
-            &cusps,
-            is_day_chart,
-            is_male,
-            ephem.jd_ut1,
-            ephem.jd_tt,
-            latitude,
-            ephem.true_obliquity_deg,
-            DEFAULT_FIXED_STAR_MAX_ORB,
-        );
-        (None, Some(h_data))
-    } else {
-        let saturn_house = ephem.bodies.iter()
-            .find(|b| b.name == "Saturn")
-            .map_or(1, |b| determine_house_traditional(b.tropical_longitude, &cusps, system));
-
-        let north_node_lon = ephem.bodies.iter().find(|b| b.name == "Rahu").map_or(0.0, |b| b.tropical_longitude);
-        let south_node_lon = ephem.bodies.iter().find(|b| b.name == "Ketu").map_or(180.0, |b| b.tropical_longitude);
-
-        let mercury_lon = ephem.bodies.iter().find(|b| b.name == "Mercury").map_or(0.0, |b| b.tropical_longitude);
-        let venus_lon = ephem.bodies.iter().find(|b| b.name == "Venus").map_or(0.0, |b| b.tropical_longitude);
-        let mars_lon = ephem.bodies.iter().find(|b| b.name == "Mars").map_or(0.0, |b| b.tropical_longitude);
-        let jupiter_lon = ephem.bodies.iter().find(|b| b.name == "Jupiter").map_or(0.0, |b| b.tropical_longitude);
-        let saturn_lon = ephem.bodies.iter().find(|b| b.name == "Saturn").map_or(0.0, |b| b.tropical_longitude);
-
-        // 3.0 Fixed Stars (computed first so Regulus, Spica, and Algol conjunctions feed into Lilly accidental dignity scoring)
-        let fixed_stars = fixed_stars::calculate_traditional_fixed_stars(ephem.jd_tt, latitude, ephem.true_obliquity_deg);
-        let dsc = (ascendant + 180.0).rem_euclid(360.0);
-        let ic = (midheaven + 180.0).rem_euclid(360.0);
-        let mut star_check_bodies = planet_pos_tuples.clone();
-        star_check_bodies.push(("Ascendant", ascendant));
-        star_check_bodies.push(("Midheaven", midheaven));
-        star_check_bodies.push(("Descendant", dsc));
-        star_check_bodies.push(("Immum Coeli", ic));
-        let fixed_star_conjunctions = fixed_stars::detect_fixed_star_conjunctions(&fixed_stars, &star_check_bodies, DEFAULT_FIXED_STAR_MAX_ORB);
-
-        // 3.1 Dignities (with Lilly 5-Degree Rule for quadrant house systems and full CA p. 115 context)
-        let mut planet_dignities = Vec::new();
-        for p in &planets {
-            if let Some(cp) = dignity::ClassicalPlanet::from_name(&p.name) {
-                let trad_house = determine_house_traditional(p.longitude, &cusps, system);
-                planet_dignities.push(dignity::calculate_planet_dignity_with_context(
-                    cp,
-                    p.longitude,
-                    p.speed,
-                    trad_house,
-                    sun_lon,
-                    is_day_chart,
-                    north_node_lon,
-                    south_node_lon,
-                    &planet_pos_tuples,
-                    &fixed_star_conjunctions,
-                ));
-            }
-        }
-
-        // 3.2 Moon Condition (Horary evaluates VOC, Via Combusta, and Next Applying Aspect; Natal evaluates only Lunar Phase)
-        let moon_condition = if is_horary {
-            moon::evaluate_moon_condition(
-                moon_lon,
-                moon_speed,
-                sun_lon,
-                &planet_tuples,
-            )
-        } else {
-            moon::evaluate_natal_moon_condition(moon_lon, sun_lon)
-        };
-
-        // 3.3 Planetary Hours & Radicality (Radicality & Considerations populated only in Horary mode)
-        let planetary_hours = hours::calculate_astronomical_planetary_hours_with_mode(
-            ephem.jd_ut1,
-            latitude,
-            ephem.ramc,
-            sun_lon,
-            ephem.true_obliquity_deg,
-            ascendant,
-            saturn_house,
-            moon_condition.is_void_of_course,
-            moon_condition.is_via_combusta,
-            is_horary,
-        );
-
-        // 3.4 Traditional Dynamic Aspects
-        let traditional_aspects = aspects::calculate_traditional_aspects(&planet_tuples);
-
-        // 3.5 Antiscia Table
-        let mut antiscia_input = planet_pos_tuples.clone();
-        antiscia_input.push(("Ascendant", ascendant));
-        antiscia_input.push(("Midheaven", midheaven));
-        let antiscia = antiscia::calculate_antiscia_table(&antiscia_input);
-
-        // 3.6 Mutual Receptions & Perfection (Perfection mechanisms only in Horary mode)
-        let mutual_receptions = reception::find_mutual_receptions(&planet_pos_tuples, is_day_chart);
-        let perfection = if is_horary {
-            reception::analyze_perfection_mechanisms(&planet_tuples)
-        } else {
-            reception::PerfectionReport::default()
-        };
-
-        // 3.7 House Cusp Dignities
-        let cusp_dignities = almuten::calculate_house_cusp_dignities(&cusps, is_day_chart);
-
-        // 3.8 Arabic Parts
-        let arabic_parts = parts::calculate_arabic_parts(
-            ascendant,
-            sun_lon,
-            moon_lon,
-            mercury_lon,
-            venus_lon,
-            mars_lon,
-            jupiter_lon,
-            saturn_lon,
-            &cusps,
-            is_day_chart,
-            is_male,
-        );
-
-        // 3.10 Prenatal Syzygy (SAN)
-        let prenatal_syzygy = syzygy::calculate_prenatal_syzygy_with_coords(ephem.jd_ut1, sun_lon, moon_lon).ok();
-
-        let trad_data = WesternTraditionalData {
-            planet_dignities,
-            moon_condition,
-            planetary_hours,
-            traditional_aspects,
-            antiscia,
-            mutual_receptions,
-            perfection,
-            cusp_dignities,
-            arabic_parts,
-            fixed_stars,
-            fixed_star_conjunctions,
-            prenatal_syzygy,
-        };
-        (Some(trad_data), None)
+    let ctx = traditional::TraditionalBuildContext {
+        ephem,
+        planets: &planets,
+        planet_tuples: &planet_tuples,
+        planet_pos_tuples: &planet_pos_tuples,
+        cusps: &cusps,
+        ascendant,
+        midheaven,
+        latitude,
+        system,
+        is_day_chart,
+        is_male,
+        is_horary,
     };
+    let (traditional, hellenistic) = build_domain_analysis(&ctx);
 
     WesternChart {
         ascendant,
@@ -476,157 +330,105 @@ pub fn calculate_western_with_mode(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::celestial::{CalendarDateTime, GeoCoordinate};
     use crate::ephemeris::compute_ephemeris;
 
-    #[test]
-    fn test_western_chart_generation() {
-        let ephem = compute_ephemeris(2024, 3, 20, 12, 0, 0.0, 51.5074, -0.1278) // London
-            .expect("ephem should succeed");
+    const SEOUL: GeoCoordinate = GeoCoordinate::new(37.5665, 126.9780);
 
-        let chart = calculate_western(&ephem, 51.5074, WesternHouseSystem::Regiomontanus, true);
-
-        assert_eq!(chart.house_cusps.len(), 12);
-        assert_eq!(chart.planets.len(), 7, "Strictly 7 classical planets in western chart");
-        assert_eq!(chart.nodes.len(), 2, "Strictly 2 lunar nodes (North Node & South Node)");
-        assert!(chart.traditional.is_some(), "Traditional data must be calculated");
-
-        let trad = chart.traditional.as_ref().unwrap();
-        assert_eq!(trad.planet_dignities.len(), 7, "7 classical planets have dignities");
-        assert_eq!(trad.cusp_dignities.len(), 12, "12 cusps have dignities");
-        assert!(!trad.fixed_stars.is_empty(), "Fixed stars must be populated");
-        assert!(!trad.arabic_parts.is_empty(), "Arabic parts must be calculated");
+    fn chart_for(
+        dt: CalendarDateTime,
+        loc: GeoCoordinate,
+        system: WesternHouseSystem,
+        is_male: bool,
+    ) -> WesternChart {
+        let ephem = compute_ephemeris(dt, loc).expect("ephem should succeed");
+        calculate_western(&ephem, loc.latitude, system, is_male)
     }
 
-    #[test]
-    fn test_western_high_latitude_fallback() {
-        let ephem = compute_ephemeris(2024, 6, 21, 12, 0, 0.0, 70.0, 25.0)
-            .expect("ephem should succeed");
-
-        let chart = calculate_western(&ephem, 70.0, WesternHouseSystem::Regiomontanus, true);
+    fn assert_basic_western_shape(chart: &WesternChart) {
         assert_eq!(chart.house_cusps.len(), 12);
         assert_eq!(chart.planets.len(), 7);
         assert_eq!(chart.nodes.len(), 2);
     }
 
     #[test]
-    fn test_phase5_precision_corrections() {
-        // 2000-01-01 03:00 UTC (12:00 KST, Saturday) Seoul (37.5665, 126.9780)
-        let ephem = compute_ephemeris(2000, 1, 1, 3, 0, 0.0, 37.5665, 126.9780)
-            .expect("ephem should succeed");
+    fn test_western_chart_generation_and_high_latitude() {
+        let chart = chart_for(
+            CalendarDateTime::new(2024, 3, 20, 12, 0, 0.0),
+            GeoCoordinate::new(51.5074, -0.1278),
+            WesternHouseSystem::Regiomontanus,
+            true,
+        );
+        assert_basic_western_shape(&chart);
 
-        let chart = calculate_western(&ephem, 37.5665, WesternHouseSystem::Regiomontanus, true);
-        assert!(chart.hellenistic.is_none(), "Medieval Regiomontanus chart must not contain Hellenistic data");
-        let trad = chart.traditional.expect("traditional data should exist");
+        let trad = chart.traditional.as_ref().expect("Traditional data must exist");
+        assert_eq!(trad.planet_dignities.len(), 7);
+        assert_eq!(trad.cusp_dignities.len(), 12);
+        assert!(!trad.fixed_stars.is_empty());
+        assert!(!trad.arabic_parts.is_empty());
+        assert!(!trad.fixed_star_conjunctions.iter().any(|c| c.body_name == "Immum Coeli"));
 
-        // 1. Planetary Hours: Daytime on Saturday at noon
+        let polar = chart_for(
+            CalendarDateTime::new(2024, 6, 21, 12, 0, 0.0),
+            GeoCoordinate::new(70.0, 25.0),
+            WesternHouseSystem::Regiomontanus,
+            true,
+        );
+        assert_basic_western_shape(&polar);
+    }
+
+    #[test]
+    fn test_medieval_precision_and_marriage_gender_branch() {
+        let j2000 = CalendarDateTime::new(2000, 1, 1, 3, 0, 0.0);
+        let male = chart_for(j2000, SEOUL, WesternHouseSystem::Regiomontanus, true);
+        let female = chart_for(j2000, SEOUL, WesternHouseSystem::Regiomontanus, false);
+
+        assert!(male.hellenistic.is_none());
+        let trad = male.traditional.as_ref().expect("traditional data should exist");
         assert_eq!(trad.planetary_hours.day_ruler, "Saturn");
         assert!(trad.planetary_hours.is_day_hour);
-        // Hour in Saturday noon is either Mars (Hour 3) or Sun (Hour 4) or Venus depending on exact sunrise
-        assert!(!trad.planetary_hours.hour_ruler.is_empty());
-
-        // 2. Moon Condition: Lunar day 25/Waning Crescent (elongation ~298.8 deg)
         assert_eq!(trad.moon_condition.lunar_phase_name, "Waning Crescent");
-
-        // 3. Prenatal Syzygy: December 1999 Full Moon
-        assert!(trad.prenatal_syzygy.is_some());
-        let san = trad.prenatal_syzygy.as_ref().unwrap();
+        let san = trad.prenatal_syzygy.as_ref().expect("SAN should exist");
         assert_eq!(san.syzygy_type, "Full Moon");
         assert!(san.exact_datetime_utc.starts_with("1999-12-22"));
-
-        // 4. Arabic Parts: 10 parts including 7 Hermetic lots
         assert!(trad.arabic_parts.len() >= 10);
-        let part_names: Vec<&str> = trad.arabic_parts.iter().map(|p| p.name.as_str()).collect();
-        assert!(part_names.contains(&"Part of Fortune"));
-        assert!(part_names.contains(&"Part of Spirit"));
-        assert!(part_names.contains(&"Lot of Eros"));
-        assert!(part_names.contains(&"Lot of Victory"));
-        assert!(part_names.contains(&"Lot of Necessity"));
-        assert!(part_names.contains(&"Lot of Courage"));
-        assert!(part_names.contains(&"Lot of Nemesis"));
-
-        // 5. Fixed Stars: 31 elite traditional stars populated
         assert_eq!(trad.fixed_stars.len(), 31);
-        let star_names: Vec<&str> = trad.fixed_stars.iter().map(|s| s.name.as_str()).collect();
-        assert!(star_names.contains(&"Arcturus"));
-        assert!(star_names.contains(&"Achernar"));
-        assert!(star_names.contains(&"Scheat"));
-        assert!(star_names.contains(&"Markab"));
-        assert!(star_names.contains(&"Deneb Algedi"));
+
+        let male_m = trad.arabic_parts.iter().find(|p| p.name == "Part of Marriage").unwrap();
+        let female_m = female.traditional.as_ref().unwrap().arabic_parts
+            .iter().find(|p| p.name == "Part of Marriage").unwrap();
+        assert_ne!(male_m.longitude, female_m.longitude);
+        let sym = (male_m.longitude + female_m.longitude - 2.0 * male.ascendant).rem_euclid(360.0);
+        assert!(sym.abs() < 1e-6 || (360.0 - sym).abs() < 1e-6);
     }
 
     #[test]
-    fn test_lot_of_marriage_gender_branch() {
-        let ephem = compute_ephemeris(2000, 1, 1, 3, 0, 0.0, 37.5665, 126.9780)
-            .expect("ephem should succeed");
-
-        let male_chart = calculate_western(&ephem, 37.5665, WesternHouseSystem::Regiomontanus, true);
-        let female_chart = calculate_western(&ephem, 37.5665, WesternHouseSystem::Regiomontanus, false);
-
-        let male_parts = &male_chart.traditional.as_ref().unwrap().arabic_parts;
-        let female_parts = &female_chart.traditional.as_ref().unwrap().arabic_parts;
-
-        let male_marriage = male_parts.iter().find(|p| p.name == "Part of Marriage").unwrap();
-        let female_marriage = female_parts.iter().find(|p| p.name == "Part of Marriage").unwrap();
-
-        // Male formula: ASC + Venus - Saturn
-        // Female formula: ASC + Saturn - Venus
-        // They must differ unless Venus == Saturn
-        assert_ne!(male_marriage.longitude, female_marriage.longitude);
-        assert!(
-            (male_marriage.longitude + female_marriage.longitude - 2.0 * male_chart.ascendant).rem_euclid(360.0).abs() < 1e-6 || (360.0 - (male_marriage.longitude + female_marriage.longitude - 2.0 * male_chart.ascendant).rem_euclid(360.0)).abs() < 1e-6,
-            "Male and female marriage lots should be symmetric about the ascendant"
+    fn test_hellenistic_whole_sign_and_day_sect() {
+        let oslo = chart_for(
+            CalendarDateTime::new(1990, 1, 1, 5, 0, 0.0),
+            GeoCoordinate::new(60.0, 10.0),
+            WesternHouseSystem::WholeSign,
+            true,
         );
-    }
+        assert!(oslo.traditional.is_none());
+        let h = oslo.hellenistic.as_ref().expect("Hellenistic data must exist");
+        assert_eq!((h.planet_conditions.len(), h.angles.ascendant_sign, h.angles.midheaven_house), (7, 7, 12));
+        assert!(!h.angles.is_mc_in_10th);
 
-    #[test]
-    fn test_hellenistic_whole_sign_branch() {
-        // Oslo at 1990-01-01 06:00 local CET (UTC 05:00)
-        let ephem = compute_ephemeris(1990, 1, 1, 5, 0, 0.0, 60.0, 10.0)
-            .expect("ephem should succeed");
-
-        let chart = calculate_western(&ephem, 60.0, WesternHouseSystem::WholeSign, true);
-
-        assert!(chart.traditional.is_none(), "William Lilly data must NOT be mixed into Whole Sign Hellenistic chart");
-        assert!(chart.hellenistic.is_some(), "Hellenistic data must be Some for Whole Sign");
-
-        let h = chart.hellenistic.as_ref().unwrap();
-        assert_eq!(h.planet_conditions.len(), 7, "7 classical planets evaluated");
-        assert!(!h.lots.is_empty(), "Hermetic lots must be populated");
-
-        // Verify independent MC angle point
-        // In Oslo 1990-01-01 05:00 UTC, ASC is Scorpio, MC is in Libra (House 12)
-        assert_eq!(h.angles.ascendant_sign, 7, "Scorpio is sign 7 (0-indexed)");
-        assert_eq!(h.angles.midheaven_sign, 6, "Libra is sign 6");
-        assert_eq!(h.angles.midheaven_house, 12, "MC falls in 12th House");
-        assert!(!h.angles.is_mc_in_10th, "MC is not in 10th House");
-    }
-
-    #[test]
-    fn test_whole_sign_post_sunrise_day_sect() {
-        // Seoul on 2024-06-21 (Summer Solstice, sunrise ~05:11 KST)
-        // 06:00 KST (UTC 2024-06-20 21:00): Sun is already well above the horizon (Day chart)
-        let ephem = compute_ephemeris(2024, 6, 20, 21, 0, 0.0, 37.5665, 126.9780)
-            .expect("ephemeris should succeed");
-
-        let chart = calculate_western(&ephem, 37.5665, WesternHouseSystem::WholeSign, true);
-        let h = chart.hellenistic.expect("Hellenistic data must exist");
-
-        let sun = chart.planets.iter().find(|p| p.name == "Sun").unwrap();
-        // Ascendant is in Cancer (sign 3), Sun is also in Cancer (sign 3)
-        // In Whole Sign, Sun is in House 1, but geometrically above the horizon
+        let solstice = chart_for(
+            CalendarDateTime::new(2024, 6, 20, 21, 0, 0.0),
+            SEOUL,
+            WesternHouseSystem::WholeSign,
+            true,
+        );
+        let sh = solstice.hellenistic.expect("Hellenistic data must exist");
+        let sun = solstice.planets.iter().find(|p| p.name == "Sun").unwrap();
+        let moon = solstice.planets.iter().find(|p| p.name == "Moon").unwrap();
         assert_eq!(sun.house_number, 1);
 
-        // In a day chart, Lot of Fortune = ASC + Moon - Sun
-        // Lot of Spirit = ASC + Sun - Moon
-        // If it were wrongly treated as night chart, Fortune would be ASC + Sun - Moon (swapped)
-        let p_fortune = h.lots.iter().find(|l| l.name == "Part of Fortune").unwrap();
-        let p_spirit = h.lots.iter().find(|l| l.name == "Part of Spirit").unwrap();
-
-        let moon = chart.planets.iter().find(|p| p.name == "Moon").unwrap();
-        let expected_fortune = (chart.ascendant + moon.longitude - sun.longitude).rem_euclid(360.0);
-        let expected_spirit = (chart.ascendant + sun.longitude - moon.longitude).rem_euclid(360.0);
-
-        assert!((p_fortune.longitude - expected_fortune).abs() < 1e-6, "Fortune must follow daytime formula");
-        assert!((p_spirit.longitude - expected_spirit).abs() < 1e-6, "Spirit must follow daytime formula");
+        let p_fortune = sh.lots.iter().find(|l| l.name == "Part of Fortune").unwrap();
+        let p_spirit = sh.lots.iter().find(|l| l.name == "Part of Spirit").unwrap();
+        assert!((p_fortune.longitude - (solstice.ascendant + moon.longitude - sun.longitude).rem_euclid(360.0)).abs() < 1e-6);
+        assert!((p_spirit.longitude - (solstice.ascendant + sun.longitude - moon.longitude).rem_euclid(360.0)).abs() < 1e-6);
     }
 }

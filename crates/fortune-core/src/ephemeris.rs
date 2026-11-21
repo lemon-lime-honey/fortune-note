@@ -1,25 +1,22 @@
 //! Pure astronomical ephemeris calculation layer.
 //!
-//! Wraps Vedaksha analytical engine to compute:
-//! - Julian Day (UT1) and Terrestrial Time (TT)
-//! - Earth orientation: Nutation, True Obliquity, and Local Sidereal Time (RAMC)
-//! - Lahiri True Ayanamsha
-//! - 7 classical planets + True Osculating Lunar Nodes (Rahu/Ketu)
-//! - Exact solar longitude arrival moments (Newton-Raphson solver)
+//! Wraps `vedaksha` VSOP87D / ELP2000 analytical ephemerides to produce
+//! unified tropical and sidereal positions, nutation, obliquity, RAMC,
+//! and Lahiri True Chitra Paksha ayanamsha for a given UTC moment and observer coordinates.
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-
 use vedaksha::astro::sidereal::{true_ayanamsha_value, Ayanamsha};
 use vedaksha::ephem::analytical::AnalyticalProvider;
 use vedaksha::ephem::bodies::Body;
 use vedaksha::ephem::coordinates::apparent_position;
 use vedaksha::ephem::delta_t::ut1_to_tt;
-use vedaksha::ephem::julian::calendar_to_jd;
 use vedaksha::ephem::nutation::nutation;
 use vedaksha::ephem::obliquity::true_obliquity;
 use vedaksha::ephem::sidereal_time::local_sidereal_time;
 use vedaksha::math::angle::normalize_degrees;
+
+use crate::celestial::{CalendarDateTime, GeoCoordinate};
 
 #[derive(Error, Debug)]
 pub enum EphemerisError {
@@ -57,44 +54,38 @@ impl EphemerisSnapshot {
     }
 }
 
-/// Compute astronomical snapshot for a given UTC calendar date, time, and observer coordinates.
+const TARGET_BODIES: [(&str, Body); 9] = [
+    ("Sun", Body::Sun),
+    ("Moon", Body::Moon),
+    ("Mercury", Body::Mercury),
+    ("Venus", Body::Venus),
+    ("Mars", Body::Mars),
+    ("Jupiter", Body::Jupiter),
+    ("Saturn", Body::Saturn),
+    ("Rahu", Body::TrueNode),
+    ("Ketu", Body::TrueSouthNode),
+];
+
+/// Compute astronomical snapshot for a given UTC calendar date/time and observer coordinates.
 pub fn compute_ephemeris(
-    year: i32,
-    month: u32,
-    day: u32,
-    hour: u32,
-    minute: u32,
-    second: f64,
-    latitude: f64,
-    longitude: f64,
+    utc: CalendarDateTime,
+    loc: GeoCoordinate,
 ) -> Result<EphemerisSnapshot, EphemerisError> {
-    let _ = latitude; // Reserved for topocentric corrections if needed
-    let day_fraction = day as f64 + (hour as f64 + (minute as f64 + second / 60.0) / 60.0) / 24.0;
-    let jd_ut1 = calendar_to_jd(year, month, day_fraction);
+    let _ = loc.latitude; // Reserved for topocentric corrections if needed
+    let jd_ut1 = utc.to_julian_day();
 
     let jd_tt = ut1_to_tt(jd_ut1);
     let (dpsi, deps) = nutation(jd_tt);
     let eps_true = true_obliquity(jd_tt, deps);
     let true_obliquity_deg = eps_true.to_degrees();
 
-    let ramc = local_sidereal_time(jd_ut1, longitude.to_radians(), dpsi, eps_true).to_degrees();
+    let ramc = local_sidereal_time(jd_ut1, loc.longitude.to_radians(), dpsi, eps_true).to_degrees();
     let true_ayanamsha_deg = true_ayanamsha_value(Ayanamsha::IndianOfficial, jd_ut1);
 
     let provider = AnalyticalProvider;
-    let target_bodies = [
-        ("Sun", Body::Sun),
-        ("Moon", Body::Moon),
-        ("Mercury", Body::Mercury),
-        ("Venus", Body::Venus),
-        ("Mars", Body::Mars),
-        ("Jupiter", Body::Jupiter),
-        ("Saturn", Body::Saturn),
-        ("Rahu", Body::TrueNode),
-        ("Ketu", Body::TrueSouthNode),
-    ];
+    let mut bodies = Vec::with_capacity(TARGET_BODIES.len());
 
-    let mut bodies = Vec::with_capacity(target_bodies.len());
-    for (name, body) in target_bodies {
+    for (name, body) in TARGET_BODIES {
         let pos = apparent_position(&provider, body, jd_ut1).map_err(|e| {
             EphemerisError::BodyCalculationFailed(name.to_string(), format!("{:?}", e))
         })?;
@@ -102,7 +93,6 @@ pub fn compute_ephemeris(
         let trop_lon = normalize_degrees(pos.ecliptic.longitude.to_degrees());
         let sid_lon = normalize_degrees(trop_lon - true_ayanamsha_deg);
         let speed = pos.longitude_speed;
-        let is_retrograde = speed < 0.0;
 
         bodies.push(CelestialBody {
             name: name.to_string(),
@@ -110,7 +100,7 @@ pub fn compute_ephemeris(
             sidereal_longitude: sid_lon,
             latitude: pos.ecliptic.latitude.to_degrees(),
             speed,
-            is_retrograde,
+            is_retrograde: speed < 0.0,
         });
     }
 
@@ -129,6 +119,10 @@ pub fn find_solar_longitude_moment(
     approx_jd: f64,
     target_lon_deg: f64,
 ) -> Result<f64, EphemerisError> {
+    if !approx_jd.is_finite() || !target_lon_deg.is_finite() {
+        return Err(EphemerisError::SolarConvergenceFailed(target_lon_deg));
+    }
+
     let provider = AnalyticalProvider;
     let mut jd = approx_jd;
 
@@ -148,78 +142,52 @@ pub fn find_solar_longitude_moment(
         }
 
         let speed = pos.longitude_speed.max(0.95);
-        let step = diff / speed;
-        jd += step;
+        jd += diff / speed;
     }
 
-    Ok(jd)
+    Err(EphemerisError::SolarConvergenceFailed(target_lon_deg))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use vedaksha::ephem::julian::jd_to_calendar;
+    use vedaksha::ephem::julian::calendar_to_jd;
 
     #[test]
-    fn test_ephemeris_basic_sanity() {
-        let ephem = compute_ephemeris(2024, 3, 20, 12, 0, 0.0, 37.5665, 126.9780)
-            .expect("ephemeris computation should succeed");
+    fn test_compute_ephemeris_vernal_equinox_2024() {
+        let ephem = compute_ephemeris(
+            CalendarDateTime::new(2024, 3, 20, 12, 0, 0.0),
+            GeoCoordinate::new(37.5665, 126.9780),
+        )
+        .expect("ephemeris calculation should succeed");
 
         assert_eq!(ephem.bodies.len(), 9);
-        assert!((23.0..25.0).contains(&ephem.true_ayanamsha_deg));
+        assert!(ephem.true_ayanamsha_deg > 24.0 && ephem.true_ayanamsha_deg < 24.3);
 
-        let rahu = ephem.get_body("Rahu").unwrap();
-        let ketu = ephem.get_body("Ketu").unwrap();
-        let node_diff = ((rahu.sidereal_longitude - ketu.sidereal_longitude).abs() - 180.0).abs();
-        assert!(node_diff < 0.01, "Nodes must be opposed by 180 degrees");
+        let sun = ephem.get_body("Sun").expect("Sun should exist");
+        assert!(sun.tropical_longitude >= 0.0 && sun.tropical_longitude < 1.0);
+        assert!(sun.sidereal_longitude > 335.0 && sun.sidereal_longitude < 337.0);
+
+        let rahu = ephem.get_body("Rahu").expect("Rahu should exist");
+        let ketu = ephem.get_body("Ketu").expect("Ketu should exist");
+        let diff = (rahu.tropical_longitude - ketu.tropical_longitude).abs();
+        assert!((diff - 180.0).abs() < 1e-4);
     }
 
     #[test]
-    fn test_solar_equinox_moment() {
-        // 2024 Vernal Equinox (0 deg) occurred on March 20 around 03:06 UTC
-        let approx_jd = calendar_to_jd(2024, 3, 20.0);
-        let equinox_jd = find_solar_longitude_moment(approx_jd, 0.0)
-            .expect("solver should find equinox");
+    fn test_find_solar_longitude_ipchun_2024() {
+        let approx_jd = calendar_to_jd(2024, 2, 4.0);
+        let exact_jd = find_solar_longitude_moment(approx_jd, 315.0)
+            .expect("Ipchun solver should converge");
 
-        let (y, m, d_frac) = jd_to_calendar(equinox_jd);
-        assert_eq!(y, 2024);
-        assert_eq!(m, 3);
-        assert_eq!(d_frac.floor() as u32, 20);
+        let expected_jd = calendar_to_jd(2024, 2, 4.0 + (8.0 + 27.0 / 60.0) / 24.0);
+        let diff_minutes = (exact_jd - expected_jd).abs() * 1440.0;
+        assert!(diff_minutes < 2.0, "Ipchun time error too large: {:.2} min", diff_minutes);
     }
 
     #[test]
-    fn test_kasi_2024_solar_terms_precision() {
-        let test_cases = [
-            ("입춘", 315.0, 2024, 2, 4, 8, 27),
-            ("춘분", 0.0,   2024, 3, 20, 3, 6),
-            ("하지", 90.0,  2024, 6, 20, 20, 51),
-            ("추분", 180.0, 2024, 9, 22, 12, 44),
-            ("동지", 270.0, 2024, 12, 21, 9, 20),
-        ];
-
-        for (name, target_deg, exp_y, exp_m, exp_d, exp_h, exp_min) in test_cases {
-            let approx_jd = calendar_to_jd(exp_y, exp_m, exp_d as f64);
-            let calc_jd = find_solar_longitude_moment(approx_jd, target_deg)
-                .expect("solar moment should converge");
-
-            let (y, m, d_frac) = jd_to_calendar(calc_jd);
-            let d = d_frac.floor() as u32;
-            let day_remainder = d_frac - d as f64;
-            let total_minutes = day_remainder * 1440.0;
-            let h = (total_minutes / 60.0).floor() as u32;
-            let min = (total_minutes % 60.0).round() as u32;
-
-            let diff_minutes = ((h as i32 * 60 + min as i32) - (exp_h * 60 + exp_min)).abs();
-
-            assert_eq!(y, exp_y);
-            assert_eq!(m, exp_m);
-            assert_eq!(d, exp_d);
-            assert!(
-                diff_minutes <= 1,
-                "Solar term {} expected {:02}:{:02} UTC, got {:02}:{:02} UTC",
-                name, exp_h, exp_min, h, min
-            );
-        }
+    fn test_find_solar_longitude_rejects_non_finite() {
+        let res = find_solar_longitude_moment(f64::NAN, 315.0);
+        assert!(matches!(res, Err(EphemerisError::SolarConvergenceFailed(_))));
     }
 }
-

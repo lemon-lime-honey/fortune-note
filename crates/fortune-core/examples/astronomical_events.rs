@@ -677,15 +677,17 @@ fn build_exported_event(
 ) -> ExportedEvent {
     let utc = ResolvedUtcTime::from_jd(event.jd_ut1);
     let ephem = compute_ephemeris(
-        utc.year,
-        utc.month,
-        utc.day,
-        utc.hour,
-        utc.minute,
-        utc.second,
-        lat,
-        lon,
-    ).expect("Ephemeris computation failed");
+        fortune_core::CalendarDateTime::new(
+            utc.year,
+            utc.month,
+            utc.day,
+            utc.hour,
+            utc.minute,
+            utc.second,
+        ),
+        fortune_core::GeoCoordinate::new(lat, lon),
+    )
+    .expect("Ephemeris computation failed");
 
     let vedic = calculate_vedic(&ephem, lat);
     let raw_lagna_deg = vedic.lagna_sidereal % 30.0;

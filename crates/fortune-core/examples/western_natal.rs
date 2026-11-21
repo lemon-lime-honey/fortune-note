@@ -188,7 +188,7 @@ fn main() {
         println!("  Ascendant  (ASC) : {}", format_deg(asc));
         println!("  Midheaven  (MC)  : {}  [Located in House {:02}]", format_deg(mc), mc_h);
         println!("  Descendant (DSC) : {}", format_deg(dsc));
-        println!("  Immum Coeli(IC)  : {}", format_deg(ic));
+        println!("  Imum Coeli (IC)  : {}", format_deg(ic));
         println!("  Houses (Sign = House):");
         for (i, cusp) in chart.house_cusps.iter().enumerate() {
             let sign_idx = (cusp / 30.0).floor() as usize % 12;
@@ -207,7 +207,7 @@ fn main() {
         println!("  Ascendant  (ASC) : {}", format_deg(asc));
         println!("  Midheaven  (MC)  : {}", format_deg(mc));
         println!("  Descendant (DSC) : {}", format_deg(dsc));
-        println!("  Immum Coeli(IC)  : {}", format_deg(ic));
+        println!("  Imum Coeli (IC)  : {}", format_deg(ic));
         println!("  Cusps:");
         for (i, cusp) in chart.house_cusps.iter().enumerate() {
             println!("    House {:02} : {}", i + 1, format_deg(*cusp));

@@ -37,22 +37,8 @@ pub struct CreateProfileParams {
     pub notes: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateProfileParams {
-    pub name: String,
-    pub gender: String,
-    pub birth_year: i32,
-    pub birth_month: u32,
-    pub birth_day: u32,
-    pub birth_hour: u32,
-    pub birth_minute: u32,
-    #[serde(default)]
-    pub birth_second: f64,
-    pub latitude: f64,
-    pub longitude: f64,
-    pub timezone_id: Option<String>,
-    pub notes: Option<String>,
-}
+/// Update payload shares the exact schema of `CreateProfileParams`.
+pub type UpdateProfileParams = CreateProfileParams;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HoraryQuestion {
@@ -93,23 +79,8 @@ pub struct CreateHoraryParams {
     pub result_notes: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateHoraryParams {
-    pub title: String,
-    pub category: String,
-    pub question_text: String,
-    pub query_year: i32,
-    pub query_month: u32,
-    pub query_day: u32,
-    pub query_hour: u32,
-    pub query_minute: u32,
-    pub query_second: f64,
-    pub latitude: f64,
-    pub longitude: f64,
-    pub timezone_id: Option<String>,
-    pub querent_profile_id: Option<String>,
-    pub result_notes: Option<String>,
-}
+/// Update payload shares the exact schema of `CreateHoraryParams`.
+pub type UpdateHoraryParams = CreateHoraryParams;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BackupData {
